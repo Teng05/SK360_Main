@@ -8,10 +8,16 @@ use App\Http\Controllers\sk_pres\HomeController;
 use App\Http\Controllers\sk_pres\MeetingsController;
 use App\Http\Controllers\sk_pres\ModuleController;
 use App\Http\Controllers\sk_pres\PlaceholderController;
+use App\Http\Controllers\sk_pres\ChatController as SkPresidentChatController;
 use App\Http\Controllers\sk_pres\RankingController as SkPresidentRankingController;
 use App\Http\Controllers\sk_pres\LeadershipController as SkPresidentLeadershipController; 
+use App\Http\Controllers\sk_pres\ArchiveController as SkPresidentArchiveController;
+use App\Http\Controllers\sk_pres\UserManagementController as SkPresidentUserManagementController;
 
 use App\Http\Controllers\sk_chairman\RankingController as SkChairmanRankingController;
+use App\Http\Controllers\sk_chairman\HomeController as SkChairmanHomeController;
+use App\Http\Controllers\sk_chairman\ChatController as SkChairmanChatController;
+use App\Http\Controllers\sk_chairman\PlaceholderController as SkChairmanPlaceholderController;
 use App\Http\Controllers\sk_secretary\RankingController as SkSecretaryRankingController;
 
 use App\Http\Controllers\Youth\AnnouncementController as YouthAnnouncementController;
@@ -72,9 +78,8 @@ Route::middleware('auth')->prefix('sk_pres')->name('sk_pres.')->group(function (
     Route::post('/calendar', [CalendarController::class, 'store'])->name('calendar.store');
 
     // 💬 CHAT (placeholder)
-    Route::get('/chat', fn (PlaceholderController $controller) =>
-        $controller->show('Chat', 'The chat page has not been built yet.')
-    )->name('chat');
+    Route::get('/chat', [SkPresidentChatController::class, 'index'])->name('chat');
+    Route::get('/chat/users', [SkPresidentChatController::class, 'searchUsers'])->name('chat.users');
 
     /*
     |--------------------------------------------------------------------------
@@ -97,13 +102,10 @@ Route::middleware('auth')->prefix('sk_pres')->name('sk_pres.')->group(function (
     // ✅ FIXED LEADERSHIP ROUTE
     Route::get('/leadership', [SkPresidentLeadershipController::class, 'index'])->name('leadership');
 
-    Route::get('/archive', fn (PlaceholderController $controller) =>
-        $controller->show('Archive', 'The archive page has not been built yet.')
-    )->name('archive');
+    Route::get('/archive', [SkPresidentArchiveController::class, 'index'])->name('archive');
 
-    Route::get('/user-management', fn (PlaceholderController $controller) =>
-        $controller->show('User Management', 'The user management page has not been built yet.')
-    )->name('user-management');
+    Route::get('/user-management', [SkPresidentUserManagementController::class, 'index'])->name('user-management');
+    Route::post('/user-management/officials', [SkPresidentUserManagementController::class, 'storeOfficial'])->name('user-management.store-official');
 });
 
 
@@ -121,8 +123,31 @@ Route::middleware('auth')->get('/youth/profile', [YouthProfileController::class,
 Route::middleware('auth')->post('/youth/profile', [YouthProfileController::class, 'update'])->name('youth.profile.update');
 Route::middleware('auth')->post('/youth/profile/password', [YouthProfileController::class, 'updatePassword'])->name('youth.profile.password');
 
-Route::view('/sk_chairman/home', 'sk_chairman.home')->name('sk_chairman.home');
+Route::middleware('auth')->get('/sk_chairman/home', [SkChairmanHomeController::class, 'index'])->name('sk_chairman.home');
 Route::view('/sk_secretary/home', 'sk_secretary.home')->name('sk_secretary.home');
 
+Route::middleware('auth')->get('/sk_chairman/reports', fn (SkChairmanPlaceholderController $controller) =>
+    $controller->show('Reports', 'The reports page for SK Chairman has not been built yet.')
+)->name('sk_chairman.reports');
+Route::middleware('auth')->get('/sk_chairman/budget', fn (SkChairmanPlaceholderController $controller) =>
+    $controller->show('Budget', 'The budget page for SK Chairman has not been built yet.')
+)->name('sk_chairman.budget');
+Route::middleware('auth')->get('/sk_chairman/announcements', fn (SkChairmanPlaceholderController $controller) =>
+    $controller->show('Announcements', 'The announcements page for SK Chairman has not been built yet.')
+)->name('sk_chairman.announcements');
+Route::middleware('auth')->get('/sk_chairman/calendar', fn (SkChairmanPlaceholderController $controller) =>
+    $controller->show('Calendar', 'The calendar page for SK Chairman has not been built yet.')
+)->name('sk_chairman.calendar');
+Route::middleware('auth')->get('/sk_chairman/chat', [SkChairmanChatController::class, 'index'])->name('sk_chairman.chat');
+Route::middleware('auth')->get('/sk_chairman/chat/users', [SkChairmanChatController::class, 'searchUsers'])->name('sk_chairman.chat.users');
+Route::middleware('auth')->get('/sk_chairman/meetings', fn (SkChairmanPlaceholderController $controller) =>
+    $controller->show('Meetings', 'The meetings page for SK Chairman has not been built yet.')
+)->name('sk_chairman.meetings');
 Route::middleware('auth')->get('/sk_chairman/rankings', [SkChairmanRankingController::class, 'index'])->name('sk_chairman.rankings');
+Route::middleware('auth')->get('/sk_chairman/leadership', fn (SkChairmanPlaceholderController $controller) =>
+    $controller->show('Leadership', 'The leadership page for SK Chairman has not been built yet.')
+)->name('sk_chairman.leadership');
+Route::middleware('auth')->get('/sk_chairman/archive', fn (SkChairmanPlaceholderController $controller) =>
+    $controller->show('Archive', 'The archive page for SK Chairman has not been built yet.')
+)->name('sk_chairman.archive');
 Route::middleware('auth')->get('/sk_secretary/rankings', [SkSecretaryRankingController::class, 'index'])->name('sk_secretary.rankings');

@@ -2,30 +2,30 @@
 
 namespace App\Http\Controllers\sk_chairman;
 
-use App\Http\Controllers\Concerns\BuildsRankingsData;
 use App\Http\Controllers\Controller;
 use Illuminate\View\View;
 
-class RankingController extends Controller
+class HomeController extends Controller
 {
-    use BuildsRankingsData;
-
     public function index(): View
     {
         abort_unless(auth()->check() && auth()->user()->role === 'sk_chairman', 403);
 
         $user = auth()->user();
         $fullName = trim(($user->first_name ?? '') . ' ' . ($user->last_name ?? '')) ?: 'User';
-        $leaderboard = $this->rankingsLeaderboard();
 
-        return view('sk_chairman.rankings', [
+        $summaryCards = [
+            ['value' => '0', 'label' => 'Reports Submitted', 'classes' => 'bg-red-500 text-white'],
+            ['value' => '0', 'label' => 'Budget Files', 'classes' => 'bg-blue-500 text-white'],
+            ['value' => '0', 'label' => 'Announcements', 'classes' => 'bg-yellow-500 text-white'],
+            ['value' => '0', 'label' => 'Upcoming Meetings', 'classes' => 'bg-green-500 text-white'],
+        ];
+
+        return view('sk_chairman.home', [
             'fullName' => $fullName,
-            'roleLabel' => 'SK Chairman',
             'menuItems' => $this->menuItems(),
             'currentUrl' => url()->current(),
-            'topRankings' => $this->topRankings($leaderboard),
-            'leaderboard' => $leaderboard,
-            'latestPeriod' => $this->latestRankingPeriod(),
+            'summaryCards' => $summaryCards,
         ]);
     }
 
