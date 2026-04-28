@@ -1,0 +1,180 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: Arial;
+}
+
+body {
+    height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background: #e6eaef;
+}
+
+.container {
+    width: 900px;
+    display: flex;
+    background: white;
+    border-radius: 20px;
+    overflow: hidden;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+}
+
+/* LEFT PANEL */
+
+.left {
+    width: 45%;
+    background: #d90f1f;
+    color: white;
+    padding: 40px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.left h2 {
+    margin-bottom: 20px;
+}
+
+.left p {
+    font-size: 14px;
+    margin-bottom: 30px;
+}
+
+.steps {
+    margin-top: 20px;
+}
+
+.step {
+    display: flex;
+    align-items: center;
+    margin-bottom: 15px;
+}
+
+.circle {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background: white;
+    color: #d90f1f;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    margin-right: 10px;
+}
+
+/* RIGHT PANEL */
+
+.right {
+    width: 55%;
+    padding: 40px;
+}
+
+.right h2 {
+    margin-bottom: 10px;
+}
+
+.subtitle {
+    font-size: 13px;
+    color: gray;
+    margin-bottom: 25px;
+}
+
+form {
+    display: flex;
+    flex-direction: column;
+}
+
+label {
+    font-size: 14px;
+    margin-top: 10px;
+}
+
+input,
+select {
+    padding: 10px;
+    border-radius: 6px;
+    border: 1px solid #ddd;
+    margin-top: 5px;
+}
+
+button {
+    margin-top: 20px;
+    padding: 12px;
+    border: none;
+    background: #d90f1f;
+    color: white;
+    border-radius: 6px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+button:hover {
+    background: #b80d1a;
+}
+
+.btn-group {
+    display: flex;
+    gap: 10px;
+}
+
+.back-btn {
+    background: gray;
+}
+
+.hidden {
+    display: none;
+}
+
+.notice {
+    font-size: 12px;
+    color: #555;
+    margin-top: 10px;
+}
+hr{
+margin:25px 0;
+border:0;
+border-top:1px solid rgba(255,255,255,0.4);
+}
+
+.signin-link{
+font-size:14px;
+margin-top: 20px;
+}
+
+.signin-link a{
+color:#ffd54f;
+font-weight:bold;
+text-decoration:none;
+
+}
+
+.signin-link p {
+    display: inline;
+    margin-right: 5px; 
+}
+
+.signin-link a {
+    display: inline;
+}
+
+.signin-link a:hover{
+    text-decoration:underline;
+}
+
+.back {
+    font-size: 14px;
+    margin-bottom: 40px;
+    cursor: pointer;
+    opacity: 0.8;
+    width: 100%;
+}
+
+.back a {
+    color: white;
+    text-decoration: none;
+   
+}
