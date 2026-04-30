@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\sk_pres;
 
 use App\Http\Controllers\Controller;
+use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -37,31 +38,77 @@ class CalendarController extends Controller
             ->orderBy('start_datetime')
             ->get();
 
-        $upcomingEvents = DB::table('events')
-            ->where('start_datetime', '>=', now())
-            ->orderBy('start_datetime')
-            ->limit(5)
+        $slotEvents = DB::table('submission_slots')
+            ->where('status', 'open')
+            ->orderBy('start_date')
             ->get();
 
-        $calendarEvents = $events->map(fn ($event) => [
-            'id' => $event->event_id,
-            'title' => $event->title,
-            'start' => $event->start_datetime,
-            'end' => $event->end_datetime,
-        ]);
+        $upcomingEvents = DB::table('events')
+            ->where('end_datetime', '>=', now())
+            ->orderBy('start_datetime')
+            ->limit(5)
+            ->get()
+            ->map(function ($event) {
+                $event->type_label = match ($event->event_type) {
+                    'meeting' => 'Meeting',
+                    'program' => 'Event/Program',
+                    'deadline' => 'Deadline',
+                    default => 'Other Activity',
+                };
+
+                return $event;
+            });
+
+        $upcomingSlots = $slotEvents
+            ->filter(fn ($slot) => Carbon::parse($slot->end_date)->endOfDay()->greaterThanOrEqualTo(now()))
+            ->take(5)
+            ->map(function ($slot) {
+                $slot->start_datetime = Carbon::parse($slot->start_date)->startOfDay();
+                $slot->event_type = $slot->submission_type === 'budget_report' ? 'budget_slot' : 'report_slot';
+                $slot->type_label = $slot->submission_type === 'budget_report' ? 'Budget Slot' : 'Report Slot';
+
+                return $slot;
+            });
+
+        $calendarEvents = $events->map(function ($event) {
+            return [
+                'id' => $event->event_id,
+                'title' => $event->title,
+                'start' => $event->start_datetime,
+                'end' => $event->end_datetime,
+                'className' => match ($event->event_type) {
+                    'meeting' => 'bg-blue-700',
+                    'program' => 'bg-green-600',
+                    'deadline' => 'bg-red-600',
+                    default => 'bg-fuchsia-500',
+                },
+            ];
+        })->merge($slotEvents->map(function ($slot) {
+            return [
+                'id' => 'slot-'.$slot->slot_id,
+                'title' => $slot->title,
+                'start' => $slot->start_date,
+                'end' => $slot->end_date,
+                'className' => $slot->submission_type === 'budget_report' ? 'bg-amber-500' : 'bg-indigo-600',
+            ];
+        }))->values();
 
         $typeColors = [
             'meeting' => 'bg-blue-700',
             'program' => 'bg-green-600',
             'deadline' => 'bg-red-600',
             'other' => 'bg-fuchsia-500',
+            'report_slot' => 'bg-indigo-600',
+            'budget_slot' => 'bg-amber-500',
         ];
 
         $legendItems = [
             ['bg-blue-700', 'Meeting'],
-            ['bg-green-600', 'Event'],
+            ['bg-green-600', 'Event/Program'],
             ['bg-red-600', 'Deadline'],
-            ['bg-fuchsia-500', 'Training'],
+            ['bg-indigo-600', 'Report Slot'],
+            ['bg-amber-500', 'Budget Slot'],
+            ['bg-fuchsia-500', 'Other Activities'],
         ];
 
         return view('sk_pres.calendar', [
@@ -69,7 +116,7 @@ class CalendarController extends Controller
             'menuItems' => $menuItems,
             'currentUrl' => url()->current(),
             'calendarEvents' => $calendarEvents,
-            'upcomingEvents' => $upcomingEvents,
+            'upcomingEvents' => $upcomingEvents->concat($upcomingSlots)->sortBy('start_datetime')->take(5)->values(),
             'typeColors' => $typeColors,
             'legendItems' => $legendItems,
         ]);

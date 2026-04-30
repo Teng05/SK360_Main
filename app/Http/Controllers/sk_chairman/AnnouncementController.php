@@ -3,33 +3,48 @@
 namespace App\Http\Controllers\sk_chairman;
 
 use App\Http\Controllers\Controller;
+use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
-class HomeController extends Controller
+class AnnouncementController extends Controller
 {
     public function index(): View
     {
         abort_unless(auth()->check() && auth()->user()->role === 'sk_chairman', 403);
 
         $user = auth()->user();
-        $fullName = trim(($user->first_name ?? '') . ' ' . ($user->last_name ?? '')) ?: 'User';
+        $fullName = trim(($user->first_name ?? '').' '.($user->last_name ?? '')) ?: 'User';
         $barangayName = $user->barangay->barangay_name ?? 'Barangay';
 
-        $summaryCards = [
-            ['value' => '0', 'label' => 'Programs', 'classes' => 'bg-blue-500 text-white'],
-            ['value' => '0', 'label' => 'Ongoing Events', 'classes' => 'bg-yellow-500 text-white'],
-            ['value' => '#0', 'label' => 'Your Ranking', 'classes' => 'bg-green-500 text-white'],
-            ['value' => '0', 'label' => 'Pending Tasks', 'classes' => 'bg-red-500 text-white'],
-        ];
+        $announcements = DB::table('announcements as a')
+            ->leftJoin('users as u', 'a.user_id', '=', 'u.user_id')
+            ->select(
+                'a.announcement_id',
+                'a.title',
+                'a.content',
+                'a.visibility',
+                'a.created_at',
+                DB::raw("COALESCE(CONCAT(u.first_name, ' ', u.last_name), 'SK Federation President') as author_name")
+            )
+            ->where('a.visibility', 'public')
+            ->orderByDesc('a.created_at')
+            ->get()
+            ->map(function ($announcement) {
+                $announcement->priority = 'Low';
+                $announcement->priority_badge = 'bg-blue-100 text-blue-600';
+                $announcement->visibility_label = $announcement->visibility === 'officials_only' ? 'Officials Only' : 'Public';
+                $announcement->views = 0;
 
-        return view('sk_chairman.home', [
+                return $announcement;
+            });
+
+        return view('sk_chairman.announcements', [
             'fullName' => $fullName,
             'barangayName' => $barangayName,
             'initials' => strtoupper(substr($user->first_name ?? 'S', 0, 1).substr($user->last_name ?? 'K', 0, 1)),
-            'firstName' => $user->first_name ?? 'SK Chairman',
             'menuItems' => $this->menuItems(),
             'currentUrl' => url()->current(),
-            'summaryCards' => $summaryCards,
+            'announcements' => $announcements,
         ]);
     }
 

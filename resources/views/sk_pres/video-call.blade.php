@@ -16,7 +16,7 @@
 @section('content')
 <div class="relative h-screen w-screen overflow-hidden bg-[#111111] text-white">
     <div class="absolute left-4 top-4 z-30 flex items-center gap-3 rounded-2xl bg-slate-900/85 px-4 py-3 shadow-lg backdrop-blur">
-        <a href="{{ route('sk_pres.meetings') }}" class="rounded-lg bg-white/10 px-3 py-2 text-sm font-medium hover:bg-white/20">Back</a>
+        <a href="{{ $backRoute ?? route('sk_pres.meetings') }}" class="rounded-lg bg-white/10 px-3 py-2 text-sm font-medium hover:bg-white/20">Back</a>
         <div>
             <p class="text-sm font-semibold">{{ $meeting->title }}</p>
             <p class="text-xs text-slate-300">{{ $meeting->display_datetime }}</p>
@@ -82,7 +82,7 @@
 
 @push('scripts')
 <script>
-    const tokenUrl = @json(route('sk_pres.meetings.agora.token', $meeting->meeting_id));
+    const tokenUrl = @json($tokenRoute ?? route('sk_pres.meetings.agora.token', $meeting->meeting_id));
     const meetingChannel = @json($channelName);
     const statusBar = document.getElementById('statusBar');
     const statusText = document.getElementById('statusText');
@@ -293,7 +293,7 @@
         await stopScreenShare();
         for (const track of localTracks) { track.stop(); track.close(); }
         if (client) await client.leave();
-        window.location.href = @json(route('sk_pres.meetings'));
+        window.location.href = @json($backRoute ?? route('sk_pres.meetings'));
     });
 
     joinMeeting();

@@ -135,9 +135,11 @@
                             <label class="block text-lg font-semibold text-gray-900 mb-2">
                                 Submission Type
                             </label>
-                            <input type="text" id="submissionType" name="submission_type"
-                                class="w-full h-14 px-4 rounded-xl border border-red-300 bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-400"
-                                value="{{ old('submission_type') }}">
+                            <select id="submissionType" name="submission_type"
+                                class="w-full h-14 px-4 rounded-xl border border-red-300 bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-400">
+                                <option value="accomplishment_report" @selected(old('submission_type') === 'accomplishment_report')>Accomplishment Report</option>
+                                <option value="budget_report" @selected(old('submission_type') === 'budget_report')>Budget Report</option>
+                            </select>
                         </div>
 
                         <div>
@@ -219,7 +221,7 @@
                     <div class="bg-white rounded-2xl border border-green-400 p-6 min-h-[280px]">
                         <div class="flex justify-between items-start mb-5">
                             <div>
-                                <p class="text-xs text-gray-400">{{ $slot->submission_type }}</p>
+                                <p class="text-xs text-gray-400">{{ str_replace('_', ' ', $slot->submission_type) }}</p>
                                 <h4 class="text-lg font-medium">{{ $slot->title }}</h4>
                                 <p class="text-sm text-gray-400">{{ $slot->description }}</p>
                             </div>

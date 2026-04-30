@@ -165,10 +165,10 @@
                             <span class="w-2.5 h-2.5 mt-2 rounded-full {{ $typeColors[$event->event_type] ?? 'bg-gray-500' }}"></span>
                             <div>
                                 <p class="text-sm font-medium text-gray-800">{{ $event->title }}</p>
-                                <p class="text-xs text-gray-400">{{ $event->start_datetime }}</p>
+                                <p class="text-xs text-gray-400">{{ \Carbon\Carbon::parse($event->start_datetime)->format('M d, Y h:i A') }}</p>
                             </div>
                         </div>
-                        <span class="text-xs text-gray-500">{{ $event->event_type }}</span>
+                        <span class="text-xs text-gray-500">{{ $event->type_label ?? $event->event_type }}</span>
                     </div>
                 @empty
                     <div class="text-center text-gray-400 py-6">No upcoming events yet.</div>

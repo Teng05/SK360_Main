@@ -1,13 +1,22 @@
 @extends('layouts.app')
 
-@section('title', 'SK Chairman Dashboard')
+@section('title', 'SK Chairman Calendar')
 
 @section('page_css')
     <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js"></script>
+    <style>
+        .fc .fc-toolbar-title { font-size: 1.1rem; font-weight: 700; color: #1f2937; text-transform: uppercase; }
+        .fc .fc-button { background: #ef4444 !important; border: none !important; color: #fff !important; font-size: 0.8rem !important; text-transform: uppercase; font-weight: bold; }
+        .fc .fc-button:hover { background: #dc2626 !important; }
+        .fc-event { border: none !important; padding: 3px 5px !important; border-radius: 4px !important; font-size: 10px !important; cursor: pointer; }
+        .fc .fc-daygrid-day-number { color: #6b7280; font-size: 12px; text-decoration: none !important; }
+    </style>
 @endsection
 
 @section('content')
-<div class="flex h-screen bg-[#f1f5f9] overflow-hidden">
+<div class="flex h-screen bg-gray-100 overflow-hidden">
     <div class="w-64 bg-red-600 text-white flex flex-col p-3 overflow-y-auto">
         <div class="flex items-center gap-2 mb-3">
             <img src="https://cdn-icons-png.flaticon.com/512/3135/3135715.png" class="w-7 h-7" alt="logo">
@@ -15,7 +24,7 @@
         </div>
 
         <div class="bg-red-500 rounded-lg p-2 flex items-center gap-2 mb-3 shadow text-xs">
-            <div class="bg-yellow-400 text-red-600 p-1 rounded-full text-sm">👤</div>
+            <div class="bg-yellow-400 text-red-600 p-1 rounded-full text-sm">&#128100;</div>
             <div>
                 <p class="font-semibold text-xs">SK Chairman</p>
                 <p class="text-xs opacity-80">Active Role</p>
@@ -74,54 +83,53 @@
             </div>
         </div>
 
-        <div class="p-6 overflow-y-auto bg-[#f8fafc]">
-            <h1 class="text-2xl font-bold mb-4">Good morning, {{ $firstName }}!</h1>
-
-            <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
-                @foreach ($summaryCards as $card)
-                    <div class="{{ $card['classes'] }} p-5 rounded-xl shadow">
-                        <h2 class="text-2xl font-bold">{{ $card['value'] }}</h2>
-                        <p class="text-sm">{{ $card['label'] }}</p>
-                    </div>
-                @endforeach
+        <div class="p-8 overflow-y-auto h-full bg-gray-50">
+            <div class="mb-8">
+                <h1 class="text-3xl font-bold text-gray-800 uppercase">Event Calendar</h1>
+                <p class="text-gray-500">Official schedule of activities and programs</p>
             </div>
 
-            <div class="bg-white p-5 rounded-xl shadow mb-6">
-                <h2 class="font-semibold mb-3">Quick Actions</h2>
-
-                <div class="flex gap-3 flex-wrap">
-                    <a href="{{ route('sk_chairman.reports') }}" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg">
-                        Submit Report
-                    </a>
-
-                    <a href="{{ route('sk_chairman.budget') }}" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg">
-                        Upload Files
-                    </a>
-
-                    <a href="{{ route('sk_chairman.meetings') }}" class="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-lg">
-                        Join Meeting
-                    </a>
-                </div>
-            </div>
-
-            <div class="bg-white p-6 rounded-xl shadow">
-                <div class="flex justify-between items-center mb-4">
-                    <h2 class="font-semibold">Activity Feed</h2>
-                    <span class="text-xs text-gray-400">Live</span>
+            <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+                <div class="lg:col-span-3 bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                    <div id="calendar"></div>
                 </div>
 
-                <div class="border rounded-lg p-4 mb-4">
-                    <textarea class="w-full border rounded p-3 resize-none focus:outline-none focus:ring-2 focus:ring-red-400" rows="3" placeholder="Share updates with SK..."></textarea>
-
-                    <div class="flex justify-end mt-3">
-                        <button type="button" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg">
-                            Post
-                        </button>
+                <div class="space-y-6">
+                    <div class="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm">
+                        <h3 class="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4">Legend</h3>
+                        <div class="space-y-3">
+                            @foreach ($legendItems as [$color, $label])
+                                <div class="flex items-center gap-3">
+                                    <span class="w-3 h-3 rounded-full {{ $color }}"></span>
+                                    <span class="text-xs font-bold text-gray-600">{{ $label }}</span>
+                                </div>
+                            @endforeach
+                        </div>
                     </div>
-                </div>
 
-                <div class="text-center text-gray-400 py-10">
-                    No activity yet. Stay engaged
+                    <div class="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm">
+                        <h3 class="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4">Upcoming Agendas</h3>
+                        <div class="space-y-4">
+                            @forelse ($upcomingEvents as $event)
+                                <div class="border-l-4 border-red-500 pl-3">
+                                    <div class="flex items-center justify-between gap-2">
+                                        <p class="text-[11px] font-black text-gray-800 uppercase leading-none">{{ $event->title }}</p>
+                                        <span class="rounded-full px-2 py-1 text-[8px] font-bold uppercase {{ $event->type_badge }}">
+                                            {{ $event->type_label }}
+                                        </span>
+                                    </div>
+                                    <p class="text-[9px] text-gray-500 mt-2">
+                                        {{ \Carbon\Carbon::parse($event->start_datetime)->format('M d, Y • h:i A') }}
+                                    </p>
+                                    <p class="text-[9px] text-gray-400 mt-1">
+                                        {{ $event->location ?: 'No location provided' }}
+                                    </p>
+                                </div>
+                            @empty
+                                <p class="text-xs text-gray-400 italic">No scheduled events.</p>
+                            @endforelse
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -156,6 +164,21 @@
         if (!userMenuBtn.contains(e.target) && !userDropdown.contains(e.target)) {
             userDropdown.classList.add('hidden');
         }
+    });
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const calendarEl = document.getElementById('calendar');
+        const calendar = new FullCalendar.Calendar(calendarEl, {
+            initialView: 'dayGridMonth',
+            height: 'auto',
+            headerToolbar: { left: 'prev,next today', center: 'title', right: '' },
+            events: @json($calendarEvents),
+            eventClick: (info) => {
+                alert('Event: ' + info.event.title);
+            }
+        });
+
+        calendar.render();
     });
 </script>
 @endpush

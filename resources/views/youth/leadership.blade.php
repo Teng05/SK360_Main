@@ -19,7 +19,7 @@
             <div class="bg-yellow-400 text-red-600 p-1 rounded-full font-bold">&#128100;</div>
             <div>
                 <p class="font-semibold">{{ $userName }}</p>
-                <p class="opacity-80 text-[10px]">Youth Member</p>
+                <p class="opacity-80 text-[10px]">{{ $roleLabel ?? 'Youth Member' }}</p>
             </div>
         </div>
 
@@ -51,9 +51,11 @@
                         <div class="px-4 py-3 border-b border-gray-50">
                             <p class="text-[10px] text-gray-400 uppercase font-black tracking-widest">Account Settings</p>
                         </div>
-                        <a href="{{ route('youth.profile') }}" class="block px-4 py-3 text-gray-700 hover:bg-gray-50 text-xs flex items-center gap-2 transition">
-                            <span>&#128100;</span> View Profile
-                        </a>
+                        @if (!empty($profileRoute))
+                            <a href="{{ $profileRoute }}" class="block px-4 py-3 text-gray-700 hover:bg-gray-50 text-xs flex items-center gap-2 transition">
+                                <span>&#128100;</span> View Profile
+                            </a>
+                        @endif
                         <form action="{{ route('logout') }}" method="POST">
                             @csrf
                             <button type="submit" class="w-full text-left px-4 py-3 text-red-600 hover:bg-red-50 text-xs font-bold flex items-center gap-2 transition">

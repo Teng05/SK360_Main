@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'SK Secretary Dashboard')
+@section('title', 'SK Chairman Announcements')
 
 @section('page_css')
     <script src="https://cdn.tailwindcss.com"></script>
@@ -11,27 +11,22 @@
     <div class="w-64 bg-red-600 text-white flex flex-col p-3 overflow-y-auto">
         <div class="flex items-center gap-2 mb-3">
             <img src="https://cdn-icons-png.flaticon.com/512/3135/3135715.png" class="w-7 h-7" alt="logo">
-            <h2 class="text-base font-bold">SK 360&deg;</h2>
+            <h2 class="text-base font-bold text-white">SK 360&deg;</h2>
         </div>
 
         <div class="bg-red-500 rounded-lg p-2 flex items-center gap-2 mb-3 shadow text-xs">
-            <div class="bg-yellow-400 text-red-600 h-9 w-9 rounded-full flex items-center justify-center font-bold border-2 border-red-400 overflow-hidden shadow-inner flex-shrink-0">
-                <span class="text-xs">{{ $initials }}</span>
-            </div>
-
-            <div class="overflow-hidden">
-                <p class="font-semibold text-[11px] truncate">{{ $fullName }}</p>
-                <p class="text-[9px] opacity-90 uppercase font-black tracking-tighter truncate">
-                    SK Secretary - {{ $barangayName }}
-                </p>
+            <div class="bg-yellow-400 text-red-600 p-1 rounded-full text-sm">👤</div>
+            <div>
+                <p class="font-semibold text-xs">SK Chairman</p>
+                <p class="text-xs opacity-80">Active Role</p>
             </div>
         </div>
 
         <nav class="space-y-1 text-xs">
             @foreach ($menuItems as $item)
-                @php $isActive = $item['link'] === $currentUrl; @endphp
-                <a href="{{ $item['link'] }}" class="flex items-center gap-2 {{ $isActive ? 'bg-red-500' : 'hover:bg-red-500' }} p-2 rounded-lg">
-                    <span class="{{ $isActive ? 'bg-yellow-400 text-red-600' : 'bg-red-400' }} p-1 rounded text-sm">{{ $item['icon'] }}</span>
+                @php $isActive = $currentUrl === $item['link']; @endphp
+                <a href="{{ $item['link'] }}" class="flex items-center gap-2 p-2 rounded-lg {{ $isActive ? 'bg-red-500' : 'hover:bg-red-500' }}">
+                    <span class="{{ $isActive ? 'bg-yellow-400 text-red-600' : 'bg-red-400' }} p-1 rounded">{!! $item['icon'] !!}</span>
                     <span class="{{ $isActive ? 'text-yellow-300 font-semibold' : '' }}">{{ $item['label'] }}</span>
                 </a>
             @endforeach
@@ -58,11 +53,7 @@
 
                 <div class="relative">
                     <button id="userMenuBtn" type="button" class="flex items-center gap-2 hover:bg-red-500 px-3 py-2 rounded-lg transition">
-                        <div class="w-7 h-7 rounded-full bg-yellow-400 text-red-600 flex items-center justify-center text-[10px] font-black border border-white/50 overflow-hidden flex-shrink-0">
-                            {{ $initials }}
-                        </div>
-                        <span class="font-semibold text-sm">{{ $fullName }}</span>
-                        <span class="text-[10px]">▼</span>
+                        <span class="font-semibold">{{ $fullName }}</span>
                     </button>
 
                     <div id="userDropdown" class="hidden absolute right-0 mt-3 w-64 bg-white rounded-2xl shadow-xl border overflow-hidden z-50">
@@ -83,55 +74,43 @@
             </div>
         </div>
 
-        <div class="p-6 overflow-y-auto">
-            <h1 class="text-2xl font-bold mb-4">Good morning, {{ $firstName }}!</h1>
+        <div class="p-8 overflow-y-auto">
+            <h1 class="text-3xl font-bold text-gray-800">Announcements</h1>
+            <p class="text-gray-500 mb-8">Official communications and updates for SK federation</p>
 
-            <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
-                @foreach ($summaryCards as $card)
-                    <div class="{{ $card['classes'] }} p-5 rounded-xl shadow">
-                        <h2 class="text-2xl font-bold">{{ $card['value'] }}</h2>
-                        <p class="text-sm">{{ $card['label'] }}</p>
+            <div class="max-w-4xl space-y-6">
+                @forelse ($announcements as $row)
+                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition relative">
+                        <div class="absolute top-4 right-6 flex gap-2">
+                            <span class="px-3 py-1 rounded-full text-[10px] font-bold uppercase {{ $row->priority_badge }}">
+                                {{ $row->priority }}
+                            </span>
+                            <span class="bg-gray-100 text-gray-500 px-3 py-1 rounded-full text-[10px] font-bold uppercase">
+                                {{ $row->visibility_label }}
+                            </span>
+                        </div>
+
+                        <div class="flex items-start gap-4">
+                            <div class="text-red-500 text-xl mt-1">&#128226;</div>
+                            <div class="flex-1">
+                                <h2 class="text-xl font-bold text-gray-800">{{ $row->title }}</h2>
+                                <p class="text-xs text-gray-400 font-medium mb-4">
+                                    By {{ trim($row->author_name) ?: 'SK Federation President' }} &bull; {{ \Carbon\Carbon::parse($row->created_at)->format('Y-m-d') }}
+                                </p>
+
+                                <p class="text-gray-600 text-sm leading-relaxed mb-4">
+                                    {!! nl2br(e($row->content)) !!}
+                                </p>
+
+                                <div class="flex items-center text-gray-400 text-[10px] font-bold">
+                                    <span>{{ $row->views }} views</span>
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                @endforeach
-            </div>
-
-            <div class="bg-white p-5 rounded-xl shadow mb-6">
-                <h2 class="font-semibold mb-3">Quick Actions</h2>
-
-                <div class="flex gap-3 flex-wrap">
-                    <a href="{{ route('sk_secretary.reports') }}" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg">
-                        Submit Report
-                    </a>
-
-                    <a href="{{ route('sk_secretary.budget') }}" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg">
-                        Upload Files
-                    </a>
-
-                    <a href="{{ route('sk_secretary.meetings') }}" class="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-lg">
-                        Join Meeting
-                    </a>
-                </div>
-            </div>
-
-            <div class="bg-white p-6 rounded-xl shadow">
-                <div class="flex justify-between items-center mb-4">
-                    <h2 class="font-semibold">Activity Feed</h2>
-                    <span class="text-xs text-gray-400">Live</span>
-                </div>
-
-                <div class="border rounded-lg p-4 mb-4">
-                    <textarea class="w-full border rounded p-3 resize-none focus:outline-none focus:ring-2 focus:ring-red-400" rows="3" placeholder="Share updates with SK..."></textarea>
-
-                    <div class="flex justify-end mt-3">
-                        <button type="button" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg">
-                            Post
-                        </button>
-                    </div>
-                </div>
-
-                <div class="text-center text-gray-400 py-10">
-                    No activity yet. Stay engaged
-                </div>
+                @empty
+                    <p class="text-gray-400 italic">No announcements found.</p>
+                @endforelse
             </div>
         </div>
     </div>

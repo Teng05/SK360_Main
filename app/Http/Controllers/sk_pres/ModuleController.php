@@ -61,10 +61,10 @@ class ModuleController extends Controller
         abort_unless(auth()->check() && auth()->user()->role === 'sk_president', 403);
 
         $validated = $request->validate([
-            'submission_type' => ['required', 'string', 'max:100'],
+            'submission_type' => ['required', 'in:accomplishment_report,budget_report'],
             'submission_title' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
-            'submission_role' => ['required', 'string', 'max:50'],
+            'submission_role' => ['required', 'in:SK Chairman,SK Secretary,Both'],
             'start_date' => ['required', 'date'],
             'end_date' => ['required', 'date', 'after_or_equal:start_date'],
         ]);

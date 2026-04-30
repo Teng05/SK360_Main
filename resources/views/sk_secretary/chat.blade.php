@@ -40,20 +40,24 @@
                 <input type="text" placeholder="Search" class="w-full rounded-full px-4 py-2 text-black focus:outline-none text-sm">
             </div>
             <div class="w-1/4 flex justify-end items-center gap-5 text-sm">
-                <button class="hover:opacity-80">&#128276;</button>
+                <button class="hover:opacity-80">🔔</button>
                 <div class="relative">
-                    <button id="profileDropdownBtn" type="button" class="flex items-center gap-2 font-semibold focus:outline-none hover:opacity-80 transition">
+                    <button id="userMenuBtn" type="button" class="flex items-center gap-2 font-semibold focus:outline-none hover:opacity-80 transition">
                         <span>{{ $fullName }}</span>
-                        <span class="text-[10px]">&#9660;</span>
                     </button>
-                    <div id="profileMenu" class="absolute right-0 mt-3 w-48 bg-white rounded-xl shadow-2xl py-2 z-[9999] hidden border border-gray-100">
-                        <div class="px-4 py-3 border-b border-gray-50">
-                            <p class="text-[10px] text-gray-400 uppercase font-black tracking-widest">Account Settings</p>
+                    <div id="userDropdown" class="hidden absolute right-0 mt-3 w-64 bg-white rounded-2xl shadow-xl border overflow-hidden z-50">
+                        <div class="px-5 py-4 font-semibold text-gray-800 border-b">
+                            My Account
                         </div>
+                        <a href="#" class="flex items-center gap-3 px-5 py-3 hover:bg-gray-100 transition">
+                            <span>👤</span>
+                            <span class="text-gray-700">Profile Settings</span>
+                        </a>
                         <form action="{{ route('logout') }}" method="POST">
                             @csrf
-                            <button type="submit" class="w-full text-left px-4 py-3 text-red-600 hover:bg-red-50 text-xs font-bold flex items-center gap-2 transition">
-                                <span>&#128682;</span> Log Out
+                            <button type="submit" class="w-full text-left flex items-center gap-3 px-5 py-3 text-red-500 hover:bg-gray-100 transition">
+                                <span>↩️</span>
+                                <span>Log Out</span>
                             </button>
                         </form>
                     </div>
@@ -571,6 +575,23 @@
         window.addEventListener('click', (event) => {
             if (!profileMenu.contains(event.target) && !dropdownBtn.contains(event.target)) {
                 profileMenu.classList.add('hidden');
+            }
+        });
+    }
+
+    // Dropdown toggle for user menu
+    const userMenuBtn = document.getElementById('userMenuBtn');
+    const userDropdown = document.getElementById('userDropdown');
+
+    if (userMenuBtn && userDropdown) {
+        userMenuBtn.addEventListener('click', function (e) {
+            e.stopPropagation();
+            userDropdown.classList.toggle('hidden');
+        });
+
+        document.addEventListener('click', function (e) {
+            if (!userMenuBtn.contains(e.target) && !userDropdown.contains(e.target)) {
+                userDropdown.classList.add('hidden');
             }
         });
     }
