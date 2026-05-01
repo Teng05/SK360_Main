@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\sk_pres;
 
 use App\Http\Controllers\Controller;
+use App\Services\NotificationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -59,7 +60,7 @@ class AnnouncementController extends Controller
         ]);
     }
 
-    public function store(Request $request): RedirectResponse
+    public function store(Request $request, NotificationService $notifications): RedirectResponse
     {
         abort_unless(auth()->check() && auth()->user()->role === 'sk_president', 403);
 
@@ -69,14 +70,22 @@ class AnnouncementController extends Controller
             'visibility' => ['nullable', 'in:public,officials_only'],
         ]);
 
-        DB::table('announcements')->insert([
+        $announcementId = DB::table('announcements')->insertGetId([
             'user_id' => auth()->user()->user_id,
             'title' => $validated['title'],
             'content' => $validated['content'],
             'visibility' => $validated['visibility'] ?? 'public',
             'created_at' => now(),
             'updated_at' => now(),
-        ]);
+        ], 'announcement_id');
+
+        $announcement = (object) [
+            'announcement_id' => $announcementId,
+            'title' => $validated['title'],
+            'visibility' => $validated['visibility'] ?? 'public',
+        ];
+
+        $notifications->notifyAnnouncementCreated($announcement, auth()->user());
 
         return redirect()->route('sk_pres.announcements')->with('status', 'Announcement created successfully.');
     }

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\sk_chairman;
 
 use App\Http\Controllers\Controller;
+use App\Services\SubmissionSlotService;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -20,14 +21,7 @@ class ReportController extends Controller
         $user = auth()->user();
         $fullName = trim(($user->first_name ?? '') . ' ' . ($user->last_name ?? '')) ?: 'User';
         $barangayName = $user->barangay->barangay_name ?? 'Barangay';
-        $slots = DB::table('submission_slots')
-            ->where('status', 'open')
-            ->where('submission_type', 'accomplishment_report')
-            ->where(function ($query) {
-                $query->where('role', 'SK Chairman')->orWhere('role', 'Both');
-            })
-            ->orderBy('start_date')
-            ->get();
+        $slots = app(SubmissionSlotService::class)->chairmanReportSlots((int) $user->barangay_id);
 
         $reports = DB::table('accomplishment_reports')
             ->where('barangay_id', $user->barangay_id)
@@ -87,17 +81,20 @@ class ReportController extends Controller
             'report_file' => ['nullable', 'file', 'mimes:pdf', 'max:5120'],
         ]);
 
-        $slot = DB::table('submission_slots')
-            ->where('slot_id', (int) $validated['slot_id'])
-            ->where('status', 'open')
-            ->where('submission_type', 'accomplishment_report')
-            ->where(function ($query) {
-                $query->where('role', 'SK Chairman')->orWhere('role', 'Both');
-            })
-            ->first();
+        $slotService = app(SubmissionSlotService::class);
+
+        $slot = $slotService->resolveOpenSlot(
+            (int) $validated['slot_id'],
+            'accomplishment_report',
+            ['SK Chairman', 'Both']
+        );
 
         if (!$slot) {
             return back()->with('report_error', 'That accomplishment report slot is no longer available.');
+        }
+
+        if ($slotService->barangayHasSubmissionForSlot('accomplishment_reports', (int) auth()->user()->barangay_id, (int) $slot->slot_id)) {
+            return back()->with('report_error', 'This slot has already been submitted by your barangay.');
         }
 
         if ($validated['sub_method'] === 'pdf' && !$request->hasFile('report_file')) {
@@ -121,6 +118,7 @@ class ReportController extends Controller
         DB::table('accomplishment_reports')->insert([
             'user_id' => auth()->user()->user_id,
             'barangay_id' => auth()->user()->barangay_id,
+            'slot_id' => $slot->slot_id,
             'report_type' => 'monthly',
             'submission_method' => $method,
             'title' => $slot->title,

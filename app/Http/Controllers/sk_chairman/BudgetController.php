@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\sk_chairman;
 
 use App\Http\Controllers\Controller;
+use App\Services\SubmissionSlotService;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -20,7 +21,7 @@ class BudgetController extends Controller
         $fullName = trim(($user->first_name ?? '') . ' ' . ($user->last_name ?? '')) ?: 'User';
         $barangayName = $user->barangay->barangay_name ?? 'Barangay';
 
-        $slots = $this->budgetSlots('SK Chairman');
+        $slots = app(SubmissionSlotService::class)->chairmanBudgetSlots((int) $user->barangay_id);
 
         $submissions = DB::table('budget_reports')
             ->where('barangay_id', $user->barangay_id)
@@ -78,10 +79,15 @@ class BudgetController extends Controller
             'report_file' => ['nullable', 'file', 'mimes:pdf', 'max:5120'],
         ]);
 
-        $slot = $this->resolveSlot((int) $validated['slot_id'], 'SK Chairman', 'budget_report');
+        $slotService = app(SubmissionSlotService::class);
+        $slot = $slotService->resolveOpenSlot((int) $validated['slot_id'], 'budget_report', ['SK Chairman', 'Both']);
 
         if (!$slot) {
             return back()->with('report_error', 'That budget submission slot is no longer available.');
+        }
+
+        if ($slotService->barangayHasSubmissionForSlot('budget_reports', (int) auth()->user()->barangay_id, (int) $slot->slot_id)) {
+            return back()->with('report_error', 'This slot has already been submitted by your barangay.');
         }
 
         if ($validated['sub_method'] === 'pdf' && !$request->hasFile('report_file')) {
@@ -105,6 +111,7 @@ class BudgetController extends Controller
         DB::table('budget_reports')->insert([
             'user_id' => auth()->user()->user_id,
             'barangay_id' => auth()->user()->barangay_id,
+            'slot_id' => $slot->slot_id,
             'submission_method' => $method,
             'document_type' => 'financial_record',
             'fiscal_year' => now()->year,
@@ -119,30 +126,6 @@ class BudgetController extends Controller
         ]);
 
         return redirect()->route('sk_chairman.budget')->with('report_success', 'Budget document submitted successfully.');
-    }
-
-    protected function budgetSlots(string $role): \Illuminate\Support\Collection
-    {
-        return DB::table('submission_slots')
-            ->where('status', 'open')
-            ->where('submission_type', 'budget_report')
-            ->where(function ($query) use ($role) {
-                $query->where('role', $role)->orWhere('role', 'Both');
-            })
-            ->orderBy('start_date')
-            ->get();
-    }
-
-    protected function resolveSlot(int $slotId, string $role, string $type): ?object
-    {
-        return DB::table('submission_slots')
-            ->where('slot_id', $slotId)
-            ->where('status', 'open')
-            ->where('submission_type', $type)
-            ->where(function ($query) use ($role) {
-                $query->where('role', $role)->orWhere('role', 'Both');
-            })
-            ->first();
     }
 
     protected function menuItems(): array

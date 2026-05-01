@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\sk_pres;
 
 use App\Http\Controllers\Controller;
+use App\Services\NotificationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -56,7 +57,7 @@ class ModuleController extends Controller
         ]);
     }
 
-    public function store(Request $request): RedirectResponse
+    public function store(Request $request, NotificationService $notifications): RedirectResponse
     {
         abort_unless(auth()->check() && auth()->user()->role === 'sk_president', 403);
 
@@ -78,6 +79,14 @@ class ModuleController extends Controller
             'end_date' => $validated['end_date'],
             'status' => 'open',
         ]);
+
+        $notifications->notifySubmissionSlotCreated([
+            'submission_type' => $validated['submission_type'],
+            'title' => $validated['submission_title'],
+            'role' => $validated['submission_role'],
+            'start_date' => $validated['start_date'],
+            'end_date' => $validated['end_date'],
+        ], auth()->user());
 
         return redirect()->route('sk_pres.module')->with('status', 'Submission slot created successfully.');
     }

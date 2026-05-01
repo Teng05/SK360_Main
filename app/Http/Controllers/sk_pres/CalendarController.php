@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\sk_pres;
 
 use App\Http\Controllers\Controller;
+use App\Services\NotificationService;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -122,7 +123,7 @@ class CalendarController extends Controller
         ]);
     }
 
-    public function store(Request $request): RedirectResponse
+    public function store(Request $request, NotificationService $notifications): RedirectResponse
     {
         abort_unless(auth()->check() && auth()->user()->role === 'sk_president', 403);
 
@@ -132,21 +133,31 @@ class CalendarController extends Controller
             'description' => ['nullable', 'string'],
             'start_datetime' => ['required', 'date'],
             'end_datetime' => ['nullable', 'date', 'after_or_equal:start_datetime'],
+            'visibility' => ['required', 'in:public,officials_only,chairman_only,secretary_only'],
         ]);
 
         $start = $validated['start_datetime'].' 00:00:00';
         $end = ($validated['end_datetime'] ?? $validated['start_datetime']).' 23:59:59';
 
-        DB::table('events')->insert([
+        $eventId = DB::table('events')->insertGetId([
             'created_by' => auth()->user()->user_id,
             'title' => $validated['event_title'],
             'description' => $validated['description'] ?? null,
             'event_type' => $validated['event_type'],
             'start_datetime' => $start,
             'end_datetime' => $end,
-            'visibility' => 'public',
+            'visibility' => $validated['visibility'],
             'created_at' => now(),
-        ]);
+        ], 'event_id');
+
+        $event = (object) [
+            'event_id' => $eventId,
+            'title' => $validated['event_title'],
+            'visibility' => $validated['visibility'],
+            'start_datetime' => Carbon::parse($start),
+        ];
+
+        $notifications->notifyEventCreated($event, auth()->user());
 
         return redirect()->route('sk_pres.calendar')->with('status', 'Event created successfully.');
     }

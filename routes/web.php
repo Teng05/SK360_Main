@@ -40,6 +40,7 @@ use App\Http\Controllers\Youth\ProfileController as YouthProfileController;
 use App\Http\Controllers\Youth\RankingController as YouthRankingController;
 
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\NotificationController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -62,6 +63,8 @@ Route::post('/register', [AuthController::class, 'register'])->name('register.su
 Route::get('/verify', [AuthController::class, 'showVerify'])->name('verify.notice');
 Route::post('/verify', [AuthController::class, 'verifyCode'])->name('verify.submit');
 Route::post('/verify/resend', [AuthController::class, 'resendVerificationCode'])->name('verify.resend');
+Route::middleware('auth')->get('/notifications/feed', [NotificationController::class, 'feed'])->name('notifications.feed');
+Route::middleware('auth')->post('/notifications/{notification}/read', [NotificationController::class, 'markRead'])->name('notifications.read');
 
 
 /*

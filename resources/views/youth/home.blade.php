@@ -41,7 +41,15 @@
                 </div>
 
                 <div class="w-1/4 flex justify-end items-center gap-5 text-sm">
-                    <button class="hover:opacity-80">&#128276;</button>
+                    <div class="relative">
+                        <button id="notifBtn" type="button" class="hover:opacity-80 relative">&#128276;</button>
+                        <div id="notifDropdown" class="hidden absolute right-0 mt-3 w-72 bg-white rounded-2xl shadow-xl border z-[9999] overflow-hidden">
+                            <div class="px-4 py-3 font-semibold border-b text-gray-800">Notifications</div>
+                            <div class="max-h-64 overflow-y-auto">
+                                <div class="px-4 py-3 text-sm text-gray-700">No notifications yet</div>
+                            </div>
+                        </div>
+                    </div>
 
                     <div class="relative">
                         <button id="profileDropdownBtn" class="flex items-center gap-2 font-semibold focus:outline-none hover:opacity-80 transition">
@@ -184,15 +192,28 @@
     </div>
 
     <script>
+        const notifBtn = document.getElementById('notifBtn');
+        const notifDropdown = document.getElementById('notifDropdown');
         const dropdownBtn = document.getElementById('profileDropdownBtn');
         const profileMenu = document.getElementById('profileMenu');
+
+        notifBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            notifDropdown.classList.toggle('hidden');
+            profileMenu.classList.add('hidden');
+        });
 
         dropdownBtn.addEventListener('click', (e) => {
             e.stopPropagation();
             profileMenu.classList.toggle('hidden');
+            notifDropdown.classList.add('hidden');
         });
 
         window.addEventListener('click', (e) => {
+            if (!notifDropdown.contains(e.target) && !notifBtn.contains(e.target)) {
+                notifDropdown.classList.add('hidden');
+            }
+
             if (!profileMenu.contains(e.target) && !dropdownBtn.contains(e.target)) {
                 profileMenu.classList.add('hidden');
             }
@@ -215,6 +236,74 @@
                 item.style.display = category === 'all' || item.getAttribute('data-category') === category ? 'block' : 'none';
             });
         }
+
+        (function () {
+            const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '{{ csrf_token() }}';
+            const feedUrl = @json(route('notifications.feed'));
+            const readBaseUrl = @json(url('/notifications'));
+
+            let badge = notifBtn.querySelector('[data-notification-badge]');
+            if (!badge) {
+                badge = document.createElement('span');
+                badge.setAttribute('data-notification-badge', 'true');
+                badge.className = 'hidden absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-yellow-400 text-red-700 text-[10px] font-bold flex items-center justify-center';
+                notifBtn.appendChild(badge);
+            }
+
+            function render(payload) {
+                const unreadCount = payload.unread_count || 0;
+                const notifications = payload.notifications || [];
+
+                badge.textContent = unreadCount > 99 ? '99+' : String(unreadCount);
+                badge.classList.toggle('hidden', unreadCount === 0);
+
+                const body = notifications.length === 0
+                    ? '<div class="px-4 py-3 text-sm text-gray-700">No notifications yet</div>'
+                    : notifications.map((notification) => `
+                        <a href="${notification.url || '#'}" data-notification-link data-id="${notification.id}" class="block px-4 py-3 border-b border-gray-100 ${notification.is_read ? 'bg-white' : 'bg-red-50'}">
+                            <div class="text-sm font-semibold text-gray-800">${notification.title}</div>
+                            <div class="mt-1 text-xs text-gray-600">${notification.message}</div>
+                            <div class="mt-1 text-[11px] text-gray-400">${notification.created_at || ''}</div>
+                        </a>
+                    `).join('');
+
+                notifDropdown.innerHTML = `
+                    <div class="px-4 py-3 font-semibold border-b text-gray-800">Notifications</div>
+                    <div class="max-h-64 overflow-y-auto">${body}</div>
+                `;
+            }
+
+            async function fetchFeed() {
+                const response = await fetch(feedUrl, {
+                    headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' },
+                    credentials: 'same-origin',
+                });
+
+                if (!response.ok) {
+                    return;
+                }
+
+                render(await response.json());
+            }
+
+            notifDropdown.addEventListener('click', async (event) => {
+                const link = event.target.closest('[data-notification-link]');
+                if (!link) return;
+
+                await fetch(`${readBaseUrl}/${link.getAttribute('data-id')}/read`, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': csrfToken,
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Accept': 'application/json',
+                    },
+                    credentials: 'same-origin',
+                });
+            });
+
+            fetchFeed();
+            setInterval(fetchFeed, 5000);
+        })();
     </script>
 </body>
 </html>

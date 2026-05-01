@@ -109,7 +109,10 @@
                                         <h3 class="text-lg font-bold text-gray-800">{{ $slot->title }}</h3>
                                         <p class="text-sm text-gray-500 mt-1">{{ $slot->description ?: 'No description provided.' }}</p>
                                     </div>
-                                    <span class="rounded-full bg-white px-3 py-1 text-[10px] font-black uppercase text-red-600">{{ $slot->role }}</span>
+                                    <div class="flex flex-col items-end gap-2">
+                                        <span class="rounded-full bg-white px-3 py-1 text-[10px] font-black uppercase text-red-600">{{ $slot->role }}</span>
+                                        <span class="rounded-full px-3 py-1 text-[10px] font-black uppercase {{ $slot->slot_status_badge ?? 'bg-red-100 text-red-600' }}">{{ $slot->slot_status_label ?? 'Open' }}</span>
+                                    </div>
                                 </div>
                                 <div class="mt-4 grid grid-cols-2 gap-3 text-xs text-gray-600">
                                     <div class="rounded-xl bg-white px-3 py-3">
@@ -122,7 +125,13 @@
                                     </div>
                                 </div>
                                 <div class="mt-4 flex justify-end">
-                                    <button type="button" class="rounded-xl bg-red-600 px-4 py-3 text-xs font-black uppercase text-white hover:bg-red-700" onclick="openSlotSubmission({{ $slot->slot_id }}, @js($slot->title))">{{ $slotActionLabel }}</button>
+                                    @if (!empty($slot->has_submitted))
+                                        <button type="button" class="rounded-xl bg-green-600 px-4 py-3 text-xs font-black uppercase text-white cursor-default">
+                                            Submitted
+                                        </button>
+                                    @else
+                                        <button type="button" class="rounded-xl bg-red-600 px-4 py-3 text-xs font-black uppercase text-white hover:bg-red-700" onclick="openSlotSubmission({{ $slot->slot_id }}, @js($slot->title))">{{ $slotActionLabel }}</button>
+                                    @endif
                                 </div>
                             </div>
                         @empty

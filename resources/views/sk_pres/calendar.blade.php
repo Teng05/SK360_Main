@@ -219,6 +219,16 @@
                             </div>
                         </div>
 
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-900 mb-2">Visibility</label>
+                            <select name="visibility" class="w-full h-12 px-4 rounded-xl border border-gray-300 bg-white focus:outline-none focus:ring-2 focus:ring-red-400">
+                                <option value="public" @selected(old('visibility') === 'public')>All Users</option>
+                                <option value="officials_only" @selected(old('visibility') === 'officials_only')>SK Chairman and SK Secretary</option>
+                                <option value="chairman_only" @selected(old('visibility') === 'chairman_only')>SK Chairman Only</option>
+                                <option value="secretary_only" @selected(old('visibility') === 'secretary_only')>SK Secretary Only</option>
+                            </select>
+                        </div>
+
                         <button type="submit" class="w-full bg-red-600 hover:bg-red-700 text-white text-lg font-bold py-3 rounded-2xl transition">
                             Save Event
                         </button>
