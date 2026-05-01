@@ -145,6 +145,10 @@ Route::middleware('auth')->get('/sk_chairman/reports', [SkChairmanReportControll
 Route::middleware('auth')->post('/sk_chairman/reports', [SkChairmanReportController::class, 'store'])->name('sk_chairman.reports.store');
 Route::middleware('auth')->get('/sk_chairman/budget', [SkChairmanBudgetController::class, 'index'])->name('sk_chairman.budget');
 Route::middleware('auth')->post('/sk_chairman/budget', [SkChairmanBudgetController::class, 'store'])->name('sk_chairman.budget.store');
+Route::middleware('auth')->get('/sk_chairman/budget/template', [SkChairmanBudgetController::class, 'createTemplate'])->name('sk_chairman.budget.template.create');
+Route::middleware('auth')->post('/sk_chairman/budget/template', [SkChairmanBudgetController::class, 'storeTemplate'])->name('sk_chairman.budget.template.store');
+Route::middleware('auth')->get('/sk_chairman/budget/template/{budgetReportId}/view', [SkChairmanBudgetController::class, 'viewTemplate'])->name('sk_chairman.budget.template.view');
+Route::middleware('auth')->get('/sk_chairman/budget/template/{budgetReportId}/download', [SkChairmanBudgetController::class, 'downloadTemplate'])->name('sk_chairman.budget.template.download');
 Route::middleware('auth')->get('/sk_chairman/announcements', [SkChairmanAnnouncementController::class, 'index'])->name('sk_chairman.announcements');
 Route::middleware('auth')->get('/sk_chairman/calendar', [SkChairmanCalendarController::class, 'index'])->name('sk_chairman.calendar');
 Route::middleware('auth')->get('/sk_chairman/chat', [SkChairmanChatController::class, 'index'])->name('sk_chairman.chat');
@@ -162,6 +166,10 @@ Route::middleware('auth')->get('/sk_secretary/reports', [SkSecretaryReportContro
 Route::middleware('auth')->post('/sk_secretary/reports', [SkSecretaryReportController::class, 'store'])->name('sk_secretary.reports.store');
 Route::middleware('auth')->get('/sk_secretary/budget', [SkSecretaryBudgetController::class, 'index'])->name('sk_secretary.budget');
 Route::middleware('auth')->post('/sk_secretary/budget', [SkSecretaryBudgetController::class, 'store'])->name('sk_secretary.budget.store');
+Route::middleware('auth')->get('/sk_secretary/budget/template', [SkSecretaryBudgetController::class, 'createTemplate'])->name('sk_secretary.budget.template.create');
+Route::middleware('auth')->post('/sk_secretary/budget/template', [SkSecretaryBudgetController::class, 'storeTemplate'])->name('sk_secretary.budget.template.store');
+Route::middleware('auth')->get('/sk_secretary/budget/template/{budgetReportId}/view', [SkSecretaryBudgetController::class, 'viewTemplate'])->name('sk_secretary.budget.template.view');
+Route::middleware('auth')->get('/sk_secretary/budget/template/{budgetReportId}/download', [SkSecretaryBudgetController::class, 'downloadTemplate'])->name('sk_secretary.budget.template.download');
 Route::middleware('auth')->get('/sk_secretary/announcements', [SkSecretaryAnnouncementController::class, 'index'])->name('sk_secretary.announcements');
 Route::middleware('auth')->get('/sk_secretary/calendar', [SkSecretaryCalendarController::class, 'index'])->name('sk_secretary.calendar');
 Route::redirect('/sk_secretary/chat', '/sk_secretary/home')->middleware('auth')->name('sk_secretary.chat');

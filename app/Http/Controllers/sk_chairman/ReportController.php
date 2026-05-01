@@ -48,6 +48,7 @@ class ReportController extends Controller
                 $report->download_url = $method === 'pdf' && !empty($report->uploaded_file_path)
                     ? asset($report->uploaded_file_path)
                     : null;
+                $report->view_url = $report->download_url;
 
                 return $report;
             });

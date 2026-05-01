@@ -170,7 +170,11 @@
                                             <span class="{{ $submission->status_badge }} px-3 py-1 rounded-full text-[9px] font-black uppercase">{{ $submission->status }}</span>
                                         </td>
                                         <td class="px-8 py-5 text-right space-x-2">
-                                            <button type="button" onclick="window.alert('Submission: {{ addslashes($submission->title ?? $submission->report_title) }}')" class="w-8 h-8 rounded-xl bg-gray-100 text-gray-500 hover:bg-blue-100 hover:text-blue-600 transition shadow-sm">V</button>
+                                            @if (!empty($submission->view_url))
+                                                <a href="{{ $submission->view_url }}" target="_blank" class="inline-flex items-center justify-center w-8 h-8 rounded-xl bg-gray-100 text-gray-500 hover:bg-blue-100 hover:text-blue-600 transition shadow-sm">V</a>
+                                            @else
+                                                <button type="button" onclick="window.alert('No preview is available for this submission.')" class="w-8 h-8 rounded-xl bg-gray-100 text-gray-500 hover:bg-blue-100 hover:text-blue-600 transition shadow-sm">V</button>
+                                            @endif
                                             @if ($submission->download_url)
                                                 <a href="{{ $submission->download_url }}" target="_blank" class="inline-flex items-center justify-center w-8 h-8 rounded-xl bg-gray-100 text-gray-500 hover:bg-green-100 hover:text-green-600 transition shadow-sm">D</a>
                                             @else
@@ -207,12 +211,12 @@
             <input type="hidden" name="slot_id" id="slotIdField" value="{{ old('slot_id') }}">
 
             <div class="grid grid-cols-2 gap-3">
-                <label class="text-center p-3 rounded-xl border-2 border-gray-100 bg-gray-50 cursor-pointer text-[10px] font-black uppercase transition">
-                    <input type="radio" name="sub_method" value="template" class="hidden" {{ old('sub_method', 'template') === 'template' ? 'checked' : '' }} onclick="toggleSlotFile(false)">
+                <label data-submission-mode="template" class="slot-mode-label text-center p-3 rounded-xl border-2 border-gray-100 bg-gray-50 cursor-pointer text-[10px] font-black uppercase transition">
+                    <input type="radio" name="sub_method" value="template" class="hidden" {{ old('sub_method', 'template') === 'template' ? 'checked' : '' }}>
                     System Template
                 </label>
-                <label class="text-center p-3 rounded-xl border-2 border-gray-100 bg-gray-50 cursor-pointer text-[10px] font-black uppercase transition">
-                    <input type="radio" name="sub_method" value="pdf" class="hidden" {{ old('sub_method') === 'pdf' ? 'checked' : '' }} onclick="toggleSlotFile(true)">
+                <label data-submission-mode="pdf" class="slot-mode-label text-center p-3 rounded-xl border-2 border-gray-100 bg-gray-50 cursor-pointer text-[10px] font-black uppercase transition">
+                    <input type="radio" name="sub_method" value="pdf" class="hidden" {{ old('sub_method') === 'pdf' ? 'checked' : '' }}>
                     PDF Upload
                 </label>
             </div>
@@ -226,7 +230,7 @@
                 </div>
             </div>
 
-            <button type="submit" class="w-full bg-red-600 text-white py-4 rounded-2xl font-black uppercase tracking-tighter shadow-lg hover:bg-red-700 active:scale-95 transition">Submit Slot</button>
+            <button id="slotSubmitButton" type="submit" class="w-full bg-red-600 text-white py-4 rounded-2xl font-black uppercase tracking-tighter shadow-lg hover:bg-red-700 active:scale-95 transition">Submit Slot</button>
         </form>
     </div>
 </div>

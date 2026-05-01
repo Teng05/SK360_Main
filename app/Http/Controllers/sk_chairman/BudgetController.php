@@ -4,9 +4,11 @@ namespace App\Http\Controllers\sk_chairman;
 
 use App\Http\Controllers\Controller;
 use App\Services\SubmissionSlotService;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\View\View;
@@ -45,7 +47,10 @@ class BudgetController extends Controller
                 $submission->method_label = $method === 'pdf' ? 'PDF Upload' : 'Template';
                 $submission->download_url = $method === 'pdf' && !empty($submission->uploaded_file_path)
                     ? asset($submission->uploaded_file_path)
-                    : null;
+                    : route('sk_chairman.budget.template.download', $submission->budget_report_id);
+                $submission->view_url = $method === 'pdf' && !empty($submission->uploaded_file_path)
+                    ? asset($submission->uploaded_file_path)
+                    : route('sk_chairman.budget.template.view', $submission->budget_report_id);
 
                 return $submission;
             });
@@ -126,6 +131,139 @@ class BudgetController extends Controller
         ]);
 
         return redirect()->route('sk_chairman.budget')->with('report_success', 'Budget document submitted successfully.');
+    }
+
+    public function createTemplate(Request $request): View|RedirectResponse
+    {
+        abort_unless(auth()->check() && auth()->user()->role === 'sk_chairman', 403);
+
+        $slotId = (int) $request->query('slot_id');
+        $slotService = app(SubmissionSlotService::class);
+        $slot = $slotService->resolveOpenSlot($slotId, 'budget_report', ['SK Chairman', 'Both']);
+
+        if (!$slot) {
+            return redirect()->route('sk_chairman.budget')->with('report_error', 'That budget submission slot is no longer available.');
+        }
+
+        if ($slotService->barangayHasSubmissionForSlot('budget_reports', (int) auth()->user()->barangay_id, (int) $slot->slot_id)) {
+            return redirect()->route('sk_chairman.budget')->with('report_error', 'This slot has already been submitted by your barangay.');
+        }
+
+        $user = auth()->user();
+
+        return view('shared.budget-template-form', [
+            'slot' => $slot,
+            'submitRoute' => route('sk_chairman.budget.template.store'),
+            'backRoute' => route('sk_chairman.budget'),
+            'fullName' => trim(($user->first_name ?? '').' '.($user->last_name ?? '')) ?: 'User',
+            'barangayName' => $user->barangay->barangay_name ?? 'Barangay',
+        ]);
+    }
+
+    public function storeTemplate(Request $request): RedirectResponse
+    {
+        abort_unless(auth()->check() && auth()->user()->role === 'sk_chairman', 403);
+
+        $validated = $request->validate([
+            'slot_id' => ['required', 'integer'],
+            'monitoring_officer' => ['required', 'string', 'max:255'],
+            'sheet_no' => ['required', 'string', 'max:255'],
+            'city' => ['required', 'string', 'max:255'],
+            'province' => ['required', 'string', 'max:255'],
+            'program_project_activity' => ['required', 'string', 'max:255'],
+            'object_headers' => ['required', 'array', 'size:4'],
+            'object_headers.*' => ['nullable', 'string', 'max:255'],
+            'rows' => ['required', 'array', 'min:1'],
+            'rows.*.particulars' => ['nullable', 'string', 'max:255'],
+            'rows.*.date' => ['nullable', 'date'],
+            'rows.*.reference' => ['nullable', 'string', 'max:255'],
+            'rows.*.total_amount' => ['nullable', 'numeric'],
+            'rows.*.object_1' => ['nullable', 'numeric'],
+            'rows.*.object_2' => ['nullable', 'numeric'],
+            'rows.*.object_3' => ['nullable', 'numeric'],
+            'rows.*.object_4' => ['nullable', 'numeric'],
+            'spf_carried_forward' => ['nullable', 'numeric'],
+            'commitments_carried_forward' => ['nullable', 'numeric'],
+            'payments_carried_forward' => ['nullable', 'numeric'],
+            'available_balance' => ['nullable', 'numeric'],
+            'unpaid_commitments' => ['nullable', 'numeric'],
+            'certified_date' => ['required', 'date'],
+        ]);
+
+        $slotService = app(SubmissionSlotService::class);
+        $slot = $slotService->resolveOpenSlot((int) $validated['slot_id'], 'budget_report', ['SK Chairman', 'Both']);
+
+        if (!$slot) {
+            return redirect()->route('sk_chairman.budget')->with('report_error', 'That budget submission slot is no longer available.');
+        }
+
+        if ($slotService->barangayHasSubmissionForSlot('budget_reports', (int) auth()->user()->barangay_id, (int) $slot->slot_id)) {
+            return redirect()->route('sk_chairman.budget')->with('report_error', 'This slot has already been submitted by your barangay.');
+        }
+
+        DB::table('budget_reports')->insert([
+            'user_id' => auth()->user()->user_id,
+            'barangay_id' => auth()->user()->barangay_id,
+            'slot_id' => $slot->slot_id,
+            'submission_method' => 'direct_input',
+            'document_type' => 'financial_record',
+            'fiscal_year' => now()->year,
+            'title' => $slot->title,
+            'generated_pdf_path' => 'TEMPLATE_GEN',
+            'template_data' => json_encode($validated, JSON_UNESCAPED_UNICODE),
+            'uploaded_file_name' => null,
+            'uploaded_file_path' => null,
+            'total_amount' => collect($validated['rows'])->sum(fn ($row) => (float) ($row['total_amount'] ?? 0)),
+            'status' => 'recorded',
+            'submitted_at' => now(),
+            'created_at' => now(),
+        ]);
+
+        return redirect()->route('sk_chairman.budget')->with('report_success', 'Budget template submitted successfully.');
+    }
+
+    public function downloadTemplate(int $budgetReportId): Response|RedirectResponse
+    {
+        abort_unless(auth()->check() && auth()->user()->role === 'sk_chairman', 403);
+
+        $submission = DB::table('budget_reports')
+            ->where('budget_report_id', $budgetReportId)
+            ->where('barangay_id', auth()->user()->barangay_id)
+            ->first();
+
+        if (!$submission || empty($submission->template_data)) {
+            return redirect()->route('sk_chairman.budget')->with('report_error', 'Template submission not found.');
+        }
+
+        $data = json_decode($submission->template_data, true) ?: [];
+        $pdf = Pdf::loadView('shared.budget-template-download', [
+            'data' => $data,
+            'barangayName' => auth()->user()->barangay->barangay_name ?? 'Barangay',
+        ])->setPaper('a4', 'landscape');
+
+        return $pdf->download('budget-template-'.$budgetReportId.'.pdf');
+    }
+
+    public function viewTemplate(int $budgetReportId): Response|RedirectResponse
+    {
+        abort_unless(auth()->check() && auth()->user()->role === 'sk_chairman', 403);
+
+        $submission = DB::table('budget_reports')
+            ->where('budget_report_id', $budgetReportId)
+            ->where('barangay_id', auth()->user()->barangay_id)
+            ->first();
+
+        if (!$submission || empty($submission->template_data)) {
+            return redirect()->route('sk_chairman.budget')->with('report_error', 'Template submission not found.');
+        }
+
+        $data = json_decode($submission->template_data, true) ?: [];
+        $pdf = Pdf::loadView('shared.budget-template-download', [
+            'data' => $data,
+            'barangayName' => auth()->user()->barangay->barangay_name ?? 'Barangay',
+        ])->setPaper('a4', 'landscape');
+
+        return $pdf->stream('budget-template-'.$budgetReportId.'.pdf');
     }
 
     protected function menuItems(): array
