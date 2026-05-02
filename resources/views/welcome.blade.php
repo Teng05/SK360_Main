@@ -12,19 +12,23 @@
 @section('content')
     <header class="hero-shell" id="home">
         <nav class="navbar">
-            <a href="#home" class="logo">SK 360&deg;</a>
+             <div class="footer-column brand-info">
+                <div class="footer-logo">
+                    <img src="{{ asset('images/logo.png') }}" class="w-8 h-8 rounded-full object-cover" alt="SK 360 Logo">
+                    <span class="logo-text">SK 360&deg;</span>
+                </div>
 
+            </div>
             <ul class="nav-links">
                 <li><a href="#features">Features</a></li>
                 <li><a href="#benefits">Benefits</a></li>
-                <li><a href="#announcement">Announcement</a></li>
                 <li><a href="#contact">Contact</a></li>
             </ul>
 
-            <a href="#features" class="btn-yellow nav-cta">Get Started</a>
+            <a href="#home" class="btn-yellow nav-cta">Get Started</a>
         </nav>
 
-        <section class="hero-panel">
+        <section class="hero-panel" id = "home">
             <div class="hero-copy">
                 <h1>SK 360&deg;</h1>
                 <h2>Empowering the youth, transforming communities.</h2>
@@ -47,7 +51,7 @@
 
             <div class="hero-visual">
                 <div class="hero-image-wrap">
-                    <img src="{{ asset('images/lipa-city.jpg') }}" alt="Lipa City">
+                    <img src="{{ asset('images/lipacity.png') }}" alt="Lipa City">
                 </div>
             </div>
         </section>
@@ -125,70 +129,6 @@
         </div>
     </section>
 
-    <section class="event-updates" id="announcement">
-        <div class="update-box red-bg">
-            <h3>Latest Updates</h3>
-
-            <div class="class-update">
-                <span class="update-date">May 15, 2025</span>
-                <h4>New Reporting Guidelines Released</h4>
-                <p>Updated templates and submission procedures for Q2 2025 reports are now available.</p>
-            </div>
-
-            <div class="class-update">
-                <span class="update-date">May 20, 2025</span>
-                <h4>Monthly Federation Meeting</h4>
-                <p>All SK Chairmen are invited to attend the monthly coordination meeting via video call.</p>
-            </div>
-
-            <div class="class-update">
-                <span class="update-date">May 25, 2025</span>
-                <h4>Youth Leadership Training</h4>
-                <p>Register now for the upcoming leadership development program for SK officials.</p>
-            </div>
-
-            <a href="#" class="btn-yellow">View All Announcements</a>
-        </div>
-
-        <div class="update-box white-bg">
-            <h3 class="events-title">Upcoming Events</h3>
-
-            <div class="event-update">
-                <div class="event-date">
-                    <span class="day">20</span>
-                    <span class="month">MAY</span>
-                </div>
-                <div class="event-details">
-                    <h4>Federation Meeting</h4>
-                    <p>2:00 PM</p>
-                </div>
-            </div>
-
-            <div class="event-update">
-                <div class="event-date">
-                    <span class="day">25</span>
-                    <span class="month">MAY</span>
-                </div>
-                <div class="event-details">
-                    <h4>Leadership Training</h4>
-                    <p>9:00 AM</p>
-                </div>
-            </div>
-
-            <div class="event-update">
-                <div class="event-date">
-                    <span class="day">30</span>
-                    <span class="month">MAY</span>
-                </div>
-                <div class="event-details">
-                    <h4>Report Deadline</h4>
-                    <p>5:00 PM</p>
-                </div>
-            </div>
-
-            <a href="#" class="btn-blue">View Full Calendar</a>
-        </div>
-    </section>
 
     <section class="cta-section">
         <h2>Ready to Transform Youth Governance?</h2>

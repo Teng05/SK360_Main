@@ -10,10 +10,13 @@
 @section('content')
 <div class="flex h-screen bg-gray-100">
     <div class="w-64 bg-red-600 text-white flex flex-col p-3 overflow-y-auto">
-        <div class="flex items-center gap-2 mb-3">
-            <img src="https://cdn-icons-png.flaticon.com/512/3135/3135715.png" class="w-7 h-7" alt="logo">
-            <h2 class="text-base font-bold">SK 360&deg;</h2>
-        </div>
+       <div class="flex items-center gap-3 mb-4">
+    <img src="{{ asset('images/logo.png') }}" class="w-8 h-8 rounded-full object-cover"  alt="logo">
+    <div class="leading-tight">
+        <h2 class="text-lg font-extrabold tracking-wide">SK 360°</h2>
+        <p class="text-[10px] opacity-80">Management System</p>
+    </div>
+</div>
 
         <div class="bg-red-500 rounded-lg p-2 flex items-center gap-2 mb-3 shadow text-xs">
             <div class="bg-yellow-400 text-red-600 p-1 rounded-full text-sm">&#128100;</div>
@@ -606,3 +609,4 @@
     loadRooms();
 </script>
 @endpush
+

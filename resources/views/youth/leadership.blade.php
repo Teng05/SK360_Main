@@ -12,7 +12,7 @@
 <div class="flex h-screen">
     <div class="w-64 bg-red-600 text-white flex flex-col p-3">
         <div class="flex items-center gap-2 mb-3">
-            <img src="https://cdn-icons-png.flaticon.com/512/3135/3135715.png" class="w-7 h-7" alt="logo">
+            <img src="{{ asset('logo.png') }}" class="w-7 h-7" alt="logo">
             <h2 class="text-base font-bold text-white">SK 360&deg;</h2>
         </div>
 
@@ -164,3 +164,4 @@ window.addEventListener('click', (e) => {
 
 </body>
 </html>
+

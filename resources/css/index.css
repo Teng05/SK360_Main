@@ -126,8 +126,8 @@ a {
 }
 
 .hero-image-wrap {
-    width: min(100%, 480px);
-    aspect-ratio: 4 / 3.1;
+    width: min(100%, 900px);
+    aspect-ratio: 20 / 15;
     border-radius: 28px;
     overflow: hidden;
     background: rgba(255, 255, 255, 0.08);

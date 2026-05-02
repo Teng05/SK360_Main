@@ -1,4 +1,3 @@
-{{-- File guide: Blade view template for resources/views/sk_secretary/partials/topbar.blade.php. --}}
 <div class="bg-red-600 text-white px-6 py-3 flex justify-between items-center shadow">
     {{-- Topbar search --}}
     <input type="text" placeholder="Search..." class="px-4 py-2 rounded-full text-black w-1/3 focus:outline-none">

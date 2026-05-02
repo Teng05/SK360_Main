@@ -1,10 +1,13 @@
 {{-- File guide: Blade view template for resources/views/shared/submission-slots-page.blade.php. --}}
 <div class="flex h-screen bg-gray-100 overflow-hidden">
     <div class="w-64 bg-red-600 text-white flex flex-col p-3 overflow-y-auto">
-        <div class="flex items-center gap-2 mb-3">
-            <img src="https://cdn-icons-png.flaticon.com/512/3135/3135715.png" class="w-7 h-7" alt="logo">
-            <h2 class="text-base font-bold">SK 360&deg;</h2>
-        </div>
+        <div class="flex items-center gap-3 mb-4">
+    <img src="{{ asset('images/logo.png') }}" class="w-8 h-8 rounded-full object-cover"  alt="logo">
+    <div class="leading-tight">
+        <h2 class="text-lg font-extrabold tracking-wide">SK 360°</h2>
+        <p class="text-[10px] opacity-80">Management System</p>
+    </div>
+</div>
 
         <div class="bg-red-500 rounded-lg p-2 flex items-center gap-2 mb-3 shadow text-xs">
             <div class="bg-yellow-400 text-red-600 p-1 rounded-full text-sm">👤</div>
@@ -174,14 +177,36 @@
                                         </td>
                                         <td class="px-8 py-5 text-right space-x-2">
                                             @if (!empty($submission->view_url))
-                                                <a href="{{ $submission->view_url }}" target="_blank" class="inline-flex items-center justify-center w-8 h-8 rounded-xl bg-gray-100 text-gray-500 hover:bg-blue-100 hover:text-blue-600 transition shadow-sm">V</a>
+                                                <a href="{{ $submission->view_url }}" target="_blank" class="inline-flex items-center justify-center w-8 h-8 rounded-xl bg-gray-100 text-gray-500 hover:bg-blue-100 hover:text-blue-600 transition shadow-sm" title="View submission" aria-label="View submission">
+                                                    <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                                        <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"></path>
+                                                        <circle cx="12" cy="12" r="3"></circle>
+                                                    </svg>
+                                                </a>
                                             @else
-                                                <button type="button" onclick="window.alert('No preview is available for this submission.')" class="w-8 h-8 rounded-xl bg-gray-100 text-gray-500 hover:bg-blue-100 hover:text-blue-600 transition shadow-sm">V</button>
+                                                <button type="button" onclick="window.alert('No preview is available for this submission.')" class="inline-flex items-center justify-center w-8 h-8 rounded-xl bg-gray-100 text-gray-500 hover:bg-blue-100 hover:text-blue-600 transition shadow-sm" title="No preview available" aria-label="No preview available">
+                                                    <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                                        <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"></path>
+                                                        <circle cx="12" cy="12" r="3"></circle>
+                                                    </svg>
+                                                </button>
                                             @endif
                                             @if ($submission->download_url)
-                                                <a href="{{ $submission->download_url }}" target="_blank" class="inline-flex items-center justify-center w-8 h-8 rounded-xl bg-gray-100 text-gray-500 hover:bg-green-100 hover:text-green-600 transition shadow-sm">D</a>
+                                                <a href="{{ $submission->download_url }}" target="_blank" class="inline-flex items-center justify-center w-8 h-8 rounded-xl bg-gray-100 text-gray-500 hover:bg-green-100 hover:text-green-600 transition shadow-sm" title="Download submission" aria-label="Download submission">
+                                                    <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                                        <path d="M7 10l5 5 5-5"></path>
+                                                        <path d="M12 15V3"></path>
+                                                    </svg>
+                                                </a>
                                             @else
-                                                <button type="button" onclick="window.alert('{{ ($submissionType ?? '') === 'report' ? 'No PDF file is available for this report.' : 'This slot used the system template.' }}')" class="w-8 h-8 rounded-xl bg-gray-100 text-gray-500 hover:bg-green-100 hover:text-green-600 transition shadow-sm">D</button>
+                                                <button type="button" onclick="window.alert('{{ ($submissionType ?? '') === 'report' ? 'No PDF file is available for this report.' : 'This slot used the system template.' }}')" class="inline-flex items-center justify-center w-8 h-8 rounded-xl bg-gray-100 text-gray-500 hover:bg-green-100 hover:text-green-600 transition shadow-sm" title="No download available" aria-label="No download available">
+                                                    <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                                        <path d="M7 10l5 5 5-5"></path>
+                                                        <path d="M12 15V3"></path>
+                                                    </svg>
+                                                </button>
                                             @endif
                                         </td>
                                     </tr>
@@ -324,3 +349,4 @@
     syncReportPeriodFields();
 </script>
 @endpush
+

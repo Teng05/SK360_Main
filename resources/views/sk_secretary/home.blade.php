@@ -28,25 +28,51 @@
                 @endforeach
             </div>
 
-            <div class="bg-white p-5 rounded-xl shadow mb-6">
-                <h2 class="font-semibold mb-3">Quick Actions</h2>
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div class="lg:col-span-2">
+                    @include('shared.wall-feed')
+                </div>
 
-                <div class="flex gap-3 flex-wrap">
-                    <a href="{{ route('sk_secretary.reports') }}" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg">
-                        Submit Report
-                    </a>
+                <div class="space-y-6">
+                    <div class="bg-white p-4 rounded-xl shadow border">
+                        <h2 class="font-bold text-gray-700 uppercase text-[10px] mb-3 tracking-widest border-b pb-2">Quick Actions</h2>
+                        <div class="grid grid-cols-3 gap-2">
+                            <a href="{{ route('sk_secretary.reports') }}" class="flex aspect-square flex-col items-center justify-center rounded-lg bg-red-600 p-3 text-white transition hover:bg-red-700">
+                                <span class="text-xl">&#128196;</span>
+                                <span class="mt-1 text-center text-[8px] font-bold">REPORT</span>
+                            </a>
+                            <a href="{{ route('sk_secretary.budget') }}" class="flex aspect-square flex-col items-center justify-center rounded-lg bg-blue-600 p-3 text-white transition hover:bg-blue-700">
+                                <span class="text-xl">&#128229;</span>
+                                <span class="mt-1 text-center text-[8px] font-bold">BUDGET</span>
+                            </a>
+                            <a href="{{ route('sk_secretary.meetings') }}" class="flex aspect-square flex-col items-center justify-center rounded-lg bg-yellow-500 p-3 text-white transition hover:bg-yellow-600">
+                                <span class="text-xl">&#128222;</span>
+                                <span class="mt-1 text-center text-[8px] font-bold">MEETING</span>
+                            </a>
+                        </div>
+                    </div>
 
-                    <a href="{{ route('sk_secretary.budget') }}" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg">
-                        Upload Files
-                    </a>
-
-                    <a href="{{ route('sk_secretary.meetings') }}" class="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-lg">
-                        Join Meeting
-                    </a>
+                    <div class="bg-white p-4 rounded-xl shadow border">
+                        <h2 class="font-bold text-gray-700 uppercase text-[10px] mb-3 tracking-widest border-b pb-2">Calendar Preview</h2>
+                        <div class="space-y-4">
+                            @forelse ($upcomingEvents as $event)
+                                <div class="border-l-4 border-red-500 pl-3">
+                                    <div class="flex items-center justify-between gap-2">
+                                        <p class="text-[11px] font-black text-gray-800 uppercase leading-none">{{ $event->title }}</p>
+                                        <span class="rounded-full px-2 py-1 text-[8px] font-bold uppercase {{ $event->type_badge }}">
+                                            {{ $event->type_label }}
+                                        </span>
+                                    </div>
+                                    <p class="text-[9px] text-gray-500 mt-2">{{ \Carbon\Carbon::parse($event->start_datetime)->format('M d, Y h:i A') }}</p>
+                                    <p class="text-[9px] text-gray-400 mt-1">{{ $event->location ?: 'No location provided' }}</p>
+                                </div>
+                            @empty
+                                <p class="text-[10px] text-gray-400 italic">No scheduled events.</p>
+                            @endforelse
+                        </div>
+                    </div>
                 </div>
             </div>
-
-            @include('shared.wall-feed')
         </div>
     </div>
 </div>

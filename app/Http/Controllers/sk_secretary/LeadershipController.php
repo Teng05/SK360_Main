@@ -17,7 +17,7 @@ class LeadershipController extends Controller
         abort_unless(auth()->check() && auth()->user()->role === 'sk_secretary', 403);
 
         $user = auth()->user();
-        $userName = trim(($user->first_name ?? '') . ' ' . ($user->last_name ?? '')) ?: 'User';
+        $fullName = trim(($user->first_name ?? '') . ' ' . ($user->last_name ?? '')) ?: 'User';
         $barangayId = (int) ($user->barangay_id ?? 0);
         $barangayName = $user->barangay->barangay_name ?? 'Barangay';
         $councilMembers = $this->councilMembers($barangayId);
@@ -37,8 +37,9 @@ class LeadershipController extends Controller
             return str_contains($position, 'councilor') || str_contains($position, 'kagawad');
         })->values();
 
-        return view('youth.leadership', [
-            'userName' => $userName,
+        return view('sk_secretary.leadership', [
+            'fullName' => $fullName,
+            'userName' => $fullName,
             'roleLabel' => 'SK Secretary',
             'profileRoute' => route('sk_secretary.profile'),
             'menuItems' => $this->menuItems(),

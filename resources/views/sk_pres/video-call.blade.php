@@ -9,8 +9,6 @@
     <style>
         html, body { height: 100%; margin: 0; overflow: hidden; background: #111111; }
         .video-pane { background: #0f172a; border: 1px solid rgba(255, 255, 255, 0.06); }
-        /* Scale screen share to take more space if active */
-        .screen-share-mode { grid-column: span 2; }
     </style>
 @endsection
 
@@ -54,10 +52,6 @@
                 </div>
 
                 <div class="flex flex-wrap items-center gap-2">
-                    <button id="shareScreenBtn" class="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 transition flex items-center gap-2 px-4 border border-white/10">
-                        <span id="screenIcon">🖥️</span>
-                        <span class="text-xs font-semibold">Share Screen</span>
-                    </button>
                     <button id="toggleMicBtn" type="button" class="rounded-xl bg-white/10 px-4 py-2 text-xs font-semibold hover:bg-white/20">Mute Mic</button>
                     <button id="toggleCamBtn" type="button" class="rounded-xl bg-white/10 px-4 py-2 text-xs font-semibold hover:bg-white/20">Turn Off Camera</button>
                     <button id="leaveBtn" type="button" class="rounded-xl bg-[#ef4444] px-4 py-2 text-xs font-semibold text-white hover:bg-[#dc2626]">Leave Meeting</button>
@@ -95,18 +89,10 @@
     const toggleMicBtn = document.getElementById('toggleMicBtn');
     const toggleCamBtn = document.getElementById('toggleCamBtn');
     const leaveBtn = document.getElementById('leaveBtn');
-    const shareScreenBtn = document.getElementById('shareScreenBtn');
-    const screenIcon = document.getElementById('screenIcon');
 
     let client;
     let localTracks = [];
     let remoteUsers = new Map();
-    
-    // Screen Sharing Variables
-    let screenClient = null;
-    let screenTrack = null;
-    let isScreenSharing = false;
-    let currentUid = null;
 
     const showStatus = (message) => {
         statusText.textContent = message;
@@ -177,8 +163,6 @@
 
             const tokenPayload = await tokenResponse.json();
             if (!tokenResponse.ok) throw new Error(tokenPayload.message || 'Failed to fetch token.');
-            
-            currentUid = tokenPayload.uid;
             client = AgoraRTC.createClient({ mode: 'rtc', codec: 'vp8' });
 
             client.on('user-published', async (user, mediaType) => {
@@ -215,66 +199,6 @@
             showStatus(`Call failed: ${error.message}`);
         }
     };
-
-    // --- SCREEN SHARE HANDLER ---
-    shareScreenBtn.addEventListener('click', async () => {
-        if (!isScreenSharing) {
-            try {
-                setConnectionStatus('Starting share...', 'bg-yellow-500/20 text-yellow-300');
-                
-                screenClient = AgoraRTC.createClient({ mode: 'rtc', codec: 'vp8' });
-                
-                // We request a NEW token for the screen sharing UID (currentUid + 1000)
-                const screenUid = currentUid + 1000;
-                const tokenResp = await fetch(tokenUrl, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRF-TOKEN': @json(csrf_token()),
-                        'Accept': 'application/json',
-                    },
-                    body: JSON.stringify({ 
-                        channel: meetingChannel,
-                        uid: screenUid // Ensure your backend uses this UID for the token
-                    }),
-                });
-                
-                const payload = await tokenResp.json();
-                await screenClient.join(payload.appId, payload.channel, payload.token, screenUid);
-
-                screenTrack = await AgoraRTC.createScreenVideoTrack({
-                    optimizationMode: "detail",
-                    selfBrowserSurface: "exclude"
-                });
-
-                await screenClient.publish(screenTrack);
-
-                isScreenSharing = true;
-                shareScreenBtn.classList.replace('bg-slate-800', 'bg-green-600');
-                screenIcon.innerHTML = '🛑';
-                
-                screenTrack.on("track-ended", () => stopScreenShare());
-                setConnectionStatus('Sharing Screen', 'bg-green-500/20 text-green-300');
-
-            } catch (error) {
-                console.error("Screen share failed:", error);
-                showStatus("Could not share screen: " + error.message);
-                stopScreenShare();
-            }
-        } else {
-            await stopScreenShare();
-        }
-    });
-
-    async function stopScreenShare() {
-        if (screenTrack) { screenTrack.close(); screenTrack = null; }
-        if (screenClient) { await screenClient.leave(); screenClient = null; }
-        isScreenSharing = false;
-        shareScreenBtn.classList.replace('bg-green-600', 'bg-slate-800');
-        screenIcon.innerHTML = '🖥️';
-        setConnectionStatus('Connected', 'bg-green-500/20 text-green-300');
-    }
-
     // Existing Mic/Cam/Leave Handlers
     toggleMicBtn.addEventListener('click', async () => {
         if (!localTracks[0]) return;
@@ -291,7 +215,6 @@
     });
 
     leaveBtn.addEventListener('click', async () => {
-        await stopScreenShare();
         for (const track of localTracks) { track.stop(); track.close(); }
         if (client) await client.leave();
         window.location.href = @json($backRoute ?? route('sk_pres.meetings'));
@@ -300,3 +223,4 @@
     joinMeeting();
 </script>
 @endpush
+
