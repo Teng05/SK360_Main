@@ -52,75 +52,68 @@ use Illuminate\Support\Facades\Route;
 | PUBLIC ROUTES
 |--------------------------------------------------------------------------
 */
+Route::get('/', fn () => view('welcome'));
 
-Route::get('/', function () {
-    return view('welcome');
+Route::controller(AuthController::class)->group(function () {
+    Route::get('/login', 'showLogin')->name('login');
+    Route::post('/login', 'login')->name('login.submit');
+    Route::post('/logout', 'logout')->name('logout');
+    Route::get('/register', 'showRegister')->name('register');
+    Route::post('/register', 'register')->name('register.submit');
+
+    Route::get('/verify', 'showVerify')->name('verify.notice');
+    Route::post('/verify', 'verifyCode')->name('verify.submit');
+    Route::post('/verify/resend', 'resendVerificationCode')->name('verify.resend');
+
+    
+    Route::get('/password/request', [AuthController::class, 'showForgotPassword'])->name('password.request');
+    Route::post('/password/email', [AuthController::class, 'sendPasswordReset'])->name('password.email');
+    Route::get('/password/reset/{token}', [AuthController::class, 'showResetPassword'])->name('password.reset');
+    Route::post('/password/reset', [AuthController::class, 'resetPassword'])->name('password.store');
+    Route::post('/password/verify-phone', [AuthController::class, 'verifyPhoneReset'])->name('password.verify-phone');
 });
 
-Route::get('/login', [AuthController::class, 'showLogin'])->name('login');
-Route::post('/login', [AuthController::class, 'login'])->name('login.submit');
-Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
+Route::middleware('auth')->group(function () {
+    Route::get('/notifications/feed', [NotificationController::class, 'feed'])->name('notifications.feed');
+    Route::post('/notifications/{notification}/read', [NotificationController::class, 'markRead'])->name('notifications.read');
+    Route::middleware('auth')->post('/wall/posts', [WallPostController::class, 'store'])->name('wall.posts.store');
+    Route::middleware('auth')->post('/wall/posts/{announcement}/like', [WallPostController::class, 'toggleLike'])->name('wall.posts.like');
+});
 
-Route::get('/register', [AuthController::class, 'showRegister'])->name('register');
-Route::post('/register', [AuthController::class, 'register'])->name('register.submit');
-
-Route::get('/verify', [AuthController::class, 'showVerify'])->name('verify.notice');
-Route::post('/verify', [AuthController::class, 'verifyCode'])->name('verify.submit');
-Route::post('/verify/resend', [AuthController::class, 'resendVerificationCode'])->name('verify.resend');
-Route::middleware('auth')->get('/notifications/feed', [NotificationController::class, 'feed'])->name('notifications.feed');
-Route::middleware('auth')->post('/notifications/{notification}/read', [NotificationController::class, 'markRead'])->name('notifications.read');
-Route::middleware('auth')->post('/wall/posts', [WallPostController::class, 'store'])->name('wall.posts.store');
 
 
 /*
 |--------------------------------------------------------------------------
-| SK PRESIDENT ROUTES
+| SK PRESIDENT
 |--------------------------------------------------------------------------
 */
 Route::middleware('auth')->prefix('sk_pres')->name('sk_pres.')->group(function () {
 
-    // MAIN PAGES
     Route::get('/home', [HomeController::class, 'index'])->name('home');
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
     Route::get('/consolidation', [ConsolidationController::class, 'index'])->name('consolidation');
     Route::get('/consolidation/download', [ConsolidationController::class, 'download'])->name('consolidation.download');
 
-    // MODULE MANAGEMENT
     Route::get('/module', [ModuleController::class, 'index'])->name('module');
     Route::post('/module', [ModuleController::class, 'store'])->name('module.store');
     Route::post('/module/{slotId}/delete', [ModuleController::class, 'destroy'])->name('module.destroy');
 
-    // ANNOUNCEMENTS
     Route::get('/announcements', [AnnouncementController::class, 'index'])->name('announcements');
     Route::post('/announcements', [AnnouncementController::class, 'store'])->name('announcements.store');
 
-    // CALENDAR
     Route::get('/calendar', [CalendarController::class, 'index'])->name('calendar');
     Route::post('/calendar', [CalendarController::class, 'store'])->name('calendar.store');
 
-    // 💬 CHAT (placeholder)
     Route::get('/chat', [SkPresidentChatController::class, 'index'])->name('chat');
     Route::get('/chat/users', [SkPresidentChatController::class, 'searchUsers'])->name('chat.users');
 
-    /*
-    |--------------------------------------------------------------------------
-    | MEETINGS
-    |--------------------------------------------------------------------------
-    */
     Route::get('/meetings', [MeetingsController::class, 'index'])->name('meetings');
     Route::post('/meetings', [MeetingsController::class, 'store'])->name('meetings.store');
     Route::get('/meetings/{meeting}/call', [MeetingsController::class, 'call'])->name('meetings.call');
     Route::post('/meetings/{meeting}/agora-token', [MeetingsController::class, 'token'])->name('meetings.agora.token');
     Route::get('/video', fn () => redirect()->route('sk_pres.meetings'))->name('video');
 
-    // OTHER MENUS
     Route::get('/rankings', [SkPresidentRankingController::class, 'index'])->name('rankings');
-
-    Route::get('/analytics', fn (PlaceholderController $controller) =>
-        $controller->show('Analytics', 'The analytics page has not been built yet.')
-    )->name('analytics');
-
-    //  LEADERSHIP ROUTE
     Route::get('/leadership', [SkPresidentLeadershipController::class, 'index'])->name('leadership');
 
     Route::get('/archive', [SkPresidentArchiveController::class, 'index'])->name('archive');
@@ -129,72 +122,115 @@ Route::middleware('auth')->prefix('sk_pres')->name('sk_pres.')->group(function (
 
     Route::get('/user-management', [SkPresidentUserManagementController::class, 'index'])->name('user-management');
     Route::post('/user-management/officials', [SkPresidentUserManagementController::class, 'storeOfficial'])->name('user-management.store-official');
-    Route::get('/profile', fn (ProfileSettingsController $controller) => $controller->show('sk_president'))->name('profile');
-    Route::post('/profile', fn (Request $request, ProfileSettingsController $controller) => $controller->update($request, 'sk_president'))->name('profile.update');
-    Route::post('/profile/password', fn (Request $request, ProfileSettingsController $controller) => $controller->updatePassword($request, 'sk_president'))->name('profile.password');
+
+    Route::get('/profile', fn (ProfileSettingsController $c) => $c->show('sk_president'))->name('profile');
+    Route::post('/profile', fn (Request $r, ProfileSettingsController $c) => $c->update($r, 'sk_president'))->name('profile.update');
+    Route::post('/profile/password', fn (Request $r, ProfileSettingsController $c) => $c->updatePassword($r, 'sk_president'))->name('profile.password');
 });
+
 
 
 /*
 |--------------------------------------------------------------------------
-| OTHER ROLES
+| SK CHAIRMAN
 |--------------------------------------------------------------------------
 */
-Route::middleware('auth')->get('/youth/home', [YouthHomeController::class, 'index'])->name('youth.home');
-Route::middleware('auth')->get('/youth/announcements', [YouthAnnouncementController::class, 'index'])->name('youth.announcements');
-Route::middleware('auth')->get('/youth/calendar', [YouthCalendarController::class, 'index'])->name('youth.calendar');
-Route::middleware('auth')->get('/youth/rankings', [YouthRankingController::class, 'index'])->name('youth.rankings');
-Route::middleware('auth')->get('/youth/leadership', [YouthLeadershipController::class, 'index'])->name('youth.leadership');
-Route::middleware('auth')->get('/youth/profile', [YouthProfileController::class, 'show'])->name('youth.profile');
-Route::middleware('auth')->post('/youth/profile', [YouthProfileController::class, 'update'])->name('youth.profile.update');
-Route::middleware('auth')->post('/youth/profile/password', [YouthProfileController::class, 'updatePassword'])->name('youth.profile.password');
+Route::middleware('auth')->prefix('sk_chairman')->name('sk_chairman.')->group(function () {
 
-Route::middleware('auth')->get('/sk_chairman/home', [SkChairmanHomeController::class, 'index'])->name('sk_chairman.home');
-Route::middleware('auth')->get('/sk_secretary/home', [SkSecretaryHomeController::class, 'index'])->name('sk_secretary.home');
+    Route::get('/home', [SkChairmanHomeController::class, 'index'])->name('home');
 
-Route::middleware('auth')->get('/sk_chairman/reports', [SkChairmanReportController::class, 'index'])->name('sk_chairman.reports');
-Route::middleware('auth')->post('/sk_chairman/reports', [SkChairmanReportController::class, 'store'])->name('sk_chairman.reports.store');
-Route::middleware('auth')->get('/sk_chairman/budget', [SkChairmanBudgetController::class, 'index'])->name('sk_chairman.budget');
-Route::middleware('auth')->post('/sk_chairman/budget', [SkChairmanBudgetController::class, 'store'])->name('sk_chairman.budget.store');
-Route::middleware('auth')->get('/sk_chairman/budget/template', [SkChairmanBudgetController::class, 'createTemplate'])->name('sk_chairman.budget.template.create');
-Route::middleware('auth')->post('/sk_chairman/budget/template', [SkChairmanBudgetController::class, 'storeTemplate'])->name('sk_chairman.budget.template.store');
-Route::middleware('auth')->get('/sk_chairman/budget/template/{budgetReportId}/view', [SkChairmanBudgetController::class, 'viewTemplate'])->name('sk_chairman.budget.template.view');
-Route::middleware('auth')->get('/sk_chairman/budget/template/{budgetReportId}/download', [SkChairmanBudgetController::class, 'downloadTemplate'])->name('sk_chairman.budget.template.download');
-Route::middleware('auth')->get('/sk_chairman/announcements', [SkChairmanAnnouncementController::class, 'index'])->name('sk_chairman.announcements');
-Route::middleware('auth')->get('/sk_chairman/calendar', [SkChairmanCalendarController::class, 'index'])->name('sk_chairman.calendar');
-Route::middleware('auth')->get('/sk_chairman/chat', [SkChairmanChatController::class, 'index'])->name('sk_chairman.chat');
-Route::middleware('auth')->get('/sk_chairman/chat/users', [SkChairmanChatController::class, 'searchUsers'])->name('sk_chairman.chat.users');
-Route::middleware('auth')->get('/sk_chairman/meetings', [SkChairmanMeetingsController::class, 'index'])->name('sk_chairman.meetings');
-Route::middleware('auth')->get('/sk_chairman/meetings/{meeting}/call', [SkChairmanMeetingsController::class, 'call'])->name('sk_chairman.meetings.call');
-Route::middleware('auth')->post('/sk_chairman/meetings/{meeting}/agora-token', [SkChairmanMeetingsController::class, 'token'])->name('sk_chairman.meetings.agora.token');
-Route::middleware('auth')->get('/sk_chairman/rankings', [SkChairmanRankingController::class, 'index'])->name('sk_chairman.rankings');
-Route::middleware('auth')->get('/sk_chairman/leadership', [SkChairmanLeadershipController::class, 'index'])->name('sk_chairman.leadership');
-Route::middleware('auth')->post('/sk_chairman/leadership', [SkChairmanLeadershipController::class, 'store'])->name('sk_chairman.leadership.store');
-Route::middleware('auth')->post('/sk_chairman/leadership/{councilId}/delete', [SkChairmanLeadershipController::class, 'destroy'])->name('sk_chairman.leadership.destroy');
-Route::middleware('auth')->get('/sk_chairman/archive', [App\Http\Controllers\sk_chairman\ArchiveController::class, 'index'])->name('sk_chairman.archive');
-Route::middleware('auth')->get('/sk_chairman/archive/download/bulk', [App\Http\Controllers\sk_chairman\ArchiveController::class, 'bulkDownload'])->name('sk_chairman.archive.bulk-download');
-Route::middleware('auth')->get('/sk_chairman/archive/download/{sourceType}/{sourceId}', [App\Http\Controllers\sk_chairman\ArchiveController::class, 'download'])->name('sk_chairman.archive.download');
-Route::middleware('auth')->get('/sk_chairman/profile', fn (ProfileSettingsController $controller) => $controller->show('sk_chairman'))->name('sk_chairman.profile');
-Route::middleware('auth')->post('/sk_chairman/profile', fn (Request $request, ProfileSettingsController $controller) => $controller->update($request, 'sk_chairman'))->name('sk_chairman.profile.update');
-Route::middleware('auth')->post('/sk_chairman/profile/password', fn (Request $request, ProfileSettingsController $controller) => $controller->updatePassword($request, 'sk_chairman'))->name('sk_chairman.profile.password');
+    Route::get('/reports', [SkChairmanReportController::class, 'index'])->name('reports');
+    Route::post('/reports', [SkChairmanReportController::class, 'store'])->name('reports.store');
 
-Route::middleware('auth')->get('/sk_secretary/reports', [SkSecretaryReportController::class, 'index'])->name('sk_secretary.reports');
-Route::middleware('auth')->post('/sk_secretary/reports', [SkSecretaryReportController::class, 'store'])->name('sk_secretary.reports.store');
-Route::middleware('auth')->get('/sk_secretary/budget', [SkSecretaryBudgetController::class, 'index'])->name('sk_secretary.budget');
-Route::middleware('auth')->post('/sk_secretary/budget', [SkSecretaryBudgetController::class, 'store'])->name('sk_secretary.budget.store');
-Route::middleware('auth')->get('/sk_secretary/budget/template', [SkSecretaryBudgetController::class, 'createTemplate'])->name('sk_secretary.budget.template.create');
-Route::middleware('auth')->post('/sk_secretary/budget/template', [SkSecretaryBudgetController::class, 'storeTemplate'])->name('sk_secretary.budget.template.store');
-Route::middleware('auth')->get('/sk_secretary/budget/template/{budgetReportId}/view', [SkSecretaryBudgetController::class, 'viewTemplate'])->name('sk_secretary.budget.template.view');
-Route::middleware('auth')->get('/sk_secretary/budget/template/{budgetReportId}/download', [SkSecretaryBudgetController::class, 'downloadTemplate'])->name('sk_secretary.budget.template.download');
-Route::middleware('auth')->get('/sk_secretary/announcements', [SkSecretaryAnnouncementController::class, 'index'])->name('sk_secretary.announcements');
-Route::middleware('auth')->get('/sk_secretary/calendar', [SkSecretaryCalendarController::class, 'index'])->name('sk_secretary.calendar');
-Route::middleware('auth')->get('/sk_secretary/chat', [SkSecretaryChatController::class, 'index'])->name('sk_secretary.chat');
-Route::middleware('auth')->get('/sk_secretary/chat/users', [SkSecretaryChatController::class, 'searchUsers'])->name('sk_secretary.chat.users');
-Route::middleware('auth')->get('/sk_secretary/meetings', [SkSecretaryMeetingsController::class, 'index'])->name('sk_secretary.meetings');
-Route::middleware('auth')->get('/sk_secretary/meetings/{meeting}/call', [SkSecretaryMeetingsController::class, 'call'])->name('sk_secretary.meetings.call');
-Route::middleware('auth')->post('/sk_secretary/meetings/{meeting}/agora-token', [SkSecretaryMeetingsController::class, 'token'])->name('sk_secretary.meetings.agora.token');
-Route::middleware('auth')->get('/sk_secretary/rankings', [SkSecretaryRankingController::class, 'index'])->name('sk_secretary.rankings');
-Route::middleware('auth')->get('/sk_secretary/leadership', [SkSecretaryLeadershipController::class, 'index'])->name('sk_secretary.leadership');
-Route::middleware('auth')->get('/sk_secretary/profile', fn (ProfileSettingsController $controller) => $controller->show('sk_secretary'))->name('sk_secretary.profile');
-Route::middleware('auth')->post('/sk_secretary/profile', fn (Request $request, ProfileSettingsController $controller) => $controller->update($request, 'sk_secretary'))->name('sk_secretary.profile.update');
-Route::middleware('auth')->post('/sk_secretary/profile/password', fn (Request $request, ProfileSettingsController $controller) => $controller->updatePassword($request, 'sk_secretary'))->name('sk_secretary.profile.password');
+    Route::get('/budget', [SkChairmanBudgetController::class, 'index'])->name('budget');
+    Route::post('/budget', [SkChairmanBudgetController::class, 'store'])->name('budget.store');
+
+    Route::get('/budget/template', [SkChairmanBudgetController::class, 'createTemplate'])->name('budget.template.create');
+    Route::post('/budget/template', [SkChairmanBudgetController::class, 'storeTemplate'])->name('budget.template.store');
+    Route::get('/budget/template/{budgetReportId}/view', [SkChairmanBudgetController::class, 'viewTemplate'])->name('budget.template.view');
+    Route::get('/budget/template/{budgetReportId}/download', [SkChairmanBudgetController::class, 'downloadTemplate'])->name('budget.template.download');
+
+    Route::get('/announcements', [SkChairmanAnnouncementController::class, 'index'])->name('announcements');
+    Route::get('/calendar', [SkChairmanCalendarController::class, 'index'])->name('calendar');
+
+    Route::get('/chat', [SkChairmanChatController::class, 'index'])->name('chat');
+    Route::get('/chat/users', [SkChairmanChatController::class, 'searchUsers'])->name('chat.users');
+
+    Route::get('/meetings', [SkChairmanMeetingsController::class, 'index'])->name('meetings');
+    Route::get('/meetings/{meeting}/call', [SkChairmanMeetingsController::class, 'call'])->name('meetings.call');
+    Route::post('/meetings/{meeting}/agora-token', [SkChairmanMeetingsController::class, 'token'])->name('meetings.agora.token');
+
+    Route::get('/rankings', [SkChairmanRankingController::class, 'index'])->name('rankings');
+
+    Route::get('/leadership', [SkChairmanLeadershipController::class, 'index'])->name('leadership');
+    Route::post('/leadership', [SkChairmanLeadershipController::class, 'store'])->name('leadership.store');
+    Route::post('/leadership/{councilId}/delete', [SkChairmanLeadershipController::class, 'destroy'])->name('leadership.destroy');
+
+    Route::get('/archive', [App\Http\Controllers\sk_chairman\ArchiveController::class, 'index'])->name('archive');
+    Route::get('/archive/download/bulk', [App\Http\Controllers\sk_chairman\ArchiveController::class, 'bulkDownload'])->name('archive.bulk-download');
+    Route::get('/archive/download/{sourceType}/{sourceId}', [App\Http\Controllers\sk_chairman\ArchiveController::class, 'download'])->name('archive.download');
+
+    Route::get('/profile', fn (ProfileSettingsController $c) => $c->show('sk_chairman'))->name('profile');
+    Route::post('/profile', fn (Request $r, ProfileSettingsController $c) => $c->update($r, 'sk_chairman'))->name('profile.update');
+    Route::post('/profile/password', fn (Request $r, ProfileSettingsController $c) => $c->updatePassword($r, 'sk_chairman'))->name('profile.password');
+});
+
+
+
+/*
+|--------------------------------------------------------------------------
+| SK SECRETARY
+|--------------------------------------------------------------------------
+*/
+Route::middleware('auth')->prefix('sk_secretary')->name('sk_secretary.')->group(function () {
+
+    Route::get('/home', [SkSecretaryHomeController::class, 'index'])->name('home');
+
+    Route::get('/reports', [SkSecretaryReportController::class, 'index'])->name('reports');
+    Route::post('/reports', [SkSecretaryReportController::class, 'store'])->name('reports.store');
+
+    Route::get('/budget', [SkSecretaryBudgetController::class, 'index'])->name('budget');
+    Route::post('/budget', [SkSecretaryBudgetController::class, 'store'])->name('budget.store');
+
+    Route::get('/budget/template', [SkSecretaryBudgetController::class, 'createTemplate'])->name('budget.template.create');
+    Route::post('/budget/template', [SkSecretaryBudgetController::class, 'storeTemplate'])->name('budget.template.store');
+    Route::get('/budget/template/{budgetReportId}/view', [SkSecretaryBudgetController::class, 'viewTemplate'])->name('budget.template.view');
+    Route::get('/budget/template/{budgetReportId}/download', [SkSecretaryBudgetController::class, 'downloadTemplate'])->name('budget.template.download');
+
+    Route::get('/announcements', [SkSecretaryAnnouncementController::class, 'index'])->name('announcements');
+    Route::get('/calendar', [SkSecretaryCalendarController::class, 'index'])->name('calendar');
+
+    Route::get('/chat', [SkSecretaryChatController::class, 'index'])->name('chat');
+    Route::get('/chat/users', [SkSecretaryChatController::class, 'searchUsers'])->name('chat.users');
+
+    Route::get('/meetings', [SkSecretaryMeetingsController::class, 'index'])->name('meetings');
+    Route::get('/meetings/{meeting}/call', [SkSecretaryMeetingsController::class, 'call'])->name('meetings.call');
+    Route::post('/meetings/{meeting}/agora-token', [SkSecretaryMeetingsController::class, 'token'])->name('meetings.agora.token');
+
+    Route::get('/rankings', [SkSecretaryRankingController::class, 'index'])->name('rankings');
+    Route::get('/leadership', [SkSecretaryLeadershipController::class, 'index'])->name('leadership');
+
+    Route::get('/profile', fn (ProfileSettingsController $c) => $c->show('sk_secretary'))->name('profile');
+    Route::post('/profile', fn (Request $r, ProfileSettingsController $c) => $c->update($r, 'sk_secretary'))->name('profile.update');
+    Route::post('/profile/password', fn (Request $r, ProfileSettingsController $c) => $c->updatePassword($r, 'sk_secretary'))->name('profile.password');
+});
+
+
+
+/*
+|--------------------------------------------------------------------------
+| YOUTH
+|--------------------------------------------------------------------------
+*/
+Route::middleware('auth')->prefix('youth')->name('youth.')->group(function () {
+
+    Route::get('/home', [YouthHomeController::class, 'index'])->name('home');
+    Route::get('/announcements', [YouthAnnouncementController::class, 'index'])->name('announcements');
+    Route::get('/calendar', [YouthCalendarController::class, 'index'])->name('calendar');
+    Route::get('/rankings', [YouthRankingController::class, 'index'])->name('rankings');
+    Route::get('/leadership', [YouthLeadershipController::class, 'index'])->name('leadership');
+
+    Route::get('/profile', [YouthProfileController::class, 'show'])->name('profile');
+    Route::post('/profile', [YouthProfileController::class, 'update'])->name('profile.update');
+    Route::post('/profile/password', [YouthProfileController::class, 'updatePassword'])->name('profile.password');
+});
