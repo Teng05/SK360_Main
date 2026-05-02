@@ -1,5 +1,7 @@
 <?php
 
+// File guide: Handles route logic and page data for app/Http/Controllers/sk_pres/ModuleController.php.
+
 namespace App\Http\Controllers\sk_pres;
 
 use App\Http\Controllers\Controller;
@@ -28,7 +30,7 @@ class ModuleController extends Controller
             ['link' => route('sk_pres.chat'), 'icon' => '💬', 'label' => 'Chat'],
             ['link' => route('sk_pres.meetings'), 'icon' => '📞', 'label' => 'Meetings'],
             ['link' => route('sk_pres.rankings'), 'icon' => '🏆', 'label' => 'Rankings'],
-            ['link' => route('sk_pres.analytics'), 'icon' => '📈', 'label' => 'Analytics'],
+            
             ['link' => route('sk_pres.leadership'), 'icon' => '👥', 'label' => 'Leadership'],
             ['link' => route('sk_pres.archive'), 'icon' => '🗂️', 'label' => 'Archive'],
             ['link' => route('sk_pres.user-management'), 'icon' => '👤', 'label' => 'User Management'],

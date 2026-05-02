@@ -1,5 +1,7 @@
 <?php
 
+// File guide: Handles route logic and page data for app/Http/Controllers/sk_secretary/CalendarController.php.
+
 namespace App\Http\Controllers\sk_secretary;
 
 use App\Http\Controllers\Controller;

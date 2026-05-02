@@ -1,13 +1,18 @@
 <?php
 
+// File guide: Handles route logic and page data for app/Http/Controllers/youth/HomeController.php.
+
 namespace App\Http\Controllers\Youth;
 
+use App\Http\Controllers\Concerns\BuildsWallFeed;
 use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
 class HomeController extends Controller
 {
+    use BuildsWallFeed;
+
     public function index(): View
     {
         abort_unless(auth()->check() && auth()->user()->role === 'youth', 403);
@@ -24,6 +29,8 @@ class HomeController extends Controller
             'eventsJoined' => 0,
             'participationRate' => 0,
             'barangayRank' => $this->resolveBarangayRank((int) ($user->barangay_id ?? 0)),
+            'feedPosts' => $this->wallFeedPosts(),
+            'defaultPostCategory' => 'update',
         ]);
     }
 

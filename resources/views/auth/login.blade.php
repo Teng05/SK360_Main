@@ -1,3 +1,4 @@
+{{-- File guide: Blade view template for resources/views/auth/login.blade.php. --}}
 @extends('layouts.app')
 
 @section('title', 'SK 360 | Login')
@@ -86,7 +87,7 @@
                             Remember me
                         </label>
 
-                        <a href="#">Forgot Password?</a>
+                        <a href="{{ route('password.request') }}">Forgot Password?</a>
                     </div>
 
                     <button class="login-btn" type="submit">Sign In</button>

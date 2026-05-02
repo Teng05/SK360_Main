@@ -1,3 +1,4 @@
+{{-- File guide: Blade view template for resources/views/sk_pres/module.blade.php. --}}
 @extends('layouts.app')
 
 @section('title', 'SK 360 Dashboard')
@@ -70,7 +71,7 @@
                             My Account
                         </div>
 
-                        <a href="#" class="flex items-center gap-3 px-5 py-3 hover:bg-gray-100 transition">
+                        <a href="{{ route('sk_pres.profile') }}" class="flex items-center gap-3 px-5 py-3 hover:bg-gray-100 transition">
                             <span>👤</span>
                             <span class="text-gray-700">Profile Settings</span>
                         </a>

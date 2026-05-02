@@ -1,5 +1,7 @@
 <?php
 
+// File guide: Handles route logic and page data for app/Http/Controllers/sk_chairman/RankingController.php.
+
 namespace App\Http\Controllers\sk_chairman;
 
 use App\Http\Controllers\Concerns\BuildsRankingsData;
@@ -26,6 +28,8 @@ class RankingController extends Controller
             'topRankings' => $this->topRankings($leaderboard),
             'leaderboard' => $leaderboard,
             'latestPeriod' => $this->latestRankingPeriod(),
+            'pointSystem' => $this->rankingPointSystem(),
+            'profileRoute' => route('sk_chairman.profile'),
         ]);
     }
 

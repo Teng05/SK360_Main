@@ -1,3 +1,4 @@
+{{-- File guide: Blade view template for resources/views/shared/budget-template-download.blade.php. --}}
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -13,10 +14,16 @@
         .subtitle { font-size: 20px; font-weight: 700; }
         .section-title { font-weight: 700; background: #f3f4f6; }
         .small { font-size: 11px; }
+        .top-note { text-align: right; font-size: 11px; margin-bottom: 28px; }
+        .underline { text-decoration: underline; font-weight: 700; }
     </style>
 </head>
 <body>
     @php
+        $templateType = $data['report_type'] ?? 'quarterly';
+        $certifiedDate = $data['certified_date'] ?? now()->toDateString();
+        $formattedDate = \Carbon\Carbon::parse($certifiedDate)->format('F d, Y');
+        $periodDate = \Carbon\Carbon::create((int) ($data['reporting_year'] ?? now()->year), max(1, (int) ($data['reporting_month'] ?? now()->month)), 1);
         $objectHeaders = $data['object_headers'] ?? [];
         $objectHeader1 = $objectHeaders[0] ?? 'Object 1';
         $objectHeader2 = $objectHeaders[1] ?? 'Object 2';
@@ -24,6 +31,124 @@
         $objectHeader4 = $objectHeaders[3] ?? 'Insert additional Object of Expenditures';
     @endphp
 
+    @if ($templateType === 'monthly')
+        <div class="top-note">Annex 30</div>
+        <div class="center" style="margin-bottom: 22px;">
+            <div style="font-size:16px; font-weight:700;">BANK RECONCILIATION STATEMENT</div>
+            <div class="small">For the month of {{ $periodDate->format('F Y') }}</div>
+        </div>
+
+        <table>
+            <tr>
+                <td colspan="2">SK of Barangay: {{ $barangayName }}</td>
+                <td colspan="2">Bank Name: {{ $data['bank_name'] ?? '' }}</td>
+            </tr>
+            <tr>
+                <td colspan="2">City/Municipality: {{ $data['city'] ?? '' }}</td>
+                <td colspan="2">Branch: {{ $data['branch'] ?? '' }}</td>
+            </tr>
+            <tr>
+                <td colspan="2">Province: {{ $data['province'] ?? '' }}</td>
+                <td colspan="2">Current Account No.: {{ $data['current_account_no'] ?? '' }}</td>
+            </tr>
+            <tr>
+                <th>Particulars</th>
+                <th>RCB</th>
+                <th>Bank</th>
+                <th>Explanatory Comment</th>
+            </tr>
+            @foreach (($data['bank_rows'] ?? []) as $row)
+                <tr>
+                    <td>{{ $row['particulars'] ?? '' }}</td>
+                    <td class="center">{{ $row['rcb'] ?? '' }}</td>
+                    <td class="center">{{ $row['bank'] ?? '' }}</td>
+                    <td>{{ $row['comment'] ?? '' }}</td>
+                </tr>
+            @endforeach
+            <tr>
+                <td colspan="2" class="center" style="height: 110px;">
+                    <div>Prepared and Certified Correct by:</div>
+                    <div style="margin-top:32px;" class="underline">{{ $data['prepared_by'] ?? '' }}</div>
+                    <div class="small">Signature over Printed Name<br>of SK Treasurer</div>
+                    <div style="margin-top:14px;" class="underline">{{ $formattedDate }}</div>
+                    <div class="small">Date</div>
+                </td>
+                <td colspan="2" class="center" style="height: 110px;">
+                    <div>Approved by:</div>
+                    <div style="margin-top:32px;" class="underline">{{ $data['approved_by'] ?? '' }}</div>
+                    <div class="small">Signature over Printed Name<br>of SK Chairperson</div>
+                    <div style="margin-top:14px;" class="underline">{{ $formattedDate }}</div>
+                    <div class="small">Date</div>
+                </td>
+            </tr>
+        </table>
+    @elseif ($templateType === 'annual')
+        <div class="top-note">Annex 40</div>
+        <div class="center" style="margin-bottom: 20px;">
+            <div style="font-size:16px; font-weight:700;">REPORT ON INVENTORY OF DONATED PROPERTY AND EQUIPMENT</div>
+            <div class="small">As at {{ $formattedDate }}</div>
+        </div>
+
+        <div style="font-size:12px; margin-bottom: 20px;">
+            SK of Barangay: {{ $barangayName }}<br>
+            City/Municipality: {{ $data['city'] ?? '' }}<br>
+            Province: {{ $data['province'] ?? '' }}
+        </div>
+
+        <div style="font-size:12px; margin-bottom: 18px;">
+            For which <span class="underline">{{ $data['accountable_officer'] ?? '' }}</span>,
+            <span class="underline">{{ $data['official_designation'] ?? '' }}</span> is accountable, having assumed such accountability on
+            <span class="underline">{{ !empty($data['assumption_date']) ? \Carbon\Carbon::parse($data['assumption_date'])->format('F d, Y') : '' }}</span>.
+        </div>
+
+        <table>
+            <tr>
+                <th>Article<br>(1)</th>
+                <th>Item Description<br>(2)</th>
+                <th>Property No.<br>(3)</th>
+                <th>Unit of Measurement<br>(4)</th>
+                <th>Unit Cost<br>(5)</th>
+                <th>Balance Per RDPE<br>(Quantity)<br>(6)</th>
+                <th>On Hand Per Count<br>(Quantity)<br>(7)</th>
+                <th>Quantity<br>(8)</th>
+                <th>Value<br>(9)</th>
+                <th>Remarks<br>(10)</th>
+            </tr>
+            @foreach (($data['inventory_rows'] ?? []) as $row)
+                <tr>
+                    <td>{{ $row['article'] ?? '' }}</td>
+                    <td>{{ $row['description'] ?? '' }}</td>
+                    <td>{{ $row['property_no'] ?? '' }}</td>
+                    <td>{{ $row['unit'] ?? '' }}</td>
+                    <td>{{ $row['unit_cost'] ?? '' }}</td>
+                    <td>{{ $row['balance'] ?? '' }}</td>
+                    <td>{{ $row['on_hand'] ?? '' }}</td>
+                    <td>{{ $row['shortage_quantity'] ?? '' }}</td>
+                    <td>{{ $row['shortage_value'] ?? '' }}</td>
+                    <td>{{ $row['remarks'] ?? '' }}</td>
+                </tr>
+            @endforeach
+            <tr>
+                <td colspan="10" style="height: 100px;">
+                    <div>Prepared and Certified Correct by: <span style="float:right; margin-right:180px;">Approved by:</span></div>
+                    <table style="margin-top:24px;">
+                        <tr>
+                            @foreach (($data['committee_members'] ?? ['', '', '']) as $member)
+                                <td class="no-border center">
+                                    <div class="underline">{{ $member }}</div>
+                                    <div class="small">Signature over Printed Name<br>Member, Inventory Committee<br>Date: {{ $formattedDate }}</div>
+                                </td>
+                            @endforeach
+                            <td class="no-border center">
+                                <div class="underline">{{ $data['chairperson_name'] ?? '' }}</div>
+                                <div class="small">Signature over Printed Name<br>SK Chairperson<br>Date: {{ $formattedDate }}</div>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+        </table>
+    @else
     <table>
         <tr>
             <td class="no-border"></td>
@@ -107,5 +232,6 @@
             </td>
         </tr>
     </table>
+    @endif
 </body>
 </html>

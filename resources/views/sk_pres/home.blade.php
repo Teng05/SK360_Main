@@ -1,12 +1,10 @@
+{{-- File guide: Blade view template for resources/views/sk_pres/home.blade.php. --}}
 @extends('layouts.app')
 
 @section('title', 'SK 360 Dashboard')
 
 @section('page_css')
     <script src="https://cdn.tailwindcss.com"></script>
-    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
-    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 @endsection
 
 @section('content')
@@ -75,7 +73,7 @@
                             My Account
                         </div>
 
-                        <a href="#" class="flex items-center gap-3 px-5 py-3 hover:bg-gray-100 transition">
+                        <a href="{{ route('sk_pres.profile') }}" class="flex items-center gap-3 px-5 py-3 hover:bg-gray-100 transition">
                             <span>👤</span>
                             <span class="text-gray-700">Profile Settings</span>
                         </a>
@@ -132,7 +130,7 @@
                     <h2 class="text-3xl font-bold text-gray-900 mb-1">Create Post</h2>
                     <p class="text-gray-500 mb-7">Share an update with the SK community</p>
 
-                    <form action="" method="POST" enctype="multipart/form-data" class="space-y-5">
+                    <form action="{{ route('wall.posts.store') }}" method="POST" class="space-y-5">
                         @csrf
                         <input type="hidden" name="post_category" id="selectedPostCategory" value="announcement">
 
@@ -233,7 +231,7 @@
                 </div>
             </div>
 
-            <div id="activityFeedApp"></div>
+            @include('shared.wall-feed')
         </div>
     </div>
 </div>
@@ -345,77 +343,4 @@
     setActiveCategory('announcement');
 </script>
 
-<script type="text/babel">
-    const { useState } = React;
-
-    function ActivityFeed() {
-        const [postText, setPostText] = useState("");
-        const [posts, setPosts] = useState([]);
-
-        const handlePost = () => {
-            const trimmedText = postText.trim();
-
-            if (!trimmedText) return;
-
-            const newPost = {
-                id: Date.now(),
-                author: @json($fullName),
-                content: trimmedText,
-                time: new Date().toLocaleString()
-            };
-
-            setPosts([newPost, ...posts]);
-            setPostText("");
-        };
-
-        return (
-            <div className="bg-white p-6 rounded-xl shadow">
-                <div className="flex justify-between items-center mb-4">
-                    <h2 className="font-semibold">Activity Feed</h2>
-                    <span className="text-xs text-gray-400">Live</span>
-                </div>
-
-                <div className="border rounded-lg p-4 mb-4">
-                    <textarea
-                        className="w-full border rounded p-3 resize-none focus:outline-none focus:ring-2 focus:ring-red-400"
-                        rows="3"
-                        placeholder="What's on your mind?"
-                        value={postText}
-                        onChange={(e) => setPostText(e.target.value)}
-                    ></textarea>
-
-                    <div className="flex justify-end mt-3">
-                        <button
-                            type="button"
-                            onClick={handlePost}
-                            className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg"
-                        >
-                            Post
-                        </button>
-                    </div>
-                </div>
-
-                {posts.length === 0 ? (
-                    <div className="text-center text-gray-400 py-10">
-                        No posts yet. Start sharing updates 🚀
-                    </div>
-                ) : (
-                    <div className="space-y-4">
-                        {posts.map((post) => (
-                            <div key={post.id} className="border rounded-xl p-4 bg-gray-50">
-                                <div className="flex items-center justify-between mb-2">
-                                    <h3 className="font-semibold text-gray-800">{post.author}</h3>
-                                    <span className="text-xs text-gray-400">{post.time}</span>
-                                </div>
-                                <p className="text-sm text-gray-700 whitespace-pre-line">{post.content}</p>
-                            </div>
-                        ))}
-                    </div>
-                )}
-            </div>
-        );
-    }
-
-    ReactDOM.createRoot(document.getElementById('activityFeedApp')).render(<ActivityFeed />);
-</script>
 @endpush

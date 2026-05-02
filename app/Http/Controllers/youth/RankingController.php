@@ -1,8 +1,11 @@
 <?php
 
+// File guide: Handles route logic and page data for app/Http/Controllers/youth/RankingController.php.
+
 namespace App\Http\Controllers\Youth;
 
 use App\Http\Controllers\Controller;
+use App\Services\RankingPointsService;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
@@ -42,6 +45,7 @@ class RankingController extends Controller
             'topRankings' => $topRankings,
             'leaderboard' => $leaderboard,
             'latestPeriod' => $this->latestPeriod(),
+            'pointSystem' => $this->pointSystem(),
         ]);
     }
 
@@ -54,6 +58,8 @@ class RankingController extends Controller
 
     protected function leaderboard(): Collection
     {
+        app(RankingPointsService::class)->recordMissedMeetings();
+
         $latestPeriod = $this->latestPeriod();
 
         if (! $latestPeriod) {
@@ -89,6 +95,19 @@ class RankingController extends Controller
     protected function normalizeMetric(int $value): int
     {
         return max(0, min(100, $value));
+    }
+
+    protected function pointSystem(): array
+    {
+        return [
+            ['label' => 'On-time Report Submission', 'points' => 50, 'type' => 'positive'],
+            ['label' => 'Meeting Attendance', 'points' => 30, 'type' => 'positive'],
+            ['label' => 'Community Engagement', 'points' => 25, 'type' => 'positive'],
+            ['label' => 'Quality Documentation', 'points' => 20, 'type' => 'positive'],
+            ['label' => 'Event Participation', 'points' => 15, 'type' => 'positive'],
+            ['label' => 'Late Submission', 'points' => -25, 'type' => 'negative'],
+            ['label' => 'Missed Meeting', 'points' => -30, 'type' => 'negative'],
+        ];
     }
 
     protected function menuItems(): array

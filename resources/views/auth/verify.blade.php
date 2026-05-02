@@ -1,3 +1,4 @@
+{{-- File guide: Blade view template for resources/views/auth/verify.blade.php. --}}
 @extends('layouts.app')
 
 @section('title', 'SK 360 | Verify Account')

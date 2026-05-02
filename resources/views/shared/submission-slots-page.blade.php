@@ -1,3 +1,4 @@
+{{-- File guide: Blade view template for resources/views/shared/submission-slots-page.blade.php. --}}
 <div class="flex h-screen bg-gray-100 overflow-hidden">
     <div class="w-64 bg-red-600 text-white flex flex-col p-3 overflow-y-auto">
         <div class="flex items-center gap-2 mb-3">
@@ -49,7 +50,7 @@
 
                     <div id="userDropdown" class="hidden absolute right-0 mt-3 w-64 bg-white rounded-2xl shadow-xl border overflow-hidden z-50">
                         <div class="px-5 py-4 font-semibold text-gray-800 border-b">My Account</div>
-                        <a href="#" class="flex items-center gap-3 px-5 py-3 hover:bg-gray-100 transition">
+                        <a href="{{ $profileRoute ?? '#' }}" class="flex items-center gap-3 px-5 py-3 hover:bg-gray-100 transition">
                             <span>👤</span>
                             <span class="text-gray-700">Profile Settings</span>
                         </a>
@@ -125,12 +126,14 @@
                                     </div>
                                 </div>
                                 <div class="mt-4 flex justify-end">
-                                    @if (!empty($slot->has_submitted))
+                                    @if (!empty($slot->has_submitted) && empty($allowResubmission))
                                         <button type="button" class="rounded-xl bg-green-600 px-4 py-3 text-xs font-black uppercase text-white cursor-default">
                                             Submitted
                                         </button>
                                     @else
-                                        <button type="button" class="rounded-xl bg-red-600 px-4 py-3 text-xs font-black uppercase text-white hover:bg-red-700" onclick="openSlotSubmission({{ $slot->slot_id }}, @js($slot->title))">{{ $slotActionLabel }}</button>
+                                        <button type="button" class="rounded-xl {{ !empty($slot->has_submitted) ? 'bg-amber-500 hover:bg-amber-600' : 'bg-red-600 hover:bg-red-700' }} px-4 py-3 text-xs font-black uppercase text-white" onclick="openSlotSubmission({{ $slot->slot_id }}, @js($slot->title))">
+                                            {{ !empty($slot->has_submitted) ? (($submissionType ?? '') === 'report' ? 'Resubmit Report File' : 'Resubmit Budget File') : $slotActionLabel }}
+                                        </button>
                                     @endif
                                 </div>
                             </div>
@@ -160,7 +163,7 @@
                                     <tr class="hover:bg-gray-50 transition border-b border-gray-50">
                                         <td class="px-8 py-5">
                                             <div class="font-bold text-gray-800 uppercase tracking-tighter">{{ $submission->title ?? $submission->report_title }}</div>
-                                            <div class="text-[10px] text-gray-400 font-bold uppercase mt-1">{{ optional($submission->submitted_at)->format('F Y') ?? 'Submission' }}</div>
+                                            <div class="text-[10px] text-gray-400 font-bold uppercase mt-1">{{ $submission->period_label ?? optional($submission->submitted_at)->format('F Y') ?? 'Submission' }}</div>
                                         </td>
                                         <td class="px-6 py-5">
                                             <span class="{{ $submission->method_badge }} px-3 py-1 rounded-full text-[9px] font-black uppercase">{{ $submission->method_label }}</span>
@@ -178,7 +181,7 @@
                                             @if ($submission->download_url)
                                                 <a href="{{ $submission->download_url }}" target="_blank" class="inline-flex items-center justify-center w-8 h-8 rounded-xl bg-gray-100 text-gray-500 hover:bg-green-100 hover:text-green-600 transition shadow-sm">D</a>
                                             @else
-                                                <button type="button" onclick="window.alert('This slot used the system template.')" class="w-8 h-8 rounded-xl bg-gray-100 text-gray-500 hover:bg-green-100 hover:text-green-600 transition shadow-sm">D</button>
+                                                <button type="button" onclick="window.alert('{{ ($submissionType ?? '') === 'report' ? 'No PDF file is available for this report.' : 'This slot used the system template.' }}')" class="w-8 h-8 rounded-xl bg-gray-100 text-gray-500 hover:bg-green-100 hover:text-green-600 transition shadow-sm">D</button>
                                             @endif
                                         </td>
                                     </tr>
@@ -210,18 +213,60 @@
             @csrf
             <input type="hidden" name="slot_id" id="slotIdField" value="{{ old('slot_id') }}">
 
-            <div class="grid grid-cols-2 gap-3">
-                <label data-submission-mode="template" class="slot-mode-label text-center p-3 rounded-xl border-2 border-gray-100 bg-gray-50 cursor-pointer text-[10px] font-black uppercase transition">
-                    <input type="radio" name="sub_method" value="template" class="hidden" {{ old('sub_method', 'template') === 'template' ? 'checked' : '' }}>
-                    System Template
-                </label>
-                <label data-submission-mode="pdf" class="slot-mode-label text-center p-3 rounded-xl border-2 border-gray-100 bg-gray-50 cursor-pointer text-[10px] font-black uppercase transition">
-                    <input type="radio" name="sub_method" value="pdf" class="hidden" {{ old('sub_method') === 'pdf' ? 'checked' : '' }}>
-                    PDF Upload
-                </label>
-            </div>
+            @if (($submissionType ?? '') === 'budget')
+                <div class="grid grid-cols-1 gap-4 rounded-2xl border border-gray-100 bg-gray-50 p-4">
+                    <div>
+                        <label class="block text-[10px] font-black text-gray-400 uppercase mb-2 ml-1">Submission Period</label>
+                        <select id="reportTypeField" name="report_type" class="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-xs font-bold text-gray-700 outline-none focus:ring-2 focus:ring-red-300">
+                            <option value="monthly" {{ old('report_type', 'monthly') === 'monthly' ? 'selected' : '' }}>Monthly</option>
+                            <option value="quarterly" {{ old('report_type') === 'quarterly' ? 'selected' : '' }}>Quarterly</option>
+                            <option value="annual" {{ old('report_type') === 'annual' ? 'selected' : '' }}>Annual</option>
+                        </select>
+                    </div>
 
-            <div id="slotFileSection" class="{{ old('sub_method') === 'pdf' ? '' : 'hidden' }}">
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div>
+                            <label class="block text-[10px] font-black text-gray-400 uppercase mb-2 ml-1">Year</label>
+                            <input type="number" name="reporting_year" value="{{ old('reporting_year', now()->year) }}" min="2000" max="2100" class="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-xs font-bold text-gray-700 outline-none focus:ring-2 focus:ring-red-300">
+                        </div>
+
+                        <div id="reportMonthWrap">
+                            <label class="block text-[10px] font-black text-gray-400 uppercase mb-2 ml-1">Month</label>
+                            <select name="reporting_month" class="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-xs font-bold text-gray-700 outline-none focus:ring-2 focus:ring-red-300">
+                                @foreach ([1 => 'January', 2 => 'February', 3 => 'March', 4 => 'April', 5 => 'May', 6 => 'June', 7 => 'July', 8 => 'August', 9 => 'September', 10 => 'October', 11 => 'November', 12 => 'December'] as $number => $month)
+                                    <option value="{{ $number }}" {{ (int) old('reporting_month', now()->month) === $number ? 'selected' : '' }}>{{ $month }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+
+                        <div id="reportQuarterWrap" class="hidden">
+                            <label class="block text-[10px] font-black text-gray-400 uppercase mb-2 ml-1">Quarter</label>
+                            <select name="reporting_quarter" class="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-xs font-bold text-gray-700 outline-none focus:ring-2 focus:ring-red-300">
+                                @foreach (['Q1', 'Q2', 'Q3', 'Q4'] as $quarter)
+                                    <option value="{{ $quarter }}" {{ old('reporting_quarter') === $quarter ? 'selected' : '' }}>{{ $quarter }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            @endif
+
+            @if (($submissionType ?? '') === 'report')
+                <input type="hidden" name="sub_method" value="pdf">
+            @else
+                <div class="grid grid-cols-2 gap-3">
+                    <label data-submission-mode="template" class="slot-mode-label text-center p-3 rounded-xl border-2 border-gray-100 bg-gray-50 cursor-pointer text-[10px] font-black uppercase transition">
+                        <input type="radio" name="sub_method" value="template" class="hidden" {{ old('sub_method', 'template') === 'template' ? 'checked' : '' }}>
+                        System Template
+                    </label>
+                    <label data-submission-mode="pdf" class="slot-mode-label text-center p-3 rounded-xl border-2 border-gray-100 bg-gray-50 cursor-pointer text-[10px] font-black uppercase transition">
+                        <input type="radio" name="sub_method" value="pdf" class="hidden" {{ old('sub_method') === 'pdf' ? 'checked' : '' }}>
+                        PDF Upload
+                    </label>
+                </div>
+            @endif
+
+            <div id="slotFileSection" class="{{ ($submissionType ?? '') === 'report' || old('sub_method') === 'pdf' ? '' : 'hidden' }}">
                 <label class="block text-[10px] font-black text-red-500 uppercase mb-2 ml-1">Select PDF File</label>
                 <div class="border-2 border-dashed border-red-200 bg-red-50 p-4 rounded-xl text-center relative hover:bg-red-100 transition cursor-pointer">
                     <input type="file" name="report_file" accept=".pdf" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer">
@@ -240,6 +285,9 @@
     const notifDropdown = document.getElementById('notifDropdown');
     const userMenuBtn = document.getElementById('userMenuBtn');
     const userDropdown = document.getElementById('userDropdown');
+    const reportTypeField = document.getElementById('reportTypeField');
+    const reportMonthWrap = document.getElementById('reportMonthWrap');
+    const reportQuarterWrap = document.getElementById('reportQuarterWrap');
 
     notifBtn.addEventListener('click', function (e) {
         e.stopPropagation();
@@ -262,5 +310,17 @@
             userDropdown.classList.add('hidden');
         }
     });
+
+    function syncReportPeriodFields() {
+        if (!reportTypeField || !reportMonthWrap || !reportQuarterWrap) {
+            return;
+        }
+
+        reportMonthWrap.classList.toggle('hidden', reportTypeField.value !== 'monthly');
+        reportQuarterWrap.classList.toggle('hidden', reportTypeField.value !== 'quarterly');
+    }
+
+    reportTypeField?.addEventListener('change', syncReportPeriodFields);
+    syncReportPeriodFields();
 </script>
 @endpush

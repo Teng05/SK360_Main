@@ -50,6 +50,9 @@
                         <div class="px-4 py-3 border-b border-gray-50">
                             <p class="text-[10px] text-gray-400 uppercase font-black tracking-widest">Account Settings</p>
                         </div>
+                        <a href="{{ route('sk_pres.profile') }}" class="block px-4 py-3 text-gray-700 hover:bg-gray-50 text-xs flex items-center gap-2 transition">
+                            <span>&#128100;</span> View Profile
+                        </a>
                         <form action="{{ route('logout') }}" method="POST">
                             @csrf
                             <button type="submit" class="w-full text-left px-4 py-3 text-red-600 hover:bg-red-50 text-xs font-bold flex items-center gap-2 transition">
@@ -398,7 +401,7 @@
         try {
             const roomsQuery = query(
                 collection(db, 'chat_rooms'),
-                orderBy('createdAt', 'asc'),
+                where('memberIds', 'array-contains', String(currentUser.id)),
                 limit(50)
             );
 
@@ -422,9 +425,10 @@
                         .map((part) => part[0] || '')
                         .join('')
                         .slice(0, 3)
-                        .toUpperCase()
+                        .toUpperCase(),
+                    createdAtSeconds: data.createdAt?.seconds || 0
                 };
-            });
+            }).sort((a, b) => a.createdAtSeconds - b.createdAtSeconds);
 
             renderRooms();
 
@@ -459,7 +463,7 @@
         }
 
         messageList.innerHTML = messages.map((message) => {
-            const isOwn = message.senderName === currentUser.name;
+            const isOwn = String(message.senderId || '') === String(currentUser.id) || (!message.senderId && message.senderName === currentUser.name);
             return `
                 <div class="flex ${isOwn ? 'justify-end' : 'justify-start'}">
                     <div class="max-w-[75%]">
@@ -535,6 +539,7 @@
             await addDoc(collection(db, 'chat_messages'), {
                 roomId: activeRoomId,
                 text,
+                senderId: String(currentUser.id),
                 senderName: currentUser.name,
                 senderRole: currentUser.role,
                 createdAt: serverTimestamp()

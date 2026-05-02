@@ -1,3 +1,4 @@
+{{-- File guide: Blade view template for resources/views/sk_pres/archive.blade.php. --}}
 @extends('layouts.app')
 
 @section('title', 'SK 360 Archive')
@@ -50,6 +51,9 @@
                         <div class="px-4 py-3 border-b border-gray-50">
                             <p class="text-[10px] text-gray-400 uppercase font-black tracking-widest">Account Settings</p>
                         </div>
+                        <a href="{{ route('sk_pres.profile') }}" class="block px-4 py-3 text-gray-700 hover:bg-gray-50 text-xs flex items-center gap-2 transition">
+                            <span>&#128100;</span> View Profile
+                        </a>
                         <form action="{{ route('logout') }}" method="POST">
                             @csrf
                             <button type="submit" class="w-full text-left px-4 py-3 text-red-600 hover:bg-red-50 text-xs font-bold flex items-center gap-2 transition">
@@ -85,10 +89,65 @@
                         <h2 class="text-lg font-bold text-gray-900">All Documents</h2>
                         <p class="text-sm text-gray-500">Search and filter archived documents</p>
                     </div>
-                    <button type="button" class="rounded-xl bg-gray-100 px-4 py-2 text-xs font-bold text-gray-700 hover:bg-gray-200 transition">
+                    <a href="{{ route('sk_pres.archive.bulk-download', request()->query()) }}" class="rounded-xl bg-gray-100 px-4 py-2 text-xs font-bold text-gray-700 hover:bg-gray-200 transition">
                         &#128229; Bulk Download
-                    </button>
+                    </a>
                 </div>
+
+                @if (session('archive_error'))
+                    <div class="mb-4 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-xs font-bold text-red-600">
+                        {{ session('archive_error') }}
+                    </div>
+                @endif
+
+                <form method="GET" action="{{ route('sk_pres.archive') }}" class="mb-5 flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+                    <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:flex">
+                        <label class="sr-only" for="archive_barangay">Filter by barangay</label>
+                        <select
+                            id="archive_barangay"
+                            name="barangay_id"
+                            onchange="this.form.submit()"
+                            class="min-w-[240px] rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-red-300"
+                        >
+                            <option value="">All Barangays</option>
+                            @foreach ($barangays as $barangay)
+                                <option value="{{ $barangay->barangay_id }}" {{ (int) ($filters['barangay_id'] ?? 0) === (int) $barangay->barangay_id ? 'selected' : '' }}>
+                                    Barangay {{ $barangay->barangay_name }}
+                                </option>
+                            @endforeach
+                        </select>
+
+                        <label class="sr-only" for="archive_year">Filter by year</label>
+                        <select
+                            id="archive_year"
+                            name="year"
+                            onchange="this.form.submit()"
+                            class="min-w-[180px] rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-red-300"
+                        >
+                            <option value="">All Years</option>
+                            @foreach ($filterYears as $year)
+                                <option value="{{ $year }}" {{ $filters['year'] === (string) $year ? 'selected' : '' }}>{{ $year }}</option>
+                            @endforeach
+                        </select>
+
+                        <label class="sr-only" for="archive_type">Filter by document type</label>
+                        <select
+                            id="archive_type"
+                            name="type"
+                            onchange="this.form.submit()"
+                            class="min-w-[200px] rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-red-300"
+                        >
+                            <option value="">All Types</option>
+                            @foreach ($typeOptions as $value => $label)
+                                <option value="{{ $value }}" {{ $filters['type'] === $value ? 'selected' : '' }}>{{ $label }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+
+                    @if (($filters['barangay_id'] ?? null) || $filters['year'] !== '' || $filters['type'] !== '')
+                        <a href="{{ route('sk_pres.archive') }}" class="text-xs font-bold text-red-600 hover:text-red-700">Clear filters</a>
+                    @endif
+                </form>
 
                 <div class="mb-4 flex items-center justify-between text-xs text-gray-400">
                     <span>Showing {{ $documentCount }} documents</span>
@@ -110,9 +169,15 @@
                                     </div>
                                 </div>
                             </div>
-                            <button type="button" class="text-gray-500 hover:text-red-500 transition" title="{{ $document->downloadable ? 'Download' : 'Preview only' }}">
-                                &#128229;
-                            </button>
+                            @if ($document->downloadable)
+                                <a href="{{ route('sk_pres.archive.download', [$document->source_type, $document->source_id]) }}" class="text-gray-500 hover:text-red-500 transition" title="Download">
+                                    &#128229;
+                                </a>
+                            @else
+                                <span class="cursor-not-allowed text-gray-300" title="No downloadable file">
+                                    &#128229;
+                                </span>
+                            @endif
                         </div>
                     @empty
                         <p class="text-sm text-gray-400 italic">No archived documents found.</p>

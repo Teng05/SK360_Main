@@ -1,8 +1,11 @@
 <?php
 
+// File guide: Handles route logic and page data for app/Http/Controllers/sk_secretary/ReportController.php.
+
 namespace App\Http\Controllers\sk_secretary;
 
 use App\Http\Controllers\Controller;
+use App\Services\RankingPointsService;
 use App\Services\SubmissionSlotService;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
@@ -30,7 +33,7 @@ class ReportController extends Controller
             ->get()
             ->map(function ($report) {
                 $status = strtolower((string) ($report->status ?? 'submitted'));
-                $method = strtolower((string) $report->submission_method) === 'file_upload' ? 'pdf' : 'template';
+                $method = strtolower((string) $report->submission_method) === 'file_upload' ? 'pdf' : 'manual';
 
                 $report->submitted_at = $report->submitted_at
                     ? Carbon::parse($report->submitted_at)
@@ -43,8 +46,9 @@ class ReportController extends Controller
                 };
                 $report->method_badge = $method === 'pdf'
                     ? 'bg-purple-100 text-purple-600'
-                    : 'bg-blue-100 text-blue-600';
-                $report->method_label = $method === 'pdf' ? 'PDF Upload' : 'Template';
+                    : 'bg-gray-100 text-gray-600';
+                $report->method_label = $method === 'pdf' ? 'PDF Upload' : 'Manual';
+                $report->period_label = 'Manual Report';
                 $report->download_url = $method === 'pdf' && !empty($report->uploaded_file_path)
                     ? asset($report->uploaded_file_path)
                     : null;
@@ -69,6 +73,8 @@ class ReportController extends Controller
             'roleLabel' => 'SK Secretary',
             'submissionType' => 'report',
             'storeRoute' => route('sk_secretary.reports.store'),
+            'profileRoute' => route('sk_secretary.profile'),
+            'allowResubmission' => true,
         ]);
     }
 
@@ -78,8 +84,7 @@ class ReportController extends Controller
 
         $validated = $request->validate([
             'slot_id' => ['required', 'integer'],
-            'sub_method' => ['required', 'in:template,pdf'],
-            'report_file' => ['nullable', 'file', 'mimes:pdf', 'max:5120'],
+            'report_file' => ['required', 'file', 'mimes:pdf', 'max:5120'],
         ]);
 
         $slotService = app(SubmissionSlotService::class);
@@ -93,17 +98,9 @@ class ReportController extends Controller
             return back()->with('report_error', 'That accomplishment report slot is no longer available.');
         }
 
-        if ($slotService->barangayHasSubmissionForSlot('accomplishment_reports', (int) auth()->user()->barangay_id, (int) $slot->slot_id)) {
-            return back()->with('report_error', 'This slot has already been submitted by your barangay.');
-        }
-
-        if ($validated['sub_method'] === 'pdf' && !$request->hasFile('report_file')) {
-            return back()->withErrors(['report_file' => 'A PDF file is required for PDF Upload.'])->withInput();
-        }
-
         $uploadPath = null;
         $uploadName = null;
-        $method = $validated['sub_method'] === 'pdf' ? 'file_upload' : 'direct_input';
+        $method = 'file_upload';
 
         if ($request->hasFile('report_file')) {
             $directory = public_path('uploads/reports');
@@ -115,7 +112,7 @@ class ReportController extends Controller
             $uploadPath = 'uploads/reports/' . $filename;
         }
 
-        DB::table('accomplishment_reports')->insert([
+        $data = [
             'user_id' => auth()->user()->user_id,
             'barangay_id' => auth()->user()->barangay_id,
             'slot_id' => $slot->slot_id,
@@ -125,16 +122,51 @@ class ReportController extends Controller
             'reporting_year' => now()->year,
             'reporting_month' => now()->month,
             'reporting_quarter' => null,
-            'generated_pdf_path' => $method === 'direct_input' ? 'SYSTEM_GEN' : null,
+            'generated_pdf_path' => null,
             'uploaded_file_name' => $uploadName,
             'uploaded_file_path' => $uploadPath,
             'status' => 'submitted',
             'remarks' => null,
             'submitted_at' => now(),
             'created_at' => now(),
-        ]);
+        ];
+
+        $reportId = $this->saveReportSubmission($data, (int) $slot->slot_id);
+
+        $this->scoreSubmission($slot, $reportId, 'accomplishment_report');
 
         return redirect()->route('sk_secretary.reports')->with('report_success', 'Your report has been submitted successfully.');
+    }
+
+    protected function scoreSubmission(object $slot, int $sourceId, string $sourceType): void
+    {
+        $user = auth()->user();
+        $points = app(RankingPointsService::class);
+        $isOnTime = now()->lessThanOrEqualTo(Carbon::parse($slot->end_date)->endOfDay());
+        $submissionAction = $isOnTime
+            ? RankingPointsService::ON_TIME_REPORT_SUBMISSION
+            : RankingPointsService::LATE_SUBMISSION;
+
+        $points->award((int) $user->barangay_id, $submissionAction, $sourceType, $sourceId, (int) $user->user_id);
+        $points->award((int) $user->barangay_id, RankingPointsService::QUALITY_DOCUMENTATION, $sourceType, $sourceId, (int) $user->user_id);
+    }
+
+    protected function saveReportSubmission(array $data, int $slotId): int
+    {
+        $existing = DB::table('accomplishment_reports')
+            ->where('barangay_id', auth()->user()->barangay_id)
+            ->where('slot_id', $slotId)
+            ->first();
+
+        if ($existing) {
+            DB::table('accomplishment_reports')
+                ->where('report_id', $existing->report_id)
+                ->update($data);
+
+            return (int) $existing->report_id;
+        }
+
+        return (int) DB::table('accomplishment_reports')->insertGetId($data, 'report_id');
     }
 
     protected function menuItems(): array

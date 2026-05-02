@@ -1,5 +1,7 @@
 <?php
 
+// File guide: Handles route logic and page data for app/Http/Controllers/NotificationController.php.
+
 namespace App\Http\Controllers;
 
 use App\Models\Notification;

@@ -1,3 +1,4 @@
+{{-- File guide: Blade view template for resources/views/sk_secretary/home.blade.php. --}}
 @extends('layouts.app')
 
 @section('title', 'SK Secretary Dashboard')
@@ -7,82 +8,14 @@
 @endsection
 
 @section('content')
-<div class="flex h-screen bg-gray-100">
-    <div class="w-64 bg-red-600 text-white flex flex-col p-3 overflow-y-auto">
-        <div class="flex items-center gap-2 mb-3">
-            <img src="https://cdn-icons-png.flaticon.com/512/3135/3135715.png" class="w-7 h-7" alt="logo">
-            <h2 class="text-base font-bold">SK 360&deg;</h2>
-        </div>
+<div class="flex h-screen bg-gray-100 overflow-hidden">
+    {{-- Shared secretary sidebar/topbar layout --}}
+    @include('sk_secretary.partials.sidebar')
 
-        <div class="bg-red-500 rounded-lg p-2 flex items-center gap-2 mb-3 shadow text-xs">
-            <div class="bg-yellow-400 text-red-600 h-9 w-9 rounded-full flex items-center justify-center font-bold border-2 border-red-400 overflow-hidden shadow-inner flex-shrink-0">
-                <span class="text-xs">{{ $initials }}</span>
-            </div>
+    <div class="flex-1 flex flex-col overflow-hidden">
+        @include('sk_secretary.partials.topbar')
 
-            <div class="overflow-hidden">
-                <p class="font-semibold text-[11px] truncate">{{ $fullName }}</p>
-                <p class="text-[9px] opacity-90 uppercase font-black tracking-tighter truncate">
-                    SK Secretary - {{ $barangayName }}
-                </p>
-            </div>
-        </div>
-
-        <nav class="space-y-1 text-xs">
-            @foreach ($menuItems as $item)
-                @php $isActive = $item['link'] === $currentUrl; @endphp
-                <a href="{{ $item['link'] }}" class="flex items-center gap-2 {{ $isActive ? 'bg-red-500' : 'hover:bg-red-500' }} p-2 rounded-lg">
-                    <span class="{{ $isActive ? 'bg-yellow-400 text-red-600' : 'bg-red-400' }} p-1 rounded text-sm">{{ $item['icon'] }}</span>
-                    <span class="{{ $isActive ? 'text-yellow-300 font-semibold' : '' }}">{{ $item['label'] }}</span>
-                </a>
-            @endforeach
-        </nav>
-    </div>
-
-    <div class="flex-1 flex flex-col">
-        <div class="bg-red-600 text-white px-6 py-3 flex justify-between items-center shadow">
-            <input type="text" placeholder="Search..." class="px-4 py-2 rounded-full text-black w-1/3 focus:outline-none">
-
-            <div class="flex items-center gap-3 relative">
-                <div class="relative">
-                    <button id="notifBtn" type="button" class="text-xl hover:bg-red-500 p-2 rounded-lg transition">
-                        🔔
-                    </button>
-
-                    <div id="notifDropdown" class="hidden absolute right-0 mt-3 w-72 bg-white rounded-2xl shadow-xl border z-50 overflow-hidden">
-                        <div class="px-4 py-3 font-semibold border-b text-gray-800">Notifications</div>
-                        <div class="max-h-64 overflow-y-auto">
-                            <div class="px-4 py-3 hover:bg-gray-100 text-sm text-gray-700">No notifications yet</div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="relative">
-                    <button id="userMenuBtn" type="button" class="flex items-center gap-2 hover:bg-red-500 px-3 py-2 rounded-lg transition">
-                        <div class="w-7 h-7 rounded-full bg-yellow-400 text-red-600 flex items-center justify-center text-[10px] font-black border border-white/50 overflow-hidden flex-shrink-0">
-                            {{ $initials }}
-                        </div>
-                        <span class="font-semibold text-sm">{{ $fullName }}</span>
-                        <span class="text-[10px]">▼</span>
-                    </button>
-
-                    <div id="userDropdown" class="hidden absolute right-0 mt-3 w-64 bg-white rounded-2xl shadow-xl border overflow-hidden z-50">
-                        <div class="px-5 py-4 font-semibold text-gray-800 border-b">My Account</div>
-                        <a href="#" class="flex items-center gap-3 px-5 py-3 hover:bg-gray-100 transition">
-                            <span>👤</span>
-                            <span class="text-gray-700">Profile Settings</span>
-                        </a>
-                        <form method="POST" action="{{ route('logout') }}">
-                            @csrf
-                            <button type="submit" class="w-full text-left flex items-center gap-3 px-5 py-3 text-red-500 hover:bg-gray-100 transition">
-                                <span>↩️</span>
-                                <span>Log Out</span>
-                            </button>
-                        </form>
-                    </div>
-                </div>
-            </div>
-        </div>
-
+        {{-- Dashboard content --}}
         <div class="p-6 overflow-y-auto">
             <h1 class="text-2xl font-bold mb-4">Good morning, {{ $firstName }}!</h1>
 
@@ -113,58 +46,12 @@
                 </div>
             </div>
 
-            <div class="bg-white p-6 rounded-xl shadow">
-                <div class="flex justify-between items-center mb-4">
-                    <h2 class="font-semibold">Activity Feed</h2>
-                    <span class="text-xs text-gray-400">Live</span>
-                </div>
-
-                <div class="border rounded-lg p-4 mb-4">
-                    <textarea class="w-full border rounded p-3 resize-none focus:outline-none focus:ring-2 focus:ring-red-400" rows="3" placeholder="Share updates with SK..."></textarea>
-
-                    <div class="flex justify-end mt-3">
-                        <button type="button" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg">
-                            Post
-                        </button>
-                    </div>
-                </div>
-
-                <div class="text-center text-gray-400 py-10">
-                    No activity yet. Stay engaged
-                </div>
-            </div>
+            @include('shared.wall-feed')
         </div>
     </div>
 </div>
 @endsection
 
 @push('scripts')
-<script>
-    const notifBtn = document.getElementById('notifBtn');
-    const notifDropdown = document.getElementById('notifDropdown');
-    const userMenuBtn = document.getElementById('userMenuBtn');
-    const userDropdown = document.getElementById('userDropdown');
-
-    notifBtn.addEventListener('click', function (e) {
-        e.stopPropagation();
-        notifDropdown.classList.toggle('hidden');
-        userDropdown.classList.add('hidden');
-    });
-
-    userMenuBtn.addEventListener('click', function (e) {
-        e.stopPropagation();
-        userDropdown.classList.toggle('hidden');
-        notifDropdown.classList.add('hidden');
-    });
-
-    document.addEventListener('click', function (e) {
-        if (!notifBtn.contains(e.target) && !notifDropdown.contains(e.target)) {
-            notifDropdown.classList.add('hidden');
-        }
-
-        if (!userMenuBtn.contains(e.target) && !userDropdown.contains(e.target)) {
-            userDropdown.classList.add('hidden');
-        }
-    });
-</script>
+@include('sk_secretary.partials.dropdown-scripts')
 @endpush

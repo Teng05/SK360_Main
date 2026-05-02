@@ -1,3 +1,4 @@
+{{-- File guide: Blade view template for resources/views/sk_chairman/meetings.blade.php. --}}
 @extends('layouts.app')
 
 @section('title', 'Meetings & Video Conference')
@@ -62,7 +63,7 @@
 
                     <div id="userDropdown" class="hidden absolute right-0 mt-3 w-64 bg-white rounded-2xl shadow-xl border overflow-hidden z-50">
                         <div class="px-5 py-4 font-semibold text-gray-800 border-b">My Account</div>
-                        <a href="#" class="flex items-center gap-3 px-5 py-3 hover:bg-gray-100 transition">
+                        <a href="{{ route('sk_chairman.profile') }}" class="flex items-center gap-3 px-5 py-3 hover:bg-gray-100 transition">
                             <span>&#128100;</span>
                             <span class="text-gray-700">Profile Settings</span>
                         </a>
@@ -161,7 +162,7 @@
                                 <span class="text-xs text-white/60">Agora Preview</span>
                             </div>
                             <div class="mt-4 flex h-[300px] flex-col items-center justify-center rounded-[20px] bg-[#202938]">
-                                @php $activeMeeting = $activeMeetings->first() ?? $upcomingMeetings->first(); $meetingInitials = collect(explode(' ', trim($fullName)))->filter()->map(fn ($part) => strtoupper(substr($part, 0, 1)))->take(2)->implode(''); @endphp
+                                @php $activeMeeting = $activeMeetings->first(); $meetingInitials = collect(explode(' ', trim($fullName)))->filter()->map(fn ($part) => strtoupper(substr($part, 0, 1)))->take(2)->implode(''); @endphp
                                 <div class="flex h-24 w-24 items-center justify-center rounded-full bg-[#eb5757] text-2xl font-bold">{{ $meetingInitials ?: 'SK' }}</div>
                                 <p class="mt-4 text-lg font-semibold">{{ $fullName }}</p>
                                 <span class="mt-2 rounded-full bg-green-500/20 px-3 py-1 text-[11px] font-semibold text-green-300">{{ $activeMeeting ? 'Ready to join' : 'No active room' }}</span>

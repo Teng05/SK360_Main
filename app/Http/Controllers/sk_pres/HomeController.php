@@ -1,12 +1,17 @@
 <?php
 
+// File guide: Handles route logic and page data for app/Http/Controllers/sk_pres/HomeController.php.
+
 namespace App\Http\Controllers\sk_pres;
 
+use App\Http\Controllers\Concerns\BuildsWallFeed;
 use App\Http\Controllers\Controller;
 use Illuminate\View\View;
 
 class HomeController extends Controller
 {
+    use BuildsWallFeed;
+
     public function index(): View
     {
         abort_unless(auth()->check() && auth()->user()->role === 'sk_president', 403);
@@ -24,7 +29,7 @@ class HomeController extends Controller
             ['link' => route('sk_pres.chat'), 'icon' => '&#128172;', 'label' => 'Chat'],
             ['link' => route('sk_pres.meetings'), 'icon' => '&#128222;', 'label' => 'Meetings'],
             ['link' => route('sk_pres.rankings'), 'icon' => '&#127942;', 'label' => 'Rankings'],
-            ['link' => route('sk_pres.analytics'), 'icon' => '&#128200;', 'label' => 'Analytics'],
+            
             ['link' => route('sk_pres.leadership'), 'icon' => '&#128101;', 'label' => 'Leadership'],
             ['link' => route('sk_pres.archive'), 'icon' => '&#128450;&#65039;', 'label' => 'Archive'],
             ['link' => route('sk_pres.user-management'), 'icon' => '&#128100;', 'label' => 'User Management'],
@@ -42,6 +47,8 @@ class HomeController extends Controller
             'menuItems' => $menuItems,
             'currentUrl' => url()->current(),
             'summaryCards' => $summaryCards,
+            'feedPosts' => $this->wallFeedPosts(),
+            'defaultPostCategory' => 'update',
         ]);
     }
 }

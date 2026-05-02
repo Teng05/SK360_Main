@@ -1,5 +1,7 @@
 <?php
 
+// File guide: Handles route logic and page data for app/Http/Controllers/sk_chairman/ChatController.php.
+
 namespace App\Http\Controllers\sk_chairman;
 
 use App\Http\Controllers\Controller;
@@ -37,6 +39,7 @@ class ChatController extends Controller
         }
 
         $currentUserId = (int) (auth()->user()->user_id ?? 0);
+        $chatRoles = ['sk_president', 'sk_chairman', 'sk_secretary'];
 
         $users = DB::table('users as u')
             ->leftJoin('barangays as b', 'u.barangay_id', '=', 'b.barangay_id')
@@ -50,6 +53,7 @@ class ChatController extends Controller
             )
             ->where('u.user_id', '!=', $currentUserId)
             ->where('u.status', '=', 'active')
+            ->whereIn('u.role', $chatRoles)
             ->where(function ($query) use ($keyword) {
                 $query
                     ->whereRaw("CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, '')) LIKE ?", ["%{$keyword}%"])

@@ -1,8 +1,11 @@
 <?php
 
+// File guide: Handles route logic and page data for app/Http/Controllers/sk_secretary/BudgetController.php.
+
 namespace App\Http\Controllers\sk_secretary;
 
 use App\Http\Controllers\Controller;
+use App\Services\RankingPointsService;
 use App\Services\SubmissionSlotService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
@@ -11,6 +14,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\View\View;
 
 class BudgetController extends Controller
@@ -45,6 +49,7 @@ class BudgetController extends Controller
                     ? 'bg-purple-100 text-purple-600'
                     : 'bg-blue-100 text-blue-600';
                 $submission->method_label = $method === 'pdf' ? 'PDF Upload' : 'Template';
+                $submission->period_label = $this->periodLabel($submission);
                 $submission->download_url = $method === 'pdf' && !empty($submission->uploaded_file_path)
                     ? asset($submission->uploaded_file_path)
                     : route('sk_secretary.budget.template.download', $submission->budget_report_id);
@@ -71,6 +76,8 @@ class BudgetController extends Controller
             'submissions' => $submissions,
             'submissionType' => 'budget',
             'storeRoute' => route('sk_secretary.budget.store'),
+            'profileRoute' => route('sk_secretary.profile'),
+            'allowResubmission' => true,
         ]);
     }
 
@@ -81,6 +88,10 @@ class BudgetController extends Controller
         $validated = $request->validate([
             'slot_id' => ['required', 'integer'],
             'sub_method' => ['required', 'in:template,pdf'],
+            'report_type' => ['required', 'in:monthly,quarterly,annual'],
+            'reporting_year' => ['required', 'integer', 'min:2000', 'max:2100'],
+            'reporting_month' => ['nullable', 'integer', 'min:1', 'max:12', 'required_if:report_type,monthly'],
+            'reporting_quarter' => ['nullable', 'in:Q1,Q2,Q3,Q4', 'required_if:report_type,quarterly'],
             'report_file' => ['nullable', 'file', 'mimes:pdf', 'max:5120'],
         ]);
 
@@ -89,10 +100,6 @@ class BudgetController extends Controller
 
         if (!$slot) {
             return back()->with('report_error', 'That budget submission slot is no longer available.');
-        }
-
-        if ($slotService->barangayHasSubmissionForSlot('budget_reports', (int) auth()->user()->barangay_id, (int) $slot->slot_id)) {
-            return back()->with('report_error', 'This slot has already been submitted by your barangay.');
         }
 
         if ($validated['sub_method'] === 'pdf' && !$request->hasFile('report_file')) {
@@ -113,13 +120,13 @@ class BudgetController extends Controller
             $uploadPath = 'uploads/budget_reports/' . $filename;
         }
 
-        DB::table('budget_reports')->insert([
+        $data = [
             'user_id' => auth()->user()->user_id,
             'barangay_id' => auth()->user()->barangay_id,
             'slot_id' => $slot->slot_id,
             'submission_method' => $method,
             'document_type' => 'financial_record',
-            'fiscal_year' => now()->year,
+            'fiscal_year' => $validated['reporting_year'],
             'title' => $slot->title,
             'generated_pdf_path' => $method === 'direct_input' ? 'SYSTEM_GEN' : null,
             'uploaded_file_name' => $uploadName,
@@ -128,7 +135,17 @@ class BudgetController extends Controller
             'status' => 'recorded',
             'submitted_at' => now(),
             'created_at' => now(),
-        ]);
+        ];
+
+        if (Schema::hasColumn('budget_reports', 'budget_period_type')) {
+            $data['budget_period_type'] = $validated['report_type'];
+            $data['fiscal_month'] = $validated['report_type'] === 'monthly' ? $validated['reporting_month'] : null;
+            $data['fiscal_quarter'] = $validated['report_type'] === 'quarterly' ? $validated['reporting_quarter'] : null;
+        }
+
+        $budgetReportId = $this->saveBudgetSubmission($data, (int) $slot->slot_id);
+
+        $this->scoreSubmission($slot, $budgetReportId, 'budget_report');
 
         return redirect()->route('sk_secretary.budget')->with('report_success', 'Budget document submitted successfully.');
     }
@@ -145,11 +162,10 @@ class BudgetController extends Controller
             return redirect()->route('sk_secretary.budget')->with('report_error', 'That budget submission slot is no longer available.');
         }
 
-        if ($slotService->barangayHasSubmissionForSlot('budget_reports', (int) auth()->user()->barangay_id, (int) $slot->slot_id)) {
-            return redirect()->route('sk_secretary.budget')->with('report_error', 'This slot has already been submitted by your barangay.');
-        }
-
         $user = auth()->user();
+        $reportType = in_array($request->query('report_type'), ['monthly', 'quarterly', 'annual'], true)
+            ? $request->query('report_type')
+            : 'quarterly';
 
         return view('shared.budget-template-form', [
             'slot' => $slot,
@@ -157,6 +173,10 @@ class BudgetController extends Controller
             'backRoute' => route('sk_secretary.budget'),
             'fullName' => trim(($user->first_name ?? '').' '.($user->last_name ?? '')) ?: 'User',
             'barangayName' => $user->barangay->barangay_name ?? 'Barangay',
+            'reportType' => $reportType,
+            'reportingYear' => (int) $request->query('reporting_year', now()->year),
+            'reportingMonth' => (int) $request->query('reporting_month', now()->month),
+            'reportingQuarter' => $request->query('reporting_quarter', 'Q1'),
         ]);
     }
 
@@ -166,14 +186,18 @@ class BudgetController extends Controller
 
         $validated = $request->validate([
             'slot_id' => ['required', 'integer'],
-            'monitoring_officer' => ['required', 'string', 'max:255'],
-            'sheet_no' => ['required', 'string', 'max:255'],
-            'city' => ['required', 'string', 'max:255'],
-            'province' => ['required', 'string', 'max:255'],
-            'program_project_activity' => ['required', 'string', 'max:255'],
-            'object_headers' => ['required', 'array', 'size:4'],
+            'report_type' => ['required', 'in:monthly,quarterly,annual'],
+            'reporting_year' => ['required', 'integer', 'min:2000', 'max:2100'],
+            'reporting_month' => ['nullable', 'integer', 'min:1', 'max:12'],
+            'reporting_quarter' => ['nullable', 'in:Q1,Q2,Q3,Q4'],
+            'monitoring_officer' => ['nullable', 'string', 'max:255'],
+            'sheet_no' => ['nullable', 'string', 'max:255'],
+            'city' => ['nullable', 'string', 'max:255'],
+            'province' => ['nullable', 'string', 'max:255'],
+            'program_project_activity' => ['nullable', 'string', 'max:255'],
+            'object_headers' => ['nullable', 'array'],
             'object_headers.*' => ['nullable', 'string', 'max:255'],
-            'rows' => ['required', 'array', 'min:1'],
+            'rows' => ['nullable', 'array'],
             'rows.*.particulars' => ['nullable', 'string', 'max:255'],
             'rows.*.date' => ['nullable', 'date'],
             'rows.*.reference' => ['nullable', 'string', 'max:255'],
@@ -187,7 +211,34 @@ class BudgetController extends Controller
             'payments_carried_forward' => ['nullable', 'numeric'],
             'available_balance' => ['nullable', 'numeric'],
             'unpaid_commitments' => ['nullable', 'numeric'],
-            'certified_date' => ['required', 'date'],
+            'certified_date' => ['nullable', 'date'],
+            'bank_name' => ['nullable', 'string', 'max:255'],
+            'branch' => ['nullable', 'string', 'max:255'],
+            'current_account_no' => ['nullable', 'string', 'max:255'],
+            'prepared_by' => ['nullable', 'string', 'max:255'],
+            'approved_by' => ['nullable', 'string', 'max:255'],
+            'bank_rows' => ['nullable', 'array'],
+            'bank_rows.*.particulars' => ['nullable', 'string', 'max:255'],
+            'bank_rows.*.rcb' => ['nullable', 'string', 'max:255'],
+            'bank_rows.*.bank' => ['nullable', 'string', 'max:255'],
+            'bank_rows.*.comment' => ['nullable', 'string', 'max:500'],
+            'accountable_officer' => ['nullable', 'string', 'max:255'],
+            'official_designation' => ['nullable', 'string', 'max:255'],
+            'assumption_date' => ['nullable', 'date'],
+            'inventory_rows' => ['nullable', 'array'],
+            'inventory_rows.*.article' => ['nullable', 'string', 'max:255'],
+            'inventory_rows.*.description' => ['nullable', 'string', 'max:255'],
+            'inventory_rows.*.property_no' => ['nullable', 'string', 'max:255'],
+            'inventory_rows.*.unit' => ['nullable', 'string', 'max:255'],
+            'inventory_rows.*.unit_cost' => ['nullable', 'numeric'],
+            'inventory_rows.*.balance' => ['nullable', 'numeric'],
+            'inventory_rows.*.on_hand' => ['nullable', 'numeric'],
+            'inventory_rows.*.shortage_quantity' => ['nullable', 'numeric'],
+            'inventory_rows.*.shortage_value' => ['nullable', 'numeric'],
+            'inventory_rows.*.remarks' => ['nullable', 'string', 'max:255'],
+            'committee_members' => ['nullable', 'array'],
+            'committee_members.*' => ['nullable', 'string', 'max:255'],
+            'chairperson_name' => ['nullable', 'string', 'max:255'],
         ]);
 
         $slotService = app(SubmissionSlotService::class);
@@ -197,27 +248,34 @@ class BudgetController extends Controller
             return redirect()->route('sk_secretary.budget')->with('report_error', 'That budget submission slot is no longer available.');
         }
 
-        if ($slotService->barangayHasSubmissionForSlot('budget_reports', (int) auth()->user()->barangay_id, (int) $slot->slot_id)) {
-            return redirect()->route('sk_secretary.budget')->with('report_error', 'This slot has already been submitted by your barangay.');
-        }
-
-        DB::table('budget_reports')->insert([
+        $data = [
             'user_id' => auth()->user()->user_id,
             'barangay_id' => auth()->user()->barangay_id,
             'slot_id' => $slot->slot_id,
             'submission_method' => 'direct_input',
             'document_type' => 'financial_record',
-            'fiscal_year' => now()->year,
+            'fiscal_year' => $validated['reporting_year'],
             'title' => $slot->title,
             'generated_pdf_path' => 'TEMPLATE_GEN',
             'template_data' => json_encode($validated, JSON_UNESCAPED_UNICODE),
             'uploaded_file_name' => null,
             'uploaded_file_path' => null,
-            'total_amount' => collect($validated['rows'])->sum(fn ($row) => (float) ($row['total_amount'] ?? 0)),
+            'total_amount' => collect($validated['rows'] ?? [])->sum(fn ($row) => (float) ($row['total_amount'] ?? 0))
+                + collect($validated['inventory_rows'] ?? [])->sum(fn ($row) => (float) ($row['shortage_value'] ?? 0)),
             'status' => 'recorded',
             'submitted_at' => now(),
             'created_at' => now(),
-        ]);
+        ];
+
+        if (Schema::hasColumn('budget_reports', 'budget_period_type')) {
+            $data['budget_period_type'] = $validated['report_type'];
+            $data['fiscal_month'] = $validated['report_type'] === 'monthly' ? ($validated['reporting_month'] ?? now()->month) : null;
+            $data['fiscal_quarter'] = $validated['report_type'] === 'quarterly' ? ($validated['reporting_quarter'] ?? 'Q1') : null;
+        }
+
+        $budgetReportId = $this->saveBudgetSubmission($data, (int) $slot->slot_id);
+
+        $this->scoreSubmission($slot, $budgetReportId, 'budget_report');
 
         return redirect()->route('sk_secretary.budget')->with('report_success', 'Budget template submitted successfully.');
     }
@@ -236,10 +294,11 @@ class BudgetController extends Controller
         }
 
         $data = json_decode($submission->template_data, true) ?: [];
+        $paper = ($data['report_type'] ?? 'quarterly') === 'monthly' ? 'portrait' : 'landscape';
         $pdf = Pdf::loadView('shared.budget-template-download', [
             'data' => $data,
             'barangayName' => auth()->user()->barangay->barangay_name ?? 'Barangay',
-        ])->setPaper('a4', 'landscape');
+        ])->setPaper('a4', $paper);
 
         return $pdf->download('budget-template-'.$budgetReportId.'.pdf');
     }
@@ -258,10 +317,11 @@ class BudgetController extends Controller
         }
 
         $data = json_decode($submission->template_data, true) ?: [];
+        $paper = ($data['report_type'] ?? 'quarterly') === 'monthly' ? 'portrait' : 'landscape';
         $pdf = Pdf::loadView('shared.budget-template-download', [
             'data' => $data,
             'barangayName' => auth()->user()->barangay->barangay_name ?? 'Barangay',
-        ])->setPaper('a4', 'landscape');
+        ])->setPaper('a4', $paper);
 
         return $pdf->stream('budget-template-'.$budgetReportId.'.pdf');
     }
@@ -279,5 +339,47 @@ class BudgetController extends Controller
             ['link' => route('sk_secretary.rankings'), 'icon' => '&#127942;', 'label' => 'Rankings'],
             ['link' => route('sk_secretary.leadership'), 'icon' => '&#128101;', 'label' => 'Leadership'],
         ];
+    }
+
+    protected function scoreSubmission(object $slot, int $sourceId, string $sourceType): void
+    {
+        $user = auth()->user();
+        $points = app(RankingPointsService::class);
+        $isOnTime = now()->lessThanOrEqualTo(Carbon::parse($slot->end_date)->endOfDay());
+        $submissionAction = $isOnTime
+            ? RankingPointsService::ON_TIME_REPORT_SUBMISSION
+            : RankingPointsService::LATE_SUBMISSION;
+
+        $points->award((int) $user->barangay_id, $submissionAction, $sourceType, $sourceId, (int) $user->user_id);
+        $points->award((int) $user->barangay_id, RankingPointsService::QUALITY_DOCUMENTATION, $sourceType, $sourceId, (int) $user->user_id);
+    }
+
+    protected function saveBudgetSubmission(array $data, int $slotId): int
+    {
+        $existing = DB::table('budget_reports')
+            ->where('barangay_id', auth()->user()->barangay_id)
+            ->where('slot_id', $slotId)
+            ->first();
+
+        if ($existing) {
+            DB::table('budget_reports')
+                ->where('budget_report_id', $existing->budget_report_id)
+                ->update($data);
+
+            return (int) $existing->budget_report_id;
+        }
+
+        return (int) DB::table('budget_reports')->insertGetId($data, 'budget_report_id');
+    }
+
+    protected function periodLabel(object $submission): string
+    {
+        $periodType = $submission->budget_period_type ?? 'annual';
+
+        return match ($periodType) {
+            'monthly' => Carbon::create((int) $submission->fiscal_year, (int) ($submission->fiscal_month ?: 1), 1)->format('F Y'),
+            'quarterly' => ($submission->fiscal_quarter ?: 'Quarterly').' '.$submission->fiscal_year,
+            default => 'Annual '.$submission->fiscal_year,
+        };
     }
 }

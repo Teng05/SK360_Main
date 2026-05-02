@@ -1,3 +1,4 @@
+{{-- File guide: Blade view template for resources/views/sk_chairman/home.blade.php. --}}
 @extends('layouts.app')
 
 @section('title', 'SK Chairman Dashboard')
@@ -58,7 +59,7 @@
 
                     <div id="userDropdown" class="hidden absolute right-0 mt-3 w-64 bg-white rounded-2xl shadow-xl border overflow-hidden z-50">
                         <div class="px-5 py-4 font-semibold text-gray-800 border-b">My Account</div>
-                        <a href="#" class="flex items-center gap-3 px-5 py-3 hover:bg-gray-100 transition">
+                        <a href="{{ route('sk_chairman.profile') }}" class="flex items-center gap-3 px-5 py-3 hover:bg-gray-100 transition">
                             <span>👤</span>
                             <span class="text-gray-700">Profile Settings</span>
                         </a>
@@ -104,26 +105,7 @@
                 </div>
             </div>
 
-            <div class="bg-white p-6 rounded-xl shadow">
-                <div class="flex justify-between items-center mb-4">
-                    <h2 class="font-semibold">Activity Feed</h2>
-                    <span class="text-xs text-gray-400">Live</span>
-                </div>
-
-                <div class="border rounded-lg p-4 mb-4">
-                    <textarea class="w-full border rounded p-3 resize-none focus:outline-none focus:ring-2 focus:ring-red-400" rows="3" placeholder="Share updates with SK..."></textarea>
-
-                    <div class="flex justify-end mt-3">
-                        <button type="button" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg">
-                            Post
-                        </button>
-                    </div>
-                </div>
-
-                <div class="text-center text-gray-400 py-10">
-                    No activity yet. Stay engaged
-                </div>
-            </div>
+            @include('shared.wall-feed')
         </div>
     </div>
 </div>

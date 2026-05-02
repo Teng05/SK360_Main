@@ -1,3 +1,4 @@
+{{-- File guide: Blade view template for resources/views/youth/rankings.blade.php. --}}
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -139,20 +140,20 @@
 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6 pb-10">
                     <div class="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
-                        <h3 class="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-6">Points System</h3>
-                        <div class="space-y-3">
-                            <div class="flex justify-between items-center text-[11px] border-b border-gray-50 pb-2">
-                                <span class="text-gray-600 font-medium">On-time Report Submission</span>
-                                <span class="text-green-500 bg-green-50 px-2 py-0.5 rounded font-black">+50 pts</span>
-                            </div>
-                            <div class="flex justify-between items-center text-[11px] border-b border-gray-50 pb-2">
-                                <span class="text-gray-600 font-medium">Meeting Attendance</span>
-                                <span class="text-green-500 bg-green-50 px-2 py-0.5 rounded font-black">+30 pts</span>
-                            </div>
-                            <div class="flex justify-between items-center text-[11px] border-b border-gray-50 pb-2">
-                                <span class="text-gray-600 font-medium">Late Submission</span>
-                                <span class="text-red-500 bg-red-50 px-2 py-0.5 rounded font-black">-20 pts</span>
-                            </div>
+                        <h3 class="text-sm font-black text-gray-800 mb-1">Points System</h3>
+                        <p class="text-xs text-gray-400 mb-6">How points are earned and deducted</p>
+                        <div class="space-y-4">
+                            @foreach ($pointSystem ?? [] as $rule)
+                                @php
+                                    $isPositive = ($rule['type'] ?? 'positive') === 'positive';
+                                    $badgeClass = $isPositive ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600';
+                                    $prefix = $rule['points'] > 0 ? '+' : '';
+                                @endphp
+                                <div class="flex justify-between items-center text-[11px]">
+                                    <span class="text-gray-700 font-medium">{{ $rule['label'] }}</span>
+                                    <span class="{{ $badgeClass }} px-2 py-1 rounded-lg font-black">{{ $prefix }}{{ $rule['points'] }} points</span>
+                                </div>
+                            @endforeach
                         </div>
                     </div>
 

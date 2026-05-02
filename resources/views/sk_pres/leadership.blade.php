@@ -1,3 +1,4 @@
+{{-- File guide: Blade view template for resources/views/sk_pres/leadership.blade.php. --}}
 @extends('layouts.app')
 
 @section('title', 'SK 360 Leadership')
@@ -50,6 +51,9 @@
                         <div class="px-4 py-3 border-b border-gray-50">
                             <p class="text-[10px] text-gray-400 uppercase font-black tracking-widest">Account Settings</p>
                         </div>
+                        <a href="{{ route('sk_pres.profile') }}" class="block px-4 py-3 text-gray-700 hover:bg-gray-50 text-xs flex items-center gap-2 transition">
+                            <span>&#128100;</span> View Profile
+                        </a>
                         <form action="{{ route('logout') }}" method="POST">
                             @csrf
                             <button type="submit" class="w-full text-left px-4 py-3 text-red-600 hover:bg-red-50 text-xs font-bold flex items-center gap-2 transition">

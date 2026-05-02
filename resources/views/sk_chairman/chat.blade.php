@@ -1,3 +1,4 @@
+{{-- File guide: Blade view template for resources/views/sk_chairman/chat.blade.php. --}}
 @extends('layouts.app')
 
 @section('title', 'SK 360 Chat')
@@ -58,7 +59,7 @@
 
                     <div id="userDropdown" class="hidden absolute right-0 mt-3 w-64 bg-white rounded-2xl shadow-xl border overflow-hidden z-50">
                         <div class="px-5 py-4 font-semibold text-gray-800 border-b">My Account</div>
-                        <a href="#" class="flex items-center gap-3 px-5 py-3 hover:bg-gray-100 transition">
+                        <a href="{{ route('sk_chairman.profile') }}" class="flex items-center gap-3 px-5 py-3 hover:bg-gray-100 transition">
                             <span>👤</span>
                             <span class="text-gray-700">Profile Settings</span>
                         </a>
@@ -436,7 +437,7 @@
         try {
             const roomsQuery = query(
                 collection(db, 'chat_rooms'),
-                orderBy('createdAt', 'asc'),
+                where('memberIds', 'array-contains', String(currentUser.id)),
                 limit(50)
             );
 
@@ -460,9 +461,10 @@
                         .map((part) => part[0] || '')
                         .join('')
                         .slice(0, 3)
-                        .toUpperCase()
+                        .toUpperCase(),
+                    createdAtSeconds: data.createdAt?.seconds || 0
                 };
-            });
+            }).sort((a, b) => a.createdAtSeconds - b.createdAtSeconds);
 
             renderRooms();
 
@@ -497,7 +499,7 @@
         }
 
         messageList.innerHTML = messages.map((message) => {
-            const isOwn = message.senderName === currentUser.name;
+            const isOwn = String(message.senderId || '') === String(currentUser.id) || (!message.senderId && message.senderName === currentUser.name);
             return `
                 <div class="flex ${isOwn ? 'justify-end' : 'justify-start'}">
                     <div class="max-w-[75%]">
@@ -573,6 +575,7 @@
             await addDoc(collection(db, 'chat_messages'), {
                 roomId: activeRoomId,
                 text,
+                senderId: String(currentUser.id),
                 senderName: currentUser.name,
                 senderRole: currentUser.role,
                 createdAt: serverTimestamp()

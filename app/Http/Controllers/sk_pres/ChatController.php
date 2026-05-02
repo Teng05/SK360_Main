@@ -1,5 +1,7 @@
 <?php
 
+// File guide: Handles route logic and page data for app/Http/Controllers/sk_pres/ChatController.php.
+
 namespace App\Http\Controllers\sk_pres;
 
 use App\Http\Controllers\Controller;
@@ -37,6 +39,7 @@ class ChatController extends Controller
         }
 
         $currentUserId = (int) (auth()->user()->user_id ?? 0);
+        $chatRoles = ['sk_chairman', 'sk_secretary'];
 
         $users = DB::table('users as u')
             ->leftJoin('barangays as b', 'u.barangay_id', '=', 'b.barangay_id')
@@ -50,6 +53,7 @@ class ChatController extends Controller
             )
             ->where('u.user_id', '!=', $currentUserId)
             ->where('u.status', '=', 'active')
+            ->whereIn('u.role', $chatRoles)
             ->where(function ($query) use ($keyword) {
                 $query
                     ->whereRaw("CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, '')) LIKE ?", ["%{$keyword}%"])
@@ -86,7 +90,7 @@ class ChatController extends Controller
             ['link' => route('sk_pres.chat'), 'icon' => '&#128172;', 'label' => 'Chat'],
             ['link' => route('sk_pres.meetings'), 'icon' => '&#128222;', 'label' => 'Meetings'],
             ['link' => route('sk_pres.rankings'), 'icon' => '&#127942;', 'label' => 'Rankings'],
-            ['link' => route('sk_pres.analytics'), 'icon' => '&#128200;', 'label' => 'Analytics'],
+            
             ['link' => route('sk_pres.leadership'), 'icon' => '&#128101;', 'label' => 'Leadership'],
             ['link' => route('sk_pres.archive'), 'icon' => '&#128450;&#65039;', 'label' => 'Archive'],
             ['link' => route('sk_pres.user-management'), 'icon' => '&#128100;', 'label' => 'User Management'],

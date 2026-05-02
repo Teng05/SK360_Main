@@ -1,3 +1,4 @@
+{{-- File guide: Blade view template for resources/views/youth/profile.blade.php. --}}
 <!DOCTYPE html>
 <html lang="en">
 <head>

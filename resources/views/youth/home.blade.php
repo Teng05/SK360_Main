@@ -1,3 +1,4 @@
+{{-- File guide: Blade view template for resources/views/youth/home.blade.php. --}}
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -95,6 +96,8 @@
 
                 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     <div class="lg:col-span-2 space-y-4">
+                        @include('shared.wall-feed')
+
                         <div class="flex justify-between items-center">
                             <h2 class="font-bold text-gray-700 uppercase text-xs tracking-wider">Activity Feed</h2>
                             <div class="flex gap-1 bg-gray-200 p-1 rounded-lg text-[9px] font-bold">

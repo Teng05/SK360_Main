@@ -1,5 +1,7 @@
 <?php
 
+// File guide: Handles route logic and page data for app/Http/Controllers/sk_pres/MeetingsController.php.
+
 namespace App\Http\Controllers\sk_pres;
 
 use App\Http\Controllers\Controller;
@@ -16,6 +18,7 @@ class MeetingsController extends Controller
     public function index(): View
     {
         [$fullName, $menuItems] = $this->pageContext();
+        $this->completeElapsedMeetings();
 
         $meetings = Meeting::query()
             ->orderByDesc('meeting_date')
@@ -29,7 +32,7 @@ class MeetingsController extends Controller
             ->values();
 
         $activeMeetings = $meetings
-            ->filter(fn (Meeting $meeting) => $meeting->status === 'scheduled' && ($meeting->scheduled_at->isToday() || $meeting->scheduled_at->isPast()))
+            ->filter(fn (Meeting $meeting) => $meeting->status === 'scheduled' && $meeting->scheduled_at->isPast() && $meeting->ends_at->isFuture())
             ->sortBy(fn (Meeting $meeting) => $meeting->scheduled_at->timestamp)
             ->values();
 
@@ -137,6 +140,7 @@ class MeetingsController extends Controller
     {
         abort_unless(auth()->check() && auth()->user()->role === 'sk_president', 403);
 
+        // Shared topbar/sidebar data for the SK President meetings page.
         $user = auth()->user();
         $fullName = trim(($user->first_name ?? '') . ' ' . ($user->last_name ?? '')) ?: 'User';
 
@@ -150,7 +154,7 @@ class MeetingsController extends Controller
             ['link' => route('sk_pres.chat'), 'icon' => '&#128172;', 'label' => 'Chat'],
             ['link' => route('sk_pres.meetings'), 'icon' => '&#128222;', 'label' => 'Meetings'],
             ['link' => route('sk_pres.rankings'), 'icon' => '&#127942;', 'label' => 'Rankings'],
-            ['link' => route('sk_pres.analytics'), 'icon' => '&#128200;', 'label' => 'Analytics'],
+            
             ['link' => route('sk_pres.leadership'), 'icon' => '&#128101;', 'label' => 'Leadership'],
             ['link' => route('sk_pres.archive'), 'icon' => '&#128450;&#65039;', 'label' => 'Archive'],
             ['link' => route('sk_pres.user-management'), 'icon' => '&#128100;', 'label' => 'User Management'],
@@ -161,10 +165,13 @@ class MeetingsController extends Controller
 
     protected function decorateMeeting(Meeting $meeting): Meeting
     {
-        $meeting->scheduled_at = Carbon::parse($meeting->meeting_date . ' ' . $meeting->meeting_time);
-        $meeting->display_datetime = $meeting->scheduled_at->format('Y-m-d h:i A');
-        $meeting->preview_datetime = $meeting->scheduled_at->format('M d, Y h:i A');
-        $meeting->is_today = $meeting->scheduled_at->isToday();
+        // Adds display-only fields used by the meeting cards.
+        $scheduledAt = $meeting->scheduled_at;
+        $meeting->scheduled_at = $scheduledAt;
+        $meeting->ends_at = $scheduledAt->copy()->addHour();
+        $meeting->display_datetime = $scheduledAt->format('Y-m-d h:i A');
+        $meeting->preview_datetime = $scheduledAt->format('M d, Y h:i A');
+        $meeting->is_today = $scheduledAt->isToday();
         $meeting->status_label = match ($meeting->status) {
             'completed' => 'Completed',
             'cancelled' => 'Cancelled',
@@ -172,6 +179,23 @@ class MeetingsController extends Controller
         };
 
         return $meeting;
+    }
+
+    protected function completeElapsedMeetings(): void
+    {
+        // Moves meetings to Past Meetings after their one-hour meeting window ends.
+        Meeting::query()
+            ->where('status', 'scheduled')
+            ->get()
+            ->each(function (Meeting $meeting) {
+                $scheduledAt = $meeting->scheduled_at;
+
+                if ($scheduledAt->copy()->addHour()->isPast()) {
+                    $meeting->status = 'completed';
+                    $meeting->updated_at = now();
+                    $meeting->save();
+                }
+            });
     }
 
     protected function channelName(Meeting $meeting): string

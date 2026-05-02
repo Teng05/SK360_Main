@@ -1,5 +1,7 @@
 <?php
 
+// File guide: Handles route logic and page data for app/Http/Controllers/youth/ProfileController.php.
+
 namespace App\Http\Controllers\Youth;
 
 use App\Http\Controllers\Controller;

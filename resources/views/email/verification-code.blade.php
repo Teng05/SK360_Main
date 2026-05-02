@@ -1,3 +1,4 @@
+{{-- File guide: Blade view template for resources/views/email/verification-code.blade.php. --}}
 <div style="font-family: Arial, sans-serif;">
     <h2>Verify your account</h2>
     <p>Hello {{ $first_name }},</p>

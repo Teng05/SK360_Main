@@ -1,7 +1,10 @@
 <?php
 
+// File guide: Handles route logic and page data for app/Http/Controllers/Concerns/BuildsRankingsData.php.
+
 namespace App\Http\Controllers\Concerns;
 
+use App\Services\RankingPointsService;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
@@ -16,6 +19,8 @@ trait BuildsRankingsData
 
     protected function rankingsLeaderboard(): Collection
     {
+        app(RankingPointsService::class)->recordMissedMeetings();
+
         $latestPeriod = $this->latestRankingPeriod();
 
         if (! $latestPeriod) {
@@ -67,6 +72,19 @@ trait BuildsRankingsData
                 'badges' => $badges[$index + 1] ?? ['Participant'],
             ];
         });
+    }
+
+    protected function rankingPointSystem(): array
+    {
+        return [
+            ['label' => 'On-time Report Submission', 'points' => 50, 'type' => 'positive'],
+            ['label' => 'Meeting Attendance', 'points' => 30, 'type' => 'positive'],
+            ['label' => 'Community Engagement', 'points' => 25, 'type' => 'positive'],
+            ['label' => 'Quality Documentation', 'points' => 20, 'type' => 'positive'],
+            ['label' => 'Event Participation', 'points' => 15, 'type' => 'positive'],
+            ['label' => 'Late Submission', 'points' => -25, 'type' => 'negative'],
+            ['label' => 'Missed Meeting', 'points' => -30, 'type' => 'negative'],
+        ];
     }
 
     protected function normalizeRankingMetric(int $value): int

@@ -1,5 +1,7 @@
 <?php
 
+// File guide: Handles route logic and page data for app/Http/Controllers/sk_secretary/RankingController.php.
+
 namespace App\Http\Controllers\sk_secretary;
 
 use App\Http\Controllers\Concerns\BuildsRankingsData;
@@ -26,14 +28,23 @@ class RankingController extends Controller
             'topRankings' => $this->topRankings($leaderboard),
             'leaderboard' => $leaderboard,
             'latestPeriod' => $this->latestRankingPeriod(),
+            'pointSystem' => $this->rankingPointSystem(),
+            'profileRoute' => route('sk_secretary.profile'),
         ]);
     }
 
     protected function menuItems(): array
     {
         return [
-            ['link' => route('sk_secretary.home'), 'icon' => '&#127968;', 'label' => 'Home'],
-            ['link' => route('sk_secretary.rankings'), 'icon' => '&#127942;', 'label' => 'Rankings'],
+            ['link' => route('sk_secretary.home'), 'icon' => '🏠', 'label' => 'Home'],
+            ['link' => route('sk_secretary.reports'), 'icon' => '📊', 'label' => 'Reports'],
+            ['link' => route('sk_secretary.budget'), 'icon' => '💰', 'label' => 'Budget'],
+            ['link' => route('sk_secretary.announcements'), 'icon' => '📢', 'label' => 'Announcements'],
+            ['link' => route('sk_secretary.calendar'), 'icon' => '📅', 'label' => 'Calendar'],
+            ['link' => route('sk_secretary.chat'), 'icon' => '💬', 'label' => 'Chat'],
+            ['link' => route('sk_secretary.meetings'), 'icon' => '📞', 'label' => 'Meetings'],
+            ['link' => route('sk_secretary.rankings'), 'icon' => '🏆', 'label' => 'Rankings'],
+            ['link' => route('sk_secretary.leadership'), 'icon' => '👥', 'label' => 'Leadership'],
         ];
     }
 }

@@ -1,12 +1,17 @@
 <?php
 
+// File guide: Handles route logic and page data for app/Http/Controllers/sk_chairman/HomeController.php.
+
 namespace App\Http\Controllers\sk_chairman;
 
+use App\Http\Controllers\Concerns\BuildsWallFeed;
 use App\Http\Controllers\Controller;
 use Illuminate\View\View;
 
 class HomeController extends Controller
 {
+    use BuildsWallFeed;
+
     public function index(): View
     {
         abort_unless(auth()->check() && auth()->user()->role === 'sk_chairman', 403);
@@ -30,6 +35,8 @@ class HomeController extends Controller
             'menuItems' => $this->menuItems(),
             'currentUrl' => url()->current(),
             'summaryCards' => $summaryCards,
+            'feedPosts' => $this->wallFeedPosts(),
+            'defaultPostCategory' => 'update',
         ]);
     }
 
