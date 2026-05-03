@@ -77,6 +77,9 @@
                             <span class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300">&#128269;</span>
                             <input id="roomSearch" type="text" placeholder="Search users or groups..." class="w-full rounded-xl bg-gray-50 py-3 pl-10 pr-4 text-sm text-gray-700 outline-none ring-1 ring-transparent focus:ring-red-200">
                         </div>
+                        <button id="createGroupBtn" type="button" class="mt-3 w-full rounded-xl bg-red-500 px-4 py-3 text-sm font-bold text-white transition hover:bg-red-600">
+                            Create SK Group Chat
+                        </button>
                     </div>
                     <div id="roomList" class="max-h-[560px] space-y-2 overflow-y-auto p-3"></div>
                 </div>
@@ -144,6 +147,7 @@
         name: @json($fullName),
         role: @json($currentUserRole)
     };
+    const groupMembers = @json($groupMembers ?? []);
 
     let rooms = [];
     let activeRoomId = null;
@@ -159,6 +163,7 @@
     const messageForm = document.getElementById('messageForm');
     const messageInput = document.getElementById('messageInput');
     const sendMessageBtn = document.getElementById('sendMessageBtn');
+    const createGroupBtn = document.getElementById('createGroupBtn');
     const dropdownBtn = document.getElementById('profileDropdownBtn');
     const profileMenu = document.getElementById('profileMenu');
 
@@ -187,6 +192,19 @@
 
     function makeRoomKey(otherUserId) {
         return [String(currentUser.id), String(otherUserId)].sort().join('_');
+    }
+
+    function initialsFor(name, fallback = 'GC') {
+        return String(name || fallback)
+            .split(' ')
+            .map((part) => part[0] || '')
+            .join('')
+            .slice(0, 3)
+            .toUpperCase();
+    }
+
+    function makeGroupRoomKey(memberIds) {
+        return `group_${memberIds.map(String).sort().join('_')}`;
     }
 
     function renderRooms(filter = '') {
@@ -395,6 +413,95 @@
         }
     }
 
+    async function ensureFederationGroupRoom() {
+        const memberMap = new Map(groupMembers.map((member) => [String(member.id), member]));
+        memberMap.set(String(currentUser.id), {
+            id: String(currentUser.id),
+            name: currentUser.name,
+            role: currentUser.role
+        });
+
+        const members = Array.from(memberMap.values());
+        const memberIds = members.map((member) => String(member.id));
+        const memberNames = members.map((member) => member.name);
+        const roomKey = makeGroupRoomKey(memberIds);
+        const existingRoomQuery = query(
+            collection(db, 'chat_rooms'),
+            where('roomKey', '==', roomKey),
+            limit(1)
+        );
+
+        const existingRoomSnapshot = await getDocs(existingRoomQuery);
+
+        if (!existingRoomSnapshot.empty) {
+            const doc = existingRoomSnapshot.docs[0];
+            return {
+                id: doc.id,
+                ...doc.data()
+            };
+        }
+
+        await addDoc(collection(db, 'chat_rooms'), {
+            name: 'SK Federation Group',
+            type: 'group',
+            groupKind: 'federation',
+            createdBy: String(currentUser.id),
+            createdAt: serverTimestamp(),
+            memberIds,
+            memberNames,
+            roomKey
+        });
+
+        const createdRoomSnapshot = await getDocs(existingRoomQuery);
+
+        if (createdRoomSnapshot.empty) {
+            throw new Error('Unable to create group room.');
+        }
+
+        const createdDoc = createdRoomSnapshot.docs[0];
+
+        return {
+            id: createdDoc.id,
+            ...createdDoc.data()
+        };
+    }
+
+    async function openFederationGroup() {
+        chatStatus.textContent = 'Creating group chat...';
+        createGroupBtn.disabled = true;
+
+        try {
+            const room = await ensureFederationGroupRoom();
+            const memberCount = Array.isArray(room.memberIds) ? room.memberIds.length : groupMembers.length;
+            const roomEntry = {
+                id: room.id,
+                name: room.name || 'SK Federation Group',
+                subtitle: `${memberCount} members`,
+                color: 'bg-red-500',
+                initials: initialsFor(room.name || 'SK Federation Group', 'SKG'),
+                createdAtSeconds: room.createdAt?.seconds || Date.now()
+            };
+
+            const existingIndex = rooms.findIndex((item) => item.id === room.id);
+
+            if (existingIndex === -1) {
+                rooms.unshift(roomEntry);
+            } else {
+                rooms[existingIndex] = roomEntry;
+            }
+
+            activeRoomId = room.id;
+            roomSearch.value = '';
+            renderRooms();
+            subscribeToMessages();
+        } catch (error) {
+            chatStatus.textContent = 'Unable to create group chat. Check Firestore permissions.';
+            console.error(error);
+        } finally {
+            createGroupBtn.disabled = false;
+        }
+    }
+
     async function loadRooms() {
         chatStatus.textContent = 'Loading rooms...';
 
@@ -566,6 +673,8 @@
             searchRegisteredUsers(keyword);
         }, 250);
     });
+
+    createGroupBtn.addEventListener('click', openFederationGroup);
 
     if (dropdownBtn && profileMenu) {
         dropdownBtn.addEventListener('click', (event) => {
