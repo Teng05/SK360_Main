@@ -75,6 +75,10 @@
                 <p class="text-gray-500">Encouraging timely submissions and active participation{{ $latestPeriod ? ' for ' . $latestPeriod : '' }}</p>
             </div>
 
+            @isset($rankingsLiveRoute)
+                <div id="react-rankings-live" data-url="{{ $rankingsLiveRoute }}"></div>
+            @endisset
+
             @if ($topRankings->isNotEmpty())
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
                     @foreach ($topRankings as $top)

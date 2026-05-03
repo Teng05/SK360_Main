@@ -16,6 +16,10 @@ Route::prefix('mobile')->group(function () {
         Route::get('/sync', [MobileSyncController::class, 'sync'])->name('mobile.sync');
         Route::post('/wall/posts', [MobileSyncController::class, 'storeWallPost'])->name('mobile.wall.posts.store');
         Route::post('/events', [MobileSyncController::class, 'storeEvent'])->name('mobile.events.store');
+        Route::post('/meetings', [MobileSyncController::class, 'storeMeeting'])->name('mobile.meetings.store');
+        Route::get('/meetings/{meeting}/join-url', [MobileSyncController::class, 'meetingJoinUrl'])->name('mobile.meetings.join-url');
+        Route::post('/meetings/{meeting}/agora-token', [MobileSyncController::class, 'meetingAgoraToken'])->name('mobile.meetings.agora-token');
+        Route::get('/chat/users', [MobileSyncController::class, 'chatUsers'])->name('mobile.chat.users');
         Route::get('/submission-slots', [MobileSyncController::class, 'submissionSlots'])->name('mobile.submission-slots.index');
         Route::post('/submission-slots', [MobileSyncController::class, 'storeSubmissionSlot'])->name('mobile.submission-slots.store');
         Route::delete('/submission-slots/{slotId}', [MobileSyncController::class, 'deleteSubmissionSlot'])->name('mobile.submission-slots.destroy');

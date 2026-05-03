@@ -14,7 +14,6 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
-use Illuminate\Support\Str;
 
 class AuthController extends Controller
 {
@@ -109,6 +108,36 @@ class AuthController extends Controller
         ]);
 
         session()->forget(['reset_phone', 'reset_user_id']);
+
+        return redirect()->route('login')->with('verified', 'Your password has been reset. You can now log in.');
+    }
+
+    public function verifyEmailReset(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'code' => ['required', 'digits:6'],
+            'password' => ['required', 'confirmed', 'min:8', 'regex:/[A-Z]/', 'regex:/[a-z]/', 'regex:/[0-9]/'],
+        ]);
+
+        $email = session('reset_email');
+        $userId = session('reset_user_id');
+
+        if (! $email || ! $userId) {
+            return redirect()->route('password.request')->withErrors(['email' => 'Please request a reset code first.']);
+        }
+
+        $reset = DB::table('password_reset_tokens')->where('email', $email)->first();
+
+        if (! $reset || ! Hash::check($validated['code'], $reset->token) || now()->subMinutes(15)->greaterThan($reset->created_at)) {
+            return back()->withErrors(['code' => 'Invalid or expired reset code.'])->withInput();
+        }
+
+        User::where('user_id', $userId)->update([
+            'password' => Hash::make($validated['password']),
+        ]);
+
+        DB::table('password_reset_tokens')->where('email', $email)->delete();
+        session()->forget(['reset_email', 'reset_user_id']);
 
         return redirect()->route('login')->with('verified', 'Your password has been reset. You can now log in.');
     }
@@ -299,30 +328,34 @@ class AuthController extends Controller
             return back()->withErrors(['email' => 'No account found with this email.'])->withInput();
         }
 
-        $token = Str::random(64);
+        $code = (string) random_int(100000, 999999);
 
         DB::table('password_reset_tokens')->updateOrInsert(
             ['email' => $user->email],
             [
-                'token' => Hash::make($token),
+                'token' => Hash::make($code),
                 'created_at' => now(),
             ]
         );
 
-        $resetUrl = route('password.reset', [
-            'token' => $token,
-            'email' => $user->email,
-        ]);
-
         Mail::send('email.password-reset', [
             'first_name' => $user->first_name,
-            'reset_url' => $resetUrl,
+            'reset_code' => $code,
         ], function ($message) use ($user) {
             $message->to($user->email, trim($user->first_name.' '.$user->last_name))
                 ->subject('SK360 Password Reset');
         });
 
-        return back()->with('reset_success', 'Reset link sent. Please check your email.');
+        session([
+            'reset_email' => $user->email,
+            'reset_user_id' => $user->user_id,
+        ]);
+
+        return back()
+            ->with('reset_success', 'Reset code sent. Please check your email.')
+            ->with('reset_method', 'email')
+            ->with('show_email_verify', true)
+            ->with('reset_target', $user->email);
     }
 
     protected function sendPhonePasswordReset(string $phone): RedirectResponse
@@ -357,6 +390,7 @@ class AuthController extends Controller
 
         return back()
             ->with('reset_success', 'Reset code sent. Please check your phone.')
+            ->with('reset_method', 'phone')
             ->with('show_phone_verify', true)
             ->with('reset_target', $e164Phone);
     }

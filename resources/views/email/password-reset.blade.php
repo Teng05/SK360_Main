@@ -2,12 +2,9 @@
 <div style="font-family: Arial, sans-serif; color: #222;">
     <h2 style="color: #d32f2f;">Reset your SK360 password</h2>
     <p>Hello {{ $first_name ?? 'there' }},</p>
-    <p>Click the button below to create a new password. This link expires in 15 minutes.</p>
-    <p>
-        <a href="{{ $reset_url }}" style="display: inline-block; background: #d32f2f; color: #fff; padding: 12px 18px; border-radius: 8px; text-decoration: none; font-weight: bold;">
-            Reset Password
-        </a>
+    <p>Use this verification code to reset your password. This code expires in 15 minutes.</p>
+    <p style="display: inline-block; background: #fce4e4; color: #d32f2f; padding: 14px 22px; border-radius: 8px; font-size: 28px; font-weight: bold; letter-spacing: 4px;">
+        {{ $reset_code }}
     </p>
-    <p>If the button does not work, open this link:</p>
-    <p style="word-break: break-all;">{{ $reset_url }}</p>
+    <p>If you did not request a password reset, you can ignore this email.</p>
 </div>

@@ -44,6 +44,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\ProfileSettingsController;
 use App\Http\Controllers\WallPostController;
+use App\Http\Controllers\Api\MobileSyncController as MobileApiController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -53,6 +54,13 @@ use Illuminate\Support\Facades\Route;
 |--------------------------------------------------------------------------
 */
 Route::get('/', fn () => view('welcome'));
+
+Route::get('/mobile/meetings/{meeting}/call', [MobileApiController::class, 'mobileMeetingCall'])
+    ->middleware('signed')
+    ->name('mobile.meetings.call');
+Route::post('/mobile/meetings/{meeting}/agora-token', [MobileApiController::class, 'mobileMeetingToken'])
+    ->middleware('signed')
+    ->name('mobile.meetings.agora.token');
 
 Route::controller(AuthController::class)->group(function () {
     Route::get('/login', 'showLogin')->name('login');
@@ -70,6 +78,7 @@ Route::controller(AuthController::class)->group(function () {
     Route::post('/password/email', [AuthController::class, 'sendPasswordReset'])->name('password.email');
     Route::get('/password/reset/{token}', [AuthController::class, 'showResetPassword'])->name('password.reset');
     Route::post('/password/reset', [AuthController::class, 'resetPassword'])->name('password.store');
+    Route::post('/password/verify-email', [AuthController::class, 'verifyEmailReset'])->name('password.verify-email');
     Route::post('/password/verify-phone', [AuthController::class, 'verifyPhoneReset'])->name('password.verify-phone');
 });
 
