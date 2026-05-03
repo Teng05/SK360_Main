@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\EmailVerification;
+use App\Models\Meeting;
 use App\Models\MobileApiToken;
 use App\Models\User;
 use App\Services\NotificationService;
@@ -18,6 +19,9 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\URL;
+use Illuminate\View\View;
+use TaylanUnutmaz\AgoraTokenBuilder\RtcTokenBuilder;
 
 class MobileSyncController extends Controller
 {
@@ -319,6 +323,173 @@ class MobileSyncController extends Controller
         ], 201);
     }
 
+    public function storeMeeting(Request $request): JsonResponse
+    {
+        if (! $this->isPresident($request->user())) {
+            return response()->json(['message' => 'Only SK President can create meetings.'], 403);
+        }
+
+        $validated = $request->validate([
+            'title' => ['required', 'string', 'max:255'],
+            'agenda' => ['nullable', 'string', 'max:5000'],
+            'meeting_date' => ['required', 'date'],
+            'meeting_time' => ['required', 'date_format:H:i'],
+        ]);
+
+        $meetingId = DB::table('meetings')->insertGetId([
+            'title' => $validated['title'],
+            'agenda' => $validated['agenda'] ?? null,
+            'meeting_date' => $validated['meeting_date'],
+            'meeting_time' => $validated['meeting_time'] . ':00',
+            'location_or_link' => null,
+            'dyte_meeting_id' => null,
+            'created_by' => $request->user()->user_id,
+            'status' => 'scheduled',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ], 'meeting_id');
+
+        $meeting = DB::table('meetings')->where('meeting_id', $meetingId)->first();
+        $meeting->call_url = url("/sk_pres/meetings/{$meetingId}/call");
+
+        return response()->json([
+            'message' => 'Meeting scheduled successfully.',
+            'meeting' => $meeting,
+        ], 201);
+    }
+
+    public function meetingJoinUrl(Request $request, Meeting $meeting): JsonResponse
+    {
+        if (! $this->isOfficial($request->user())) {
+            return response()->json(['message' => 'Only SK officials can join meetings.'], 403);
+        }
+
+        return response()->json([
+            'join_url' => URL::temporarySignedRoute(
+                'mobile.meetings.call',
+                now()->addHours(4),
+                ['meeting' => $meeting->meeting_id]
+            ),
+        ]);
+    }
+
+    public function mobileMeetingCall(Meeting $meeting): View
+    {
+        return view('sk_pres.video-call', [
+            'fullName' => 'Mobile Participant',
+            'menuItems' => [],
+            'currentUrl' => url('/'),
+            'meeting' => $this->decorateMobileMeeting($meeting),
+            'channelName' => 'meeting-' . $meeting->meeting_id,
+            'backRoute' => url('/'),
+            'tokenRoute' => URL::temporarySignedRoute(
+                'mobile.meetings.agora.token',
+                now()->addHours(4),
+                ['meeting' => $meeting->meeting_id]
+            ),
+        ]);
+    }
+
+    public function mobileMeetingToken(Meeting $meeting): JsonResponse
+    {
+        return $this->buildAgoraTokenResponse($meeting);
+    }
+
+    public function meetingAgoraToken(Request $request, Meeting $meeting): JsonResponse
+    {
+        if (! $this->isOfficial($request->user())) {
+            return response()->json(['message' => 'Only SK officials can join meetings.'], 403);
+        }
+
+        return $this->buildAgoraTokenResponse($meeting, (int) $request->user()->user_id);
+    }
+
+    protected function buildAgoraTokenResponse(Meeting $meeting, ?int $uid = null): JsonResponse
+    {
+        $appId = config('services.agora.app_id');
+        $appCertificate = config('services.agora.app_certificate');
+
+        if (! filled($appId) || ! filled($appCertificate)) {
+            return response()->json([
+                'message' => 'Agora is not configured. Set AGORA_APP_ID and AGORA_APP_CERTIFICATE in .env.',
+            ], 500);
+        }
+
+        $uid = $uid && $uid > 0 ? $uid : random_int(1000, 999999);
+        $channel = 'meeting-' . $meeting->meeting_id;
+
+        try {
+            $token = RtcTokenBuilder::buildTokenWithUid(
+                $appId,
+                $appCertificate,
+                $channel,
+                $uid,
+                RtcTokenBuilder::RolePublisher,
+                now()->addHours(4)->timestamp
+            );
+        } catch (\Throwable $e) {
+            report($e);
+
+            return response()->json(['message' => 'Failed to generate Agora RTC token.'], 500);
+        }
+
+        return response()->json([
+            'appId' => $appId,
+            'token' => $token,
+            'channel' => $channel,
+            'uid' => $uid,
+            'title' => $meeting->title,
+        ]);
+    }
+
+    public function chatUsers(Request $request): JsonResponse
+    {
+        $keyword = trim((string) $request->query('search', ''));
+        $user = $request->user();
+        $chatRoles = $user->role === 'sk_president'
+            ? ['sk_chairman', 'sk_secretary']
+            : ['sk_president', 'sk_chairman', 'sk_secretary'];
+
+        $query = DB::table('users as u')
+            ->leftJoin('barangays as b', 'u.barangay_id', '=', 'b.barangay_id')
+            ->select(
+                'u.user_id',
+                'u.first_name',
+                'u.last_name',
+                'u.email',
+                'u.role',
+                'b.barangay_name'
+            )
+            ->where('u.user_id', '!=', $user->user_id)
+            ->where('u.status', '=', 'active')
+            ->whereIn('u.role', $chatRoles);
+
+        if ($keyword !== '') {
+            $query->where(function ($query) use ($keyword) {
+                $query
+                    ->whereRaw("CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, '')) LIKE ?", ["%{$keyword}%"])
+                    ->orWhere('u.email', 'like', "%{$keyword}%")
+                    ->orWhere('b.barangay_name', 'like', "%{$keyword}%");
+            });
+        }
+
+        return response()->json([
+            'users' => $query
+                ->orderBy('u.first_name')
+                ->orderBy('u.last_name')
+                ->limit(30)
+                ->get()
+                ->map(fn ($row) => [
+                    'id' => (string) $row->user_id,
+                    'name' => trim(($row->first_name ?? '') . ' ' . ($row->last_name ?? '')) ?: $row->email,
+                    'email' => $row->email,
+                    'role' => $row->role,
+                    'barangay' => $row->barangay_name,
+                ])
+                ->values(),
+        ]);
+    }
+
     public function submissionSlots(Request $request): JsonResponse
     {
         if (! $this->isPresident($request->user())) {
@@ -548,7 +719,13 @@ class MobileSyncController extends Controller
             $query->where('created_by', $user->user_id);
         }
 
-        return $this->finish($query, 'meetings', $since, 'meeting_id');
+        $meetings = $this->finish($query, 'meetings', $since, 'meeting_id');
+
+        return array_map(function ($meeting) {
+            $meeting->call_url = url("/sk_pres/meetings/{$meeting->meeting_id}/call");
+
+            return $meeting;
+        }, $meetings);
     }
 
     protected function notifications(User $user, ?Carbon $since): array
@@ -747,6 +924,22 @@ class MobileSyncController extends Controller
         }
 
         return url(ltrim($path, '/'));
+    }
+
+    protected function decorateMobileMeeting(Meeting $meeting): Meeting
+    {
+        $scheduledAt = $meeting->scheduled_at;
+        $meeting->scheduled_at = $scheduledAt;
+        $meeting->ends_at = $scheduledAt->copy()->addHour();
+        $meeting->display_datetime = $scheduledAt->format('Y-m-d h:i A');
+        $meeting->preview_datetime = $scheduledAt->format('M d, Y h:i A');
+        $meeting->status_label = match ($meeting->status) {
+            'completed' => 'Completed',
+            'cancelled' => 'Cancelled',
+            default => $meeting->scheduled_at->isFuture() ? 'Upcoming' : 'Ready',
+        };
+
+        return $meeting;
     }
 
     protected function isOfficial(User $user): bool

@@ -5,6 +5,10 @@
     <p>Use this verification code to reset your password. This code expires in 15 minutes.</p>
     <p style="display: inline-block; background: #fce4e4; color: #d32f2f; padding: 14px 22px; border-radius: 8px; font-size: 28px; font-weight: bold; letter-spacing: 4px;">
         {{ $reset_code }}
+    <p>Use this verification code to reset your password. This code expires in 15 minutes.</p>
+    <p style="display: inline-block; background: #fce4e4; color: #d32f2f; padding: 14px 22px; border-radius: 8px; font-size: 28px; font-weight: bold; letter-spacing: 4px;">
+        {{ $reset_code }}
     </p>
+    <p>If you did not request a password reset, you can ignore this email.</p>
     <p>If you did not request a password reset, you can ignore this email.</p>
 </div>
