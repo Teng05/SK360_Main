@@ -6,6 +6,7 @@ namespace App\Http\Controllers\sk_pres;
 
 use App\Http\Controllers\Concerns\BuildsRankingsData;
 use App\Http\Controllers\Controller;
+use Illuminate\Http\JsonResponse;
 use Illuminate\View\View;
 
 class RankingController extends Controller
@@ -30,6 +31,22 @@ class RankingController extends Controller
             'latestPeriod' => $this->latestRankingPeriod(),
             'pointSystem' => $this->rankingPointSystem(),
             'profileRoute' => route('sk_pres.profile'),
+            'rankingsLiveRoute' => route('sk_pres.rankings.live'),
+        ]);
+    }
+
+    public function live(): JsonResponse
+    {
+        abort_unless(auth()->check() && auth()->user()->role === 'sk_president', 403);
+
+        $leaderboard = $this->rankingsLeaderboard();
+
+        return response()->json([
+            'topRankings' => $this->topRankings($leaderboard)->values(),
+            'leaderboard' => $leaderboard->values(),
+            'latestPeriod' => $this->latestRankingPeriod(),
+            'pointSystem' => $this->rankingPointSystem(),
+            'updatedAt' => now()->format('M d, Y h:i A'),
         ]);
     }
 

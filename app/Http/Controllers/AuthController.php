@@ -169,7 +169,7 @@ class AuthController extends Controller
                 'verify_email' => $user->email,
             ]);
 
-            Mail::send('emails.verification-code', [
+            Mail::send('email.verification-code', [
                 'first_name' => $user->first_name,
                 'verification_code' => $verificationCode,
             ], function ($message) use ($user) {
@@ -272,7 +272,7 @@ class AuthController extends Controller
                 ]
             );
 
-            Mail::send('emails.verification-code', [
+            Mail::send('email.verification-code', [
                 'first_name' => $user->first_name,
                 'verification_code' => $newCode,
             ], function ($message) use ($user) {

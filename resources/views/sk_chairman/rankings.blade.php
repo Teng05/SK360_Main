@@ -10,3 +10,7 @@
 @section('content')
     @include('shared.rankings-page')
 @endsection
+
+@push('scripts')
+    @vite(['resources/js/app.js'])
+@endpush

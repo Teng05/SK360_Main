@@ -6,6 +6,7 @@ namespace App\Http\Controllers\sk_pres;
 
 use App\Http\Controllers\Controller;
 use App\Services\NotificationService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -59,18 +60,55 @@ class ModuleController extends Controller
         ]);
     }
 
+    public function live(): JsonResponse
+    {
+        abort_unless(auth()->check() && auth()->user()->role === 'sk_president', 403);
+
+        return response()->json($this->modulePayload());
+    }
+
+    public function storeLive(Request $request, NotificationService $notifications): JsonResponse
+    {
+        abort_unless(auth()->check() && auth()->user()->role === 'sk_president', 403);
+
+        $validated = $this->validateSlot($request);
+
+        DB::table('submission_slots')->insert([
+            'submission_type' => $validated['submission_type'],
+            'title' => $validated['submission_title'],
+            'description' => $validated['description'] ?? null,
+            'role' => $validated['submission_role'],
+            'start_date' => $validated['start_date'],
+            'end_date' => $validated['end_date'],
+            'status' => 'open',
+            'created_at' => now(),
+        ]);
+
+        $notifications->notifySubmissionSlotCreated([
+            'submission_type' => $validated['submission_type'],
+            'title' => $validated['submission_title'],
+            'role' => $validated['submission_role'],
+            'start_date' => $validated['start_date'],
+            'end_date' => $validated['end_date'],
+        ], auth()->user());
+
+        return response()->json($this->modulePayload());
+    }
+
+    public function destroyLive(int $slotId): JsonResponse
+    {
+        abort_unless(auth()->check() && auth()->user()->role === 'sk_president', 403);
+
+        DB::table('submission_slots')->where('slot_id', $slotId)->delete();
+
+        return response()->json($this->modulePayload());
+    }
+
     public function store(Request $request, NotificationService $notifications): RedirectResponse
     {
         abort_unless(auth()->check() && auth()->user()->role === 'sk_president', 403);
 
-        $validated = $request->validate([
-            'submission_type' => ['required', 'in:accomplishment_report,budget_report'],
-            'submission_title' => ['required', 'string', 'max:255'],
-            'description' => ['nullable', 'string'],
-            'submission_role' => ['required', 'in:SK Chairman,SK Secretary,Both'],
-            'start_date' => ['required', 'date'],
-            'end_date' => ['required', 'date', 'after_or_equal:start_date'],
-        ]);
+        $validated = $this->validateSlot($request);
 
         DB::table('submission_slots')->insert([
             'submission_type' => $validated['submission_type'],
@@ -100,5 +138,35 @@ class ModuleController extends Controller
         DB::table('submission_slots')->where('slot_id', $slotId)->delete();
 
         return redirect()->route('sk_pres.module')->with('status', 'Submission slot deleted successfully.');
+    }
+
+    protected function validateSlot(Request $request): array
+    {
+        return $request->validate([
+            'submission_type' => ['required', 'in:accomplishment_report,budget_report'],
+            'submission_title' => ['required', 'string', 'max:255'],
+            'description' => ['nullable', 'string'],
+            'submission_role' => ['required', 'in:SK Chairman,SK Secretary,Both'],
+            'start_date' => ['required', 'date'],
+            'end_date' => ['required', 'date', 'after_or_equal:start_date'],
+        ]);
+    }
+
+    protected function modulePayload(): array
+    {
+        $slots = DB::table('submission_slots')
+            ->orderByDesc('created_at')
+            ->get();
+
+        return [
+            'slots' => $slots,
+            'summary' => [
+                'totalSlots' => $slots->count(),
+                'openSlots' => $slots->where('status', 'open')->count(),
+                'closedSlots' => $slots->where('status', 'closed')->count(),
+                'allTimeTotal' => $slots->count(),
+            ],
+            'updatedAt' => now()->format('M d, Y h:i A'),
+        ];
     }
 }

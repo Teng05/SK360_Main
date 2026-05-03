@@ -95,6 +95,9 @@ Route::middleware('auth')->prefix('sk_pres')->name('sk_pres.')->group(function (
     Route::get('/consolidation/download', [ConsolidationController::class, 'download'])->name('consolidation.download');
 
     Route::get('/module', [ModuleController::class, 'index'])->name('module');
+    Route::get('/module/live', [ModuleController::class, 'live'])->name('module.live');
+    Route::post('/module/live', [ModuleController::class, 'storeLive'])->name('module.live.store');
+    Route::delete('/module/live/{slotId}', [ModuleController::class, 'destroyLive'])->name('module.live.destroy');
     Route::post('/module', [ModuleController::class, 'store'])->name('module.store');
     Route::post('/module/{slotId}/delete', [ModuleController::class, 'destroy'])->name('module.destroy');
 
@@ -102,6 +105,8 @@ Route::middleware('auth')->prefix('sk_pres')->name('sk_pres.')->group(function (
     Route::post('/announcements', [AnnouncementController::class, 'store'])->name('announcements.store');
 
     Route::get('/calendar', [CalendarController::class, 'index'])->name('calendar');
+    Route::get('/calendar/live', [CalendarController::class, 'live'])->name('calendar.live');
+    Route::post('/calendar/live', [CalendarController::class, 'storeLive'])->name('calendar.live.store');
     Route::post('/calendar', [CalendarController::class, 'store'])->name('calendar.store');
 
     Route::get('/chat', [SkPresidentChatController::class, 'index'])->name('chat');
@@ -114,6 +119,7 @@ Route::middleware('auth')->prefix('sk_pres')->name('sk_pres.')->group(function (
     Route::get('/video', fn () => redirect()->route('sk_pres.meetings'))->name('video');
 
     Route::get('/rankings', [SkPresidentRankingController::class, 'index'])->name('rankings');
+    Route::get('/rankings/live', [SkPresidentRankingController::class, 'live'])->name('rankings.live');
     Route::get('/leadership', [SkPresidentLeadershipController::class, 'index'])->name('leadership');
 
     Route::get('/archive', [SkPresidentArchiveController::class, 'index'])->name('archive');
@@ -161,6 +167,7 @@ Route::middleware('auth')->prefix('sk_chairman')->name('sk_chairman.')->group(fu
     Route::post('/meetings/{meeting}/agora-token', [SkChairmanMeetingsController::class, 'token'])->name('meetings.agora.token');
 
     Route::get('/rankings', [SkChairmanRankingController::class, 'index'])->name('rankings');
+    Route::get('/rankings/live', [SkChairmanRankingController::class, 'live'])->name('rankings.live');
 
     Route::get('/leadership', [SkChairmanLeadershipController::class, 'index'])->name('leadership');
     Route::post('/leadership', [SkChairmanLeadershipController::class, 'store'])->name('leadership.store');
@@ -208,6 +215,7 @@ Route::middleware('auth')->prefix('sk_secretary')->name('sk_secretary.')->group(
     Route::post('/meetings/{meeting}/agora-token', [SkSecretaryMeetingsController::class, 'token'])->name('meetings.agora.token');
 
     Route::get('/rankings', [SkSecretaryRankingController::class, 'index'])->name('rankings');
+    Route::get('/rankings/live', [SkSecretaryRankingController::class, 'live'])->name('rankings.live');
     Route::get('/leadership', [SkSecretaryLeadershipController::class, 'index'])->name('leadership');
 
     Route::get('/profile', fn (ProfileSettingsController $c) => $c->show('sk_secretary'))->name('profile');
@@ -228,6 +236,7 @@ Route::middleware('auth')->prefix('youth')->name('youth.')->group(function () {
     Route::get('/announcements', [YouthAnnouncementController::class, 'index'])->name('announcements');
     Route::get('/calendar', [YouthCalendarController::class, 'index'])->name('calendar');
     Route::get('/rankings', [YouthRankingController::class, 'index'])->name('rankings');
+    Route::get('/rankings/live', [YouthRankingController::class, 'live'])->name('rankings.live');
     Route::get('/leadership', [YouthLeadershipController::class, 'index'])->name('leadership');
 
     Route::get('/profile', [YouthProfileController::class, 'show'])->name('profile');

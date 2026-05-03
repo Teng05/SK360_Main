@@ -263,6 +263,7 @@
 @endsection
 
 @push('scripts')
+@vite(['resources/js/app.js'])
 <script>
     const notifBtn = document.getElementById('notifBtn');
     const notifDropdown = document.getElementById('notifDropdown');

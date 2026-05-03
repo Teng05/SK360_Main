@@ -6,6 +6,7 @@ namespace App\Http\Controllers\Youth;
 
 use App\Http\Controllers\Controller;
 use App\Services\RankingPointsService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
@@ -46,6 +47,22 @@ class RankingController extends Controller
             'leaderboard' => $leaderboard,
             'latestPeriod' => $this->latestPeriod(),
             'pointSystem' => $this->pointSystem(),
+            'rankingsLiveRoute' => route('youth.rankings.live'),
+        ]);
+    }
+
+    public function live(): JsonResponse
+    {
+        abort_unless(auth()->check() && auth()->user()->role === 'youth', 403);
+
+        $leaderboard = $this->leaderboard();
+
+        return response()->json([
+            'topRankings' => $this->topRankings($leaderboard),
+            'leaderboard' => $leaderboard->values(),
+            'latestPeriod' => $this->latestPeriod(),
+            'pointSystem' => $this->pointSystem(),
+            'updatedAt' => now()->format('M d, Y h:i A'),
         ]);
     }
 
@@ -90,6 +107,27 @@ class RankingController extends Controller
 
                 return $row;
             });
+    }
+
+    protected function topRankings(Collection $leaderboard): Collection
+    {
+        return $leaderboard->take(3)->values()->map(function ($row, $index) {
+            $icons = ['1st', '2nd', '3rd'];
+            $colors = ['border-yellow-400', 'border-gray-200', 'border-orange-400'];
+            $badges = [
+                1 => ['Top Performer', 'Highest Score'],
+                2 => ['Strong Compliance', 'Consistent Performer'],
+                3 => ['Rising Contender', 'Active Participation'],
+            ];
+
+            return [
+                'name' => $row->name,
+                'points' => $row->points,
+                'color' => $colors[$index] ?? 'border-gray-200',
+                'icon' => $icons[$index] ?? 'Ranked',
+                'badges' => $badges[$index + 1] ?? ['Participant'],
+            ];
+        });
     }
 
     protected function normalizeMetric(int $value): int

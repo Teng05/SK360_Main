@@ -7,6 +7,7 @@ namespace App\Http\Controllers\sk_pres;
 use App\Http\Controllers\Controller;
 use App\Services\NotificationService;
 use Carbon\Carbon;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -125,11 +126,39 @@ class CalendarController extends Controller
         ]);
     }
 
+    public function live(): JsonResponse
+    {
+        abort_unless(auth()->check() && auth()->user()->role === 'sk_president', 403);
+
+        return response()->json($this->calendarPayload());
+    }
+
+    public function storeLive(Request $request, NotificationService $notifications): JsonResponse
+    {
+        abort_unless(auth()->check() && auth()->user()->role === 'sk_president', 403);
+
+        $validated = $this->validateEvent($request);
+        $event = $this->createEvent($validated);
+        $notifications->notifyEventCreated($event, auth()->user());
+
+        return response()->json($this->calendarPayload());
+    }
+
     public function store(Request $request, NotificationService $notifications): RedirectResponse
     {
         abort_unless(auth()->check() && auth()->user()->role === 'sk_president', 403);
 
-        $validated = $request->validate([
+        $validated = $this->validateEvent($request);
+        $event = $this->createEvent($validated);
+
+        $notifications->notifyEventCreated($event, auth()->user());
+
+        return redirect()->route('sk_pres.calendar')->with('status', 'Event created successfully.');
+    }
+
+    protected function validateEvent(Request $request): array
+    {
+        return $request->validate([
             'event_title' => ['required', 'string', 'max:255'],
             'event_type' => ['required', 'in:meeting,deadline,program,other'],
             'description' => ['nullable', 'string'],
@@ -137,7 +166,10 @@ class CalendarController extends Controller
             'end_datetime' => ['nullable', 'date', 'after_or_equal:start_datetime'],
             'visibility' => ['required', 'in:public,officials_only,chairman_only,secretary_only'],
         ]);
+    }
 
+    protected function createEvent(array $validated): object
+    {
         $start = $validated['start_datetime'].' 00:00:00';
         $end = ($validated['end_datetime'] ?? $validated['start_datetime']).' 23:59:59';
 
@@ -152,15 +184,48 @@ class CalendarController extends Controller
             'created_at' => now(),
         ], 'event_id');
 
-        $event = (object) [
+        return (object) [
             'event_id' => $eventId,
             'title' => $validated['event_title'],
             'visibility' => $validated['visibility'],
             'start_datetime' => Carbon::parse($start),
         ];
+    }
 
-        $notifications->notifyEventCreated($event, auth()->user());
+    protected function calendarPayload(): array
+    {
+        $events = DB::table('events')->orderBy('start_datetime')->get();
+        $slotEvents = DB::table('submission_slots')
+            ->where('status', 'open')
+            ->orderBy('start_date')
+            ->get();
 
-        return redirect()->route('sk_pres.calendar')->with('status', 'Event created successfully.');
+        $calendarEvents = $events->map(function ($event) {
+            return [
+                'id' => $event->event_id,
+                'title' => $event->title,
+                'start' => $event->start_datetime,
+                'end' => $event->end_datetime,
+                'type' => $event->event_type,
+            ];
+        })->merge($slotEvents->map(function ($slot) {
+            return [
+                'id' => 'slot-'.$slot->slot_id,
+                'title' => $slot->title,
+                'start' => $slot->start_date,
+                'end' => $slot->end_date,
+                'type' => $slot->submission_type === 'budget_report' ? 'budget_slot' : 'report_slot',
+            ];
+        }))->values();
+
+        return [
+            'events' => $calendarEvents,
+            'upcomingEvents' => $calendarEvents
+                ->filter(fn ($event) => Carbon::parse($event['end'] ?? $event['start'])->endOfDay()->greaterThanOrEqualTo(now()))
+                ->sortBy('start')
+                ->take(5)
+                ->values(),
+            'updatedAt' => now()->format('M d, Y h:i A'),
+        ];
     }
 }
