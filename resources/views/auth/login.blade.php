@@ -30,7 +30,7 @@
 
                 <div class="features">
                     <div class="feature">
-                        <span class="feature-icon">Secure</span>
+                        <span class="feature-icon">🛡️</span>
                         <div>
                             <b>Secure Access</b>
                             <p>Role-based authentication for data protection</p>
@@ -38,7 +38,7 @@
                     </div>
 
                     <div class="feature">
-                        <span class="feature-icon">Dash</span>
+                        <span class="feature-icon">📊</span>
                         <div>
                             <b>Centralized Dashboard</b>
                             <p>All your tools in one place</p>
@@ -46,7 +46,7 @@
                     </div>
 
                     <div class="feature">
-                        <span class="feature-icon">Team</span>
+                        <span class="feature-icon">🤝</span>
                         <div>
                             <b>Real-Time Collaboration</b>
                             <p>Connect with SK officials instantly</p>

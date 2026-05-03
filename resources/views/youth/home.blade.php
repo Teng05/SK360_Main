@@ -153,15 +153,15 @@
                         <div class="bg-white p-4 rounded-xl shadow border">
                             <h2 class="font-bold text-gray-700 uppercase text-[10px] mb-3 tracking-widest border-b pb-2">Quick Actions</h2>
                             <div class="grid grid-cols-3 gap-2">
-                                <a href="#" class="flex flex-col items-center justify-center p-3 bg-blue-600 rounded-lg hover:bg-blue-700 transition aspect-square">
+                                <a href="calendar" class="flex flex-col items-center justify-center p-3 bg-blue-600 rounded-lg hover:bg-blue-700 transition aspect-square">
                                     <span class="text-white text-xl">&#128197;</span>
                                     <span class="text-[8px] font-bold mt-1 text-white text-center">JOIN EVENT</span>
                                 </a>
-                                <a href="#" class="flex flex-col items-center justify-center p-3 bg-green-600 rounded-lg hover:bg-green-700 transition aspect-square">
+                                <a href="rankings" class="flex flex-col items-center justify-center p-3 bg-green-600 rounded-lg hover:bg-green-700 transition aspect-square">
                                     <span class="text-white text-xl">&#127942;</span>
                                     <span class="text-[8px] font-bold mt-1 text-white text-center">RANKINGS</span>
                                 </a>
-                                <a href="#" class="flex flex-col items-center justify-center p-3 bg-indigo-600 rounded-lg hover:bg-indigo-700 transition aspect-square">
+                                <a href="profile" class="flex flex-col items-center justify-center p-3 bg-indigo-600 rounded-lg hover:bg-indigo-700 transition aspect-square">
                                     <span class="text-white text-xl">&#128100;</span>
                                     <span class="text-[8px] font-bold mt-1 text-white text-center">PROFILE</span>
                                 </a>
