@@ -96,7 +96,7 @@
 @endsection
 
 @push('scripts')
-    <script src="[cdn.jsdelivr.net](https://cdn.jsdelivr.net/npm/sweetalert2@11)"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
     @if ($errors->any())
         <script>

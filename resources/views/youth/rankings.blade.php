@@ -141,25 +141,7 @@
                     </div>
                 </div>
 
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 pb-10">
-                    <div class="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
-                        <h3 class="text-sm font-black text-gray-800 mb-1">Points System</h3>
-                        <p class="text-xs text-gray-400 mb-6">How points are earned and deducted</p>
-                        <div class="space-y-4">
-                            @foreach ($pointSystem ?? [] as $rule)
-                                @php
-                                    $isPositive = ($rule['type'] ?? 'positive') === 'positive';
-                                    $badgeClass = $isPositive ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600';
-                                    $prefix = $rule['points'] > 0 ? '+' : '';
-                                @endphp
-                                <div class="flex justify-between items-center text-[11px]">
-                                    <span class="text-gray-700 font-medium">{{ $rule['label'] }}</span>
-                                    <span class="{{ $badgeClass }} px-2 py-1 rounded-lg font-black">{{ $prefix }}{{ $rule['points'] }} points</span>
-                                </div>
-                            @endforeach
-                        </div>
-                    </div>
-
+                <div class="grid grid-cols-1 gap-6 pb-10">
                     <div class="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
                         <h3 class="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-6">Achievement Badges</h3>
                         <div class="space-y-4">
