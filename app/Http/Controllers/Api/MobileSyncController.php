@@ -15,7 +15,9 @@ use Illuminate\Database\Query\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
@@ -198,6 +200,121 @@ class MobileSyncController extends Controller
         return response()->json(['message' => 'Verification code resent.']);
     }
 
+    public function requestPasswordReset(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'method' => ['required', 'in:email,phone'],
+            'email' => ['nullable', 'required_if:method,email', 'email'],
+            'phone' => ['nullable', 'required_if:method,phone', 'string', 'max:30'],
+        ]);
+
+        if ($validated['method'] === 'email') {
+            $user = User::where('email', $validated['email'])->first();
+            if (! $user) {
+                return response()->json(['message' => 'No account found with this email.'], 404);
+            }
+
+            $code = (string) random_int(100000, 999999);
+            DB::table('password_reset_tokens')->updateOrInsert(
+                ['email' => $user->email],
+                [
+                    'token' => Hash::make($code),
+                    'created_at' => now(),
+                ]
+            );
+
+            Mail::send('email.password-reset', [
+                'first_name' => $user->first_name,
+                'reset_code' => $code,
+            ], function ($message) use ($user) {
+                $message->to($user->email, trim($user->first_name.' '.$user->last_name))
+                    ->subject('SK360 Password Reset');
+            });
+
+            return response()->json([
+                'message' => 'Reset code sent. Please check your email.',
+                'method' => 'email',
+                'target' => $user->email,
+            ]);
+        }
+
+        $user = $this->findUserByPhone($validated['phone']);
+        if (! $user) {
+            return response()->json(['message' => 'No account found with this phone number.'], 404);
+        }
+
+        $phone = $this->toE164Phone($validated['phone']);
+        if (! $phone) {
+            return response()->json(['message' => 'Use a valid Philippine phone number like +639123456789.'], 422);
+        }
+
+        $response = $this->twilioRequest('Verification', [
+            'To' => $phone,
+            'Channel' => 'sms',
+        ]);
+
+        if (! ($response['ok'] ?? false)) {
+            return response()->json([
+                'message' => $response['message'] ?? 'Failed to send SMS reset code.',
+            ], 500);
+        }
+
+        return response()->json([
+            'message' => 'Reset code sent. Please check your phone.',
+            'method' => 'phone',
+            'target' => $phone,
+        ]);
+    }
+
+    public function verifyPasswordReset(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'method' => ['required', 'in:email,phone'],
+            'target' => ['required', 'string', 'max:255'],
+            'code' => ['required', 'digits:6'],
+            'password' => ['required', 'confirmed', 'min:8', 'regex:/[A-Z]/', 'regex:/[a-z]/', 'regex:/[0-9]/'],
+        ], [
+            'password.confirmed' => 'Passwords do not match.',
+        ]);
+
+        if ($validated['method'] === 'email') {
+            $user = User::where('email', $validated['target'])->first();
+            $reset = DB::table('password_reset_tokens')->where('email', $validated['target'])->first();
+
+            if (! $user || ! $reset || ! Hash::check($validated['code'], $reset->token) || now()->subMinutes(15)->greaterThan($reset->created_at)) {
+                return response()->json(['message' => 'Invalid or expired reset code.'], 422);
+            }
+
+            $user->update(['password' => Hash::make($validated['password'])]);
+            DB::table('password_reset_tokens')->where('email', $validated['target'])->delete();
+
+            return response()->json(['message' => 'Your password has been reset. You can now log in.']);
+        }
+
+        $phone = $this->toE164Phone($validated['target']);
+        if (! $phone) {
+            return response()->json(['message' => 'Use a valid Philippine phone number like +639123456789.'], 422);
+        }
+
+        $user = $this->findUserByPhone($phone);
+        if (! $user) {
+            return response()->json(['message' => 'No account found with this phone number.'], 404);
+        }
+
+        $response = $this->twilioRequest('VerificationCheck', [
+            'To' => $phone,
+            'Code' => $validated['code'],
+        ]);
+
+        if (! ($response['ok'] ?? false) || ($response['json']['status'] ?? null) !== 'approved') {
+            return response()->json(['message' => 'Invalid or expired reset code.'], 422);
+        }
+
+        $user->update(['password' => Hash::make($validated['password'])]);
+
+        return response()->json(['message' => 'Your password has been reset. You can now log in.']);
+    }
+
     public function logout(Request $request): JsonResponse
     {
         $request->attributes->get('mobile_api_token')?->delete();
@@ -210,6 +327,42 @@ class MobileSyncController extends Controller
         return response()->json([
             'user' => $this->userPayload($request->user()->loadMissing('barangay')),
         ]);
+    }
+
+    public function updateProfile(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'first_name' => ['required', 'string', 'max:50'],
+            'last_name' => ['required', 'string', 'max:50'],
+        ]);
+
+        $user = $request->user();
+        $user->update([
+            'first_name' => trim($validated['first_name']),
+            'last_name' => trim($validated['last_name']),
+        ]);
+
+        return response()->json([
+            'message' => 'Profile updated successfully.',
+            'user' => $this->userPayload($user->fresh('barangay')),
+        ]);
+    }
+
+    public function updatePassword(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'current_password' => ['required'],
+            'password' => ['required', 'confirmed', 'min:8'],
+        ]);
+
+        $user = $request->user();
+        if (! Hash::check($validated['current_password'], $user->password)) {
+            return response()->json(['message' => 'Current password is incorrect.'], 422);
+        }
+
+        $user->update(['password' => $validated['password']]);
+
+        return response()->json(['message' => 'Password updated successfully.']);
     }
 
     public function sync(Request $request): JsonResponse
@@ -235,8 +388,10 @@ class MobileSyncController extends Controller
 'latest_ranking_period' => $this->latestRankingPeriod(),
             'submission_slots' => $this->tableRows('submission_slots', $since, 'slot_id'),
             'report_submissions' => $this->reportSubmissions($user, $since),
+            'accomplishment_reports' => $this->accomplishmentReports($user, $since),
             'budget_reports' => $this->budgetReports($user, $since),
             'leadership_profiles' => $this->leadershipProfiles($user, $since),
+            'archive_documents' => $this->archiveDocuments($user, $since),
         ]);
     }
 
@@ -248,6 +403,10 @@ class MobileSyncController extends Controller
         ]);
 
         $category = strtolower($validated['post_category'] ?? 'update');
+        if ($category === 'announcement' && ! $this->isPresident($request->user())) {
+            return response()->json(['message' => 'Only SK President can create announcements.'], 403);
+        }
+
         $title = match ($category) {
             'announcement' => 'Announcement',
             'event' => 'Event Update',
@@ -291,8 +450,47 @@ class MobileSyncController extends Controller
         ], 201);
     }
 
+    public function toggleWallLike(Request $request, int $announcementId): JsonResponse
+    {
+        $postExists = DB::table('announcements')
+            ->where('announcement_id', $announcementId)
+            ->where('visibility', 'public')
+            ->exists();
+
+        if (! $postExists) {
+            return response()->json(['message' => 'Post not found.'], 404);
+        }
+
+        $existing = DB::table('wall_post_likes')
+            ->where('announcement_id', $announcementId)
+            ->where('user_id', $request->user()->user_id)
+            ->first();
+
+        if ($existing) {
+            DB::table('wall_post_likes')
+                ->where('announcement_id', $announcementId)
+                ->where('user_id', $request->user()->user_id)
+                ->delete();
+        } else {
+            DB::table('wall_post_likes')->insert([
+                'announcement_id' => $announcementId,
+                'user_id' => $request->user()->user_id,
+                'created_at' => now(),
+            ]);
+        }
+
+        return response()->json([
+            'message' => $existing ? 'Post unliked.' : 'Post liked.',
+            'liked' => ! $existing,
+        ]);
+    }
+
     public function storeEvent(Request $request): JsonResponse
     {
+        if (! $this->isPresident($request->user())) {
+            return response()->json(['message' => 'Only SK President can schedule calendar events.'], 403);
+        }
+
         $validated = $request->validate([
             'title' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:5000'],
@@ -490,6 +688,109 @@ class MobileSyncController extends Controller
         ]);
     }
 
+    public function storeCouncilMember(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        if ($user->role !== 'sk_chairman') {
+            return response()->json(['message' => 'Only SK Chairman can add SK council members.'], 403);
+        }
+
+        if (! Schema::hasTable('sk_council')) {
+            return response()->json(['message' => 'SK council table is not available.'], 500);
+        }
+
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'email' => ['nullable', 'email', 'max:255'],
+            'phone' => ['nullable', 'string', 'max:20'],
+            'term' => ['nullable', 'string', 'max:50'],
+        ]);
+
+        $councilId = DB::table('sk_council')->insertGetId([
+            'barangay_id' => $user->barangay_id,
+            'name' => trim($validated['name']),
+            'position' => 'SK Councilor',
+            'email' => $validated['email'] ?? null,
+            'phone' => $validated['phone'] ?? null,
+            'term' => filled($validated['term'] ?? null) ? $validated['term'] : '2023-2026',
+            'profile_img' => 'default.png',
+            'created_at' => now(),
+        ], 'council_id');
+
+        return response()->json([
+            'message' => 'SK council member added.',
+            'council_member' => DB::table('sk_council')->where('council_id', $councilId)->first(),
+        ], 201);
+    }
+
+    public function storeOfficialSubmission(Request $request, RankingPointsService $points): JsonResponse
+    {
+        $user = $request->user();
+        if (! in_array($user->role, ['sk_chairman', 'sk_secretary'], true)) {
+            return response()->json(['message' => 'Only SK Chairman or SK Secretary can submit reports.'], 403);
+        }
+
+        $validated = $request->validate([
+            'slot_id' => ['required', 'integer'],
+            'submission_type' => ['required', 'in:accomplishment_report,budget_report'],
+            'report_type' => ['nullable', 'in:monthly,quarterly,annual'],
+            'reporting_year' => ['nullable', 'integer', 'min:2000', 'max:2100'],
+            'reporting_month' => ['nullable', 'integer', 'min:1', 'max:12'],
+            'reporting_quarter' => ['nullable', 'in:Q1,Q2,Q3,Q4'],
+            'remarks' => ['nullable', 'string', 'max:5000'],
+            'report_file' => ['required', 'file', 'mimes:pdf', 'max:5120'],
+        ]);
+
+        $roleLabel = $user->role === 'sk_chairman' ? 'SK Chairman' : 'SK Secretary';
+        $slot = DB::table('submission_slots')
+            ->where('slot_id', $validated['slot_id'])
+            ->where('submission_type', $validated['submission_type'])
+            ->whereIn('role', [$roleLabel, 'Both'])
+            ->where('status', 'open')
+            ->first();
+
+        if (! $slot) {
+            return response()->json(['message' => 'That submission slot is no longer available.'], 422);
+        }
+
+        $now = now();
+        if (Carbon::parse($slot->start_date)->startOfDay()->gt($now) || Carbon::parse($slot->end_date)->endOfDay()->lt($now)) {
+            return response()->json(['message' => 'That submission slot is not active today.'], 422);
+        }
+
+        $directoryName = $validated['submission_type'] === 'budget_report'
+            ? 'budget_reports'
+            : 'reports';
+        $prefix = $validated['submission_type'] === 'budget_report' ? 'BUD' : 'REP';
+        $directory = public_path("uploads/{$directoryName}");
+        File::ensureDirectoryExists($directory);
+
+        $file = $request->file('report_file');
+        $filename = $prefix . '_' . time() . '_' . $user->barangay_id . '.pdf';
+        $file->move($directory, $filename);
+        $validated['uploaded_file_name'] = $file->getClientOriginalName();
+        $validated['uploaded_file_path'] = "uploads/{$directoryName}/{$filename}";
+
+        if ($validated['submission_type'] === 'budget_report') {
+            $sourceId = $this->saveMobileBudgetSubmission($user, $slot, $validated);
+            $sourceType = 'budget_report';
+            $row = DB::table('budget_reports')->where('budget_report_id', $sourceId)->first();
+        } else {
+            $sourceId = $this->saveMobileAccomplishmentSubmission($user, $slot, $validated);
+            $sourceType = 'accomplishment_report';
+            $row = DB::table('accomplishment_reports')->where('report_id', $sourceId)->first();
+        }
+
+        $isOnTime = $now->lessThanOrEqualTo(Carbon::parse($slot->end_date)->endOfDay());
+        $points->award((int) $user->barangay_id, $isOnTime ? RankingPointsService::ON_TIME_REPORT_SUBMISSION : RankingPointsService::LATE_SUBMISSION, $sourceType, $sourceId, (int) $user->user_id);
+        $points->award((int) $user->barangay_id, RankingPointsService::QUALITY_DOCUMENTATION, $sourceType, $sourceId, (int) $user->user_id);
+
+        return response()->json([
+            'message' => 'Submission synced.',
+            'submission' => $row,
+        ], 201);
+    }
+
     public function submissionSlots(Request $request): JsonResponse
     {
         if (! $this->isPresident($request->user())) {
@@ -629,6 +930,84 @@ class MobileSyncController extends Controller
         });
     }
 
+    protected function twilioRequest(string $type, array $payload): array
+    {
+        $sid = config('services.twilio.sid');
+        $token = config('services.twilio.token');
+        $serviceSid = config('services.twilio.verify_service_sid');
+
+        if (! filled($sid) || ! filled($token) || ! filled($serviceSid)) {
+            return [
+                'ok' => false,
+                'message' => 'Twilio is not configured. Add TWILIO_SID, TWILIO_AUTH_TOKEN, and TWILIO_VERIFY_SERVICE_SID to .env.',
+            ];
+        }
+
+        $endpoint = $type === 'VerificationCheck'
+            ? "https://verify.twilio.com/v2/Services/{$serviceSid}/VerificationCheck"
+            : "https://verify.twilio.com/v2/Services/{$serviceSid}/Verifications";
+
+        try {
+            $response = Http::asForm()
+                ->withBasicAuth($sid, $token)
+                ->post($endpoint, $payload);
+
+            return [
+                'ok' => $response->successful(),
+                'json' => $response->json() ?: [],
+                'message' => $response->json('message') ?: 'Twilio request failed.',
+            ];
+        } catch (\Throwable $exception) {
+            report($exception);
+
+            return [
+                'ok' => false,
+                'message' => 'Failed to connect to Twilio. Please try again.',
+            ];
+        }
+    }
+
+    protected function findUserByPhone(string $phone): ?User
+    {
+        $target = $this->phoneDigits($phone);
+
+        return User::whereNotNull('phone_number')->get()
+            ->first(fn (User $user) => $this->phoneNumbersMatch($target, $this->phoneDigits((string) $user->phone_number)));
+    }
+
+    protected function phoneNumbersMatch(string $target, string $stored): bool
+    {
+        if ($target === '' || $stored === '') {
+            return false;
+        }
+
+        return $target === $stored || substr($target, -10) === substr($stored, -10);
+    }
+
+    protected function phoneDigits(string $phone): string
+    {
+        return preg_replace('/\D+/', '', $phone) ?: '';
+    }
+
+    protected function toE164Phone(string $phone): ?string
+    {
+        $digits = $this->phoneDigits($phone);
+
+        if (str_starts_with($digits, '63') && strlen($digits) === 12) {
+            return '+'.$digits;
+        }
+
+        if (str_starts_with($digits, '09') && strlen($digits) === 11) {
+            return '+63'.substr($digits, 1);
+        }
+
+        if (str_starts_with($digits, '9') && strlen($digits) === 10) {
+            return '+63'.$digits;
+        }
+
+        return null;
+    }
+
     protected function announcements(User $user, ?Carbon $since): array
     {
         if (! Schema::hasTable('announcements')) {
@@ -764,6 +1143,33 @@ class MobileSyncController extends Controller
         }, $rows);
     }
 
+    protected function accomplishmentReports(User $user, ?Carbon $since): array
+    {
+        if (! Schema::hasTable('accomplishment_reports')) {
+            return [];
+        }
+
+        $query = DB::table('accomplishment_reports')
+            ->where(function (Builder $query) use ($user) {
+                $query->where('user_id', $user->user_id);
+
+                if ($this->isPresident($user)) {
+                    $query->orWhereNotNull('user_id');
+                } elseif ($this->isOfficial($user) && $user->barangay_id) {
+                    $query->orWhere('barangay_id', $user->barangay_id);
+                }
+            });
+
+        $rows = $this->finish($query, 'accomplishment_reports', $since, 'report_id');
+
+        return array_map(function ($row) {
+            $row->uploaded_file_url = $this->publicUrl($row->uploaded_file_path ?? null);
+            $row->generated_pdf_url = $this->publicUrl($row->generated_pdf_path ?? null);
+
+            return $row;
+        }, $rows);
+    }
+
     protected function budgetReports(User $user, ?Carbon $since): array
     {
         if (! Schema::hasTable('budget_reports')) {
@@ -789,6 +1195,68 @@ class MobileSyncController extends Controller
 
             return $row;
         }, $rows);
+    }
+
+    protected function archiveDocuments(User $user, ?Carbon $since): array
+    {
+        $documents = collect();
+
+        if (Schema::hasTable('accomplishment_reports')) {
+            $query = DB::table('accomplishment_reports as ar')
+                ->leftJoin('barangays as b', 'ar.barangay_id', '=', 'b.barangay_id')
+                ->select(
+                    DB::raw("'accomplishment_report' as source_type"),
+                    'ar.report_id as source_id',
+                    'ar.title',
+                    'ar.barangay_id',
+                    'b.barangay_name',
+                    'ar.uploaded_file_path',
+                    'ar.generated_pdf_path',
+                    'ar.created_at'
+                );
+
+            if (! $this->isPresident($user) && $user->barangay_id) {
+                $query->where('ar.barangay_id', $user->barangay_id);
+            }
+
+            $this->applySince($query, 'accomplishment_reports', $since);
+            $documents = $documents->merge($query->get());
+        }
+
+        if (Schema::hasTable('budget_reports')) {
+            $query = DB::table('budget_reports as br')
+                ->leftJoin('barangays as b', 'br.barangay_id', '=', 'b.barangay_id')
+                ->select(
+                    DB::raw("'budget_report' as source_type"),
+                    'br.budget_report_id as source_id',
+                    'br.title',
+                    'br.barangay_id',
+                    'b.barangay_name',
+                    'br.uploaded_file_path',
+                    'br.generated_pdf_path',
+                    'br.created_at'
+                );
+
+            if (! $this->isPresident($user) && $user->barangay_id) {
+                $query->where('br.barangay_id', $user->barangay_id);
+            }
+
+            $this->applySince($query, 'budget_reports', $since);
+            $documents = $documents->merge($query->get());
+        }
+
+        return $documents
+            ->sortByDesc('created_at')
+            ->take(500)
+            ->map(function ($row) {
+                $path = $row->uploaded_file_path ?? $row->generated_pdf_path ?? null;
+                $row->file_url = $this->publicUrl($path);
+                $row->document_type = $row->source_type === 'budget_report' ? 'Budget' : 'Report';
+
+                return $row;
+            })
+            ->values()
+            ->all();
     }
 
    protected function leadershipProfiles(User $user, ?Carbon $since): array
@@ -924,6 +1392,85 @@ class MobileSyncController extends Controller
         }
 
         return url(ltrim($path, '/'));
+    }
+
+    protected function saveMobileAccomplishmentSubmission(User $user, object $slot, array $validated): int
+    {
+        $year = (int) ($validated['reporting_year'] ?? now()->year);
+        $month = (int) ($validated['reporting_month'] ?? now()->month);
+        $reportType = $validated['report_type'] ?? 'monthly';
+
+        $data = [
+            'user_id' => $user->user_id,
+            'barangay_id' => $user->barangay_id,
+            'slot_id' => $slot->slot_id,
+            'report_type' => $reportType,
+            'submission_method' => 'file_upload',
+            'title' => $slot->title,
+            'reporting_year' => $year,
+            'reporting_month' => $reportType === 'monthly' ? $month : null,
+            'reporting_quarter' => $reportType === 'quarterly' ? ($validated['reporting_quarter'] ?? 'Q1') : null,
+            'generated_pdf_path' => null,
+            'uploaded_file_name' => $validated['uploaded_file_name'] ?? null,
+            'uploaded_file_path' => $validated['uploaded_file_path'] ?? null,
+            'status' => 'submitted',
+            'remarks' => $validated['remarks'] ?? null,
+            'submitted_at' => now(),
+            'created_at' => now(),
+        ];
+
+        $existing = DB::table('accomplishment_reports')
+            ->where('barangay_id', $user->barangay_id)
+            ->where('slot_id', $slot->slot_id)
+            ->first();
+
+        if ($existing) {
+            DB::table('accomplishment_reports')->where('report_id', $existing->report_id)->update($data);
+            return (int) $existing->report_id;
+        }
+
+        return (int) DB::table('accomplishment_reports')->insertGetId($data, 'report_id');
+    }
+
+    protected function saveMobileBudgetSubmission(User $user, object $slot, array $validated): int
+    {
+        $reportType = $validated['report_type'] ?? 'annual';
+        $year = (int) ($validated['reporting_year'] ?? now()->year);
+        $data = [
+            'user_id' => $user->user_id,
+            'barangay_id' => $user->barangay_id,
+            'slot_id' => $slot->slot_id,
+            'submission_method' => 'file_upload',
+            'document_type' => 'financial_record',
+            'fiscal_year' => $year,
+            'title' => $slot->title,
+            'generated_pdf_path' => null,
+            'template_data' => null,
+            'uploaded_file_name' => $validated['uploaded_file_name'] ?? null,
+            'uploaded_file_path' => $validated['uploaded_file_path'] ?? null,
+            'total_amount' => 0,
+            'status' => 'recorded',
+            'submitted_at' => now(),
+            'created_at' => now(),
+        ];
+
+        if (Schema::hasColumn('budget_reports', 'budget_period_type')) {
+            $data['budget_period_type'] = $reportType;
+            $data['fiscal_month'] = $reportType === 'monthly' ? ($validated['reporting_month'] ?? now()->month) : null;
+            $data['fiscal_quarter'] = $reportType === 'quarterly' ? ($validated['reporting_quarter'] ?? 'Q1') : null;
+        }
+
+        $existing = DB::table('budget_reports')
+            ->where('barangay_id', $user->barangay_id)
+            ->where('slot_id', $slot->slot_id)
+            ->first();
+
+        if ($existing) {
+            DB::table('budget_reports')->where('budget_report_id', $existing->budget_report_id)->update($data);
+            return (int) $existing->budget_report_id;
+        }
+
+        return (int) DB::table('budget_reports')->insertGetId($data, 'budget_report_id');
     }
 
     protected function decorateMobileMeeting(Meeting $meeting): Meeting

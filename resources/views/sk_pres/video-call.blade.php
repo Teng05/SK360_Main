@@ -79,6 +79,7 @@
 <script>
     const tokenUrl = @json($tokenRoute ?? route('sk_pres.meetings.agora.token', $meeting->meeting_id));
     const meetingChannel = @json($channelName);
+    const participantNames = @json($participantNames ?? []);
     const statusBar = document.getElementById('statusBar');
     const statusText = document.getElementById('statusText');
     const connectionStatus = document.getElementById('connectionStatus');
@@ -109,6 +110,12 @@
         participantCount.textContent = `${remoteUsers.size + 1} online`;
     };
 
+    const participantNameFor = (uid) => {
+        const key = String(uid);
+
+        return participantNames[key] || `User ${key}`;
+    };
+
     const ensureRemoteCard = (user) => {
         const id = `remote-${user.uid}`;
         let player = document.getElementById(id);
@@ -116,9 +123,7 @@
         if (!player) {
             player = document.createElement('div');
             player.id = id;
-            // Highlight screenshares (UIDs over 1000)
-            const isScreen = user.uid >= 1000;
-            player.className = `video-pane h-full min-h-[320px] rounded-[24px] overflow-hidden ${isScreen ? 'md:col-span-2' : ''}`;
+            player.className = 'video-pane h-full min-h-[320px] rounded-[24px] overflow-hidden';
             remoteGrid.appendChild(player);
         }
 
@@ -137,9 +142,8 @@
         remoteUsers.forEach((user) => {
             const entry = document.createElement('div');
             entry.className = 'rounded-2xl border border-white/10 px-3 py-3';
-            const isScreen = user.uid >= 1000;
             entry.innerHTML = `
-                <p class="text-sm font-semibold">${isScreen ? 'Presentation' : 'User ' + user.uid}</p>
+                <p class="text-sm font-semibold">${participantNameFor(user.uid)}</p>
                 <p class="mt-1 text-[11px] text-slate-400">Connected</p>
             `;
             participantList.appendChild(entry);
