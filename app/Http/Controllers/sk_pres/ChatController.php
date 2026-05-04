@@ -23,6 +23,7 @@ class ChatController extends Controller
             'fullName' => $fullName,
             'currentUserId' => (string) ($user->user_id ?? ''),
             'currentUserRole' => 'sk_president',
+            'groupMembers' => $this->groupMembers(),
             'menuItems' => $this->menuItems(),
             'currentUrl' => url()->current(),
         ]);
@@ -95,5 +96,25 @@ class ChatController extends Controller
             ['link' => route('sk_pres.archive'), 'icon' => '&#128450;&#65039;', 'label' => 'Archive'],
             ['link' => route('sk_pres.user-management'), 'icon' => '&#128100;', 'label' => 'User Management'],
         ];
+    }
+
+    protected function groupMembers(): array
+    {
+        return DB::table('users')
+            ->select('user_id', 'first_name', 'last_name', 'email', 'role')
+            ->where('status', 'active')
+            ->whereIn('role', ['sk_president', 'sk_chairman', 'sk_secretary'])
+            ->orderBy('first_name')
+            ->orderBy('last_name')
+            ->get()
+            ->map(function ($user) {
+                return [
+                    'id' => (string) $user->user_id,
+                    'name' => trim(($user->first_name ?? '') . ' ' . ($user->last_name ?? '')) ?: $user->email,
+                    'role' => $user->role,
+                ];
+            })
+            ->values()
+            ->all();
     }
 }

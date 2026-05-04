@@ -4,9 +4,15 @@
 @section('title', 'SK 360 | Verify Account')
 
 @section('page_css')
-    {{-- This logic loads verify.css, exactly like your login.blade.php handles css --}}
-    @if (file_exists(public_path('build/manifest.json')) || file_exists(public_path('hot')))
-        @vite(['resources/css/verify.css'])
+    @php
+        $verifyCss = 'resources/css/verify.css';
+        $manifestPath = public_path('build/manifest.json');
+        $manifest = file_exists($manifestPath) ? json_decode(file_get_contents($manifestPath), true) : [];
+        $hasViteEntry = file_exists(public_path('hot')) || isset($manifest[$verifyCss]);
+    @endphp
+
+    @if ($hasViteEntry)
+        @vite([$verifyCss])
     @elseif (file_exists(resource_path('css/verify.css')))
         <style>
             {!! file_get_contents(resource_path('css/verify.css')) !!}

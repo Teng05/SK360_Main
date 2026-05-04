@@ -198,13 +198,17 @@ class AuthController extends Controller
                 'verify_email' => $user->email,
             ]);
 
-            Mail::send('email.verification-code', [
-                'first_name' => $user->first_name,
-                'verification_code' => $verificationCode,
-            ], function ($message) use ($user) {
-                $message->to($user->email, $user->first_name . ' ' . $user->last_name)
-                    ->subject('SK360 Verification Code');
-            });
+            try {
+                Mail::send('email.verification-code', [
+                    'first_name' => $user->first_name,
+                    'verification_code' => $verificationCode,
+                ], function ($message) use ($user) {
+                    $message->to($user->email, $user->first_name . ' ' . $user->last_name)
+                        ->subject('SK360 Verification Code');
+                });
+            } catch (\Throwable $mailException) {
+                \Log::error('Registration verification email failed: ' . $mailException->getMessage());
+            }
 
             return redirect()->route('verify.notice');
 

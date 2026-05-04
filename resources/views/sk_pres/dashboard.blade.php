@@ -5,6 +5,7 @@
 
 @section('page_css')
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 @endsection
 
 @section('content')
@@ -121,6 +122,60 @@
                     </div>
                 @endforeach
             </div>
+
+            <div class="mt-8 grid grid-cols-1 gap-6 xl:grid-cols-2">
+                <section class="bg-white rounded-2xl shadow-sm border border-gray-200 p-5">
+                    <div class="mb-4 flex items-center justify-between">
+                        <div>
+                            <h2 class="text-lg font-bold text-gray-900">User Role Mix</h2>
+                            <p class="text-sm text-gray-500">Distribution of registered accounts</p>
+                        </div>
+                        <span class="rounded-full bg-red-50 px-3 py-1 text-xs font-bold text-red-600">Users</span>
+                    </div>
+                    <div class="h-72">
+                        <canvas id="roleMixChart"></canvas>
+                    </div>
+                </section>
+
+                <section class="bg-white rounded-2xl shadow-sm border border-gray-200 p-5">
+                    <div class="mb-4 flex items-center justify-between">
+                        <div>
+                            <h2 class="text-lg font-bold text-gray-900">Barangay Submission Activity</h2>
+                            <p class="text-sm text-gray-500">Top barangays by report and budget submissions</p>
+                        </div>
+                        <span class="rounded-full bg-green-50 px-3 py-1 text-xs font-bold text-green-600">Compliance</span>
+                    </div>
+                    <div class="h-72">
+                        <canvas id="barangaySubmissionsChart"></canvas>
+                    </div>
+                </section>
+
+                <section class="bg-white rounded-2xl shadow-sm border border-gray-200 p-5">
+                    <div class="mb-4 flex items-center justify-between">
+                        <div>
+                            <h2 class="text-lg font-bold text-gray-900">Budget Template Allocation</h2>
+                            <p class="text-sm text-gray-500">Amounts encoded through the system budget template</p>
+                        </div>
+                        <span class="rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-600">Template</span>
+                    </div>
+                    <div class="h-72">
+                        <canvas id="budgetTemplateChart"></canvas>
+                    </div>
+                </section>
+
+                <section class="bg-white rounded-2xl shadow-sm border border-gray-200 p-5">
+                    <div class="mb-4 flex items-center justify-between">
+                        <div>
+                            <h2 class="text-lg font-bold text-gray-900">Submission Monitoring</h2>
+                            <p class="text-sm text-gray-500">System activity over the last six months</p>
+                        </div>
+                        <span class="rounded-full bg-yellow-50 px-3 py-1 text-xs font-bold text-yellow-600">Activity</span>
+                    </div>
+                    <div class="h-72">
+                        <canvas id="engagementMetricsChart"></canvas>
+                    </div>
+                </section>
+            </div>
         </div>
     </div>
 </div>
@@ -154,6 +209,260 @@
             userDropdown.classList.add('hidden');
         }
     });
+
+    const chartData = @json($chartData);
+    const chartGridColor = 'rgba(148, 163, 184, 0.18)';
+    const chartTextColor = '#64748b';
+
+    Chart.defaults.font.family = 'Inter, system-ui, sans-serif';
+    Chart.defaults.color = chartTextColor;
+    Chart.defaults.plugins.legend.labels.usePointStyle = true;
+
+    function makeDoughnutChart(canvasId, labels, values, colors) {
+        new Chart(document.getElementById(canvasId), {
+            type: 'doughnut',
+            data: {
+                labels,
+                datasets: [{
+                    data: values,
+                    backgroundColor: colors,
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                cutout: '62%',
+                plugins: {
+                    legend: {
+                        position: 'bottom'
+                    }
+                }
+            }
+        });
+    }
+
+    function makeBarChart(canvasId, labels, values, colors) {
+        new Chart(document.getElementById(canvasId), {
+            type: 'bar',
+            data: {
+                labels,
+                datasets: [{
+                    data: values,
+                    backgroundColor: colors,
+                    borderRadius: 8,
+                    maxBarThickness: 42
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: {
+                            display: false
+                        }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            precision: 0
+                        },
+                        grid: {
+                            color: chartGridColor
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    function makeGroupedBarChart(canvasId, labels, datasets) {
+        new Chart(document.getElementById(canvasId), {
+            type: 'bar',
+            data: {
+                labels,
+                datasets: datasets.map((dataset) => ({
+                    ...dataset,
+                    borderRadius: 8,
+                    maxBarThickness: 34
+                }))
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom'
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: {
+                            display: false
+                        }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            precision: 0
+                        },
+                        grid: {
+                            color: chartGridColor
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    function makeLineChart(canvasId, labels, values, color) {
+        new Chart(document.getElementById(canvasId), {
+            type: 'line',
+            data: {
+                labels,
+                datasets: [{
+                    data: values,
+                    borderColor: color,
+                    backgroundColor: `${color}22`,
+                    fill: true,
+                    tension: 0.35,
+                    pointRadius: 4,
+                    pointBackgroundColor: color
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: {
+                            display: false
+                        }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            precision: 0
+                        },
+                        grid: {
+                            color: chartGridColor
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    function makeMultiLineChart(canvasId, labels, datasets) {
+        new Chart(document.getElementById(canvasId), {
+            type: 'line',
+            data: {
+                labels,
+                datasets: datasets.map((dataset) => ({
+                    ...dataset,
+                    fill: false,
+                    tension: 0.35,
+                    pointRadius: 3,
+                    pointHoverRadius: 5,
+                    borderWidth: 2
+                }))
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom'
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: {
+                            borderDash: [4, 4],
+                            color: chartGridColor
+                        }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            precision: 0
+                        },
+                        grid: {
+                            borderDash: [4, 4],
+                            color: chartGridColor
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    makeDoughnutChart(
+        'roleMixChart',
+        chartData.roleMix.labels,
+        chartData.roleMix.values,
+        ['#ef4444', '#22c55e', '#3b82f6', '#f59e0b']
+    );
+
+    makeGroupedBarChart(
+        'barangaySubmissionsChart',
+        chartData.barangaySubmissions.labels,
+        [
+            {
+                label: 'Accomplishment',
+                data: chartData.barangaySubmissions.accomplishment,
+                backgroundColor: '#f59e0b'
+            },
+            {
+                label: 'Budget',
+                data: chartData.barangaySubmissions.budget,
+                backgroundColor: '#3b82f6'
+            }
+        ]
+    );
+
+    makeBarChart(
+        'budgetTemplateChart',
+        chartData.budgetTemplate.labels,
+        chartData.budgetTemplate.values,
+        ['#3b82f6', '#22c55e', '#f59e0b', '#ef4444', '#8b5cf6', '#14b8a6', '#f97316', '#64748b']
+    );
+
+    makeMultiLineChart(
+        'engagementMetricsChart',
+        chartData.engagementMetrics.labels,
+        [
+            {
+                label: 'Events',
+                data: chartData.engagementMetrics.events,
+                borderColor: '#f59e0b',
+                backgroundColor: '#f59e0b'
+            },
+            {
+                label: 'Meetings',
+                data: chartData.engagementMetrics.meetings,
+                borderColor: '#2563eb',
+                backgroundColor: '#2563eb'
+            },
+            {
+                label: 'Reports',
+                data: chartData.engagementMetrics.reports,
+                borderColor: '#ef4444',
+                backgroundColor: '#ef4444'
+            }
+        ]
+    );
 </script>
 @endpush
 

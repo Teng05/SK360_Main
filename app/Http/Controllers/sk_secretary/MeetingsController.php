@@ -6,6 +6,7 @@ namespace App\Http\Controllers\sk_secretary;
 
 use App\Http\Controllers\Controller;
 use App\Models\Meeting;
+use App\Models\User;
 use App\Services\RankingPointsService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
@@ -62,6 +63,7 @@ class MeetingsController extends Controller
             'channelName' => $this->channelName($meeting),
             'backRoute' => route('sk_secretary.meetings'),
             'tokenRoute' => route('sk_secretary.meetings.agora.token', $meeting->meeting_id),
+            'participantNames' => $this->participantNames(),
         ]);
     }
 
@@ -108,6 +110,7 @@ class MeetingsController extends Controller
             'token' => $token,
             'channel' => $this->channelName($meeting),
             'uid' => $uid,
+            'name' => $this->currentUserName(),
             'title' => $meeting->title,
         ]);
     }
@@ -133,6 +136,26 @@ class MeetingsController extends Controller
         ];
 
         return [$fullName, $menuItems];
+    }
+
+    protected function currentUserName(): string
+    {
+        $user = auth()->user();
+
+        return trim(($user->first_name ?? '') . ' ' . ($user->last_name ?? '')) ?: 'User';
+    }
+
+    protected function participantNames(): array
+    {
+        return User::query()
+            ->whereIn('role', ['sk_president', 'sk_chairman', 'sk_secretary'])
+            ->get(['user_id', 'first_name', 'last_name', 'email'])
+            ->mapWithKeys(function (User $user) {
+                $name = trim(($user->first_name ?? '') . ' ' . ($user->last_name ?? '')) ?: ($user->email ?: 'User');
+
+                return [(string) $user->user_id => $name];
+            })
+            ->all();
     }
 
     protected function decorateMeeting(Meeting $meeting): Meeting
