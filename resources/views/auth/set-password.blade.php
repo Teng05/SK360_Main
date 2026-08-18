@@ -79,7 +79,11 @@
                 </p>
 
                 <p class="expired-text">
-                    Please contact your SK President to request a new password setup link for your account.
+                    @if (($accountRole ?? '') === 'sk_secretary')
+                        Please contact your SK Chairman to request a new password setup link for your account.
+                    @else
+                        Please contact your SK President to request a new password setup link for your account.
+                    @endif
                 </p>
 
                 <div class="expired-email">

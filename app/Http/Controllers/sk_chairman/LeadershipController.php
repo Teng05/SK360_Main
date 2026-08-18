@@ -179,14 +179,79 @@ class LeadershipController extends Controller
             'councilors.*.term'=>['nullable','string','max:50'],
         ]);
 
-        DB::transaction(function() use($validated){
+        $barangayId=auth()->user()->barangay_id;
+
+        $names=[];
+        $emails=[];
+        $phones=[];
+
+        foreach($validated['councilors'] as $index=>$councilor){
+            $rowNumber=$index+1;
+
+            $normalizedName=strtolower(trim(preg_replace('/\s+/',' ',$councilor['name'])));
+            $email=strtolower(trim($councilor['email'] ?? ''));
+            $phone=preg_replace('/\D+/','',$councilor['phone'] ?? '');
+
+            if(in_array($normalizedName,$names,true)){
+                return back()
+                    ->withInput()
+                    ->withErrors([
+                        'councilors'=>"Councilor #{$rowNumber} has the same name as another councilor in this bulk form.",
+                    ],'bulkCouncilors');
+            }
+
+            $names[]=$normalizedName;
+
+            if($email !== ''){
+                if(in_array($email,$emails,true)){
+                    return back()
+                        ->withInput()
+                        ->withErrors([
+                            'councilors'=>"Councilor #{$rowNumber} has a duplicate email in this bulk form.",
+                        ],'bulkCouncilors');
+                }
+
+                $emails[]=$email;
+            }
+
+            if($phone !== ''){
+                if(in_array($phone,$phones,true)){
+                    return back()
+                        ->withInput()
+                        ->withErrors([
+                            'councilors'=>"Councilor #{$rowNumber} has a duplicate phone number in this bulk form.",
+                        ],'bulkCouncilors');
+                }
+
+                $phones[]=$phone;
+            }
+
+            $existing=DB::table('sk_council')
+                ->where('barangay_id',$barangayId)
+                ->where(function($query){
+                    $query->whereRaw('LOWER(position) LIKE ?',['%councilor%'])
+                        ->orWhereRaw('LOWER(position) LIKE ?',['%kagawad%']);
+                })
+                ->whereRaw('LOWER(TRIM(name))=?',[$normalizedName])
+                ->exists();
+
+            if($existing){
+                return back()
+                    ->withInput()
+                    ->withErrors([
+                        'councilors'=>"{$councilor['name']} is already listed as an SK Councilor.",
+                    ],'bulkCouncilors');
+            }
+        }
+
+        DB::transaction(function() use($validated,$barangayId){
             foreach($validated['councilors'] as $councilor){
                 DB::table('sk_council')->insert([
-                    'barangay_id'=>auth()->user()->barangay_id,
-                    'name'=>$councilor['name'],
+                    'barangay_id'=>$barangayId,
+                    'name'=>trim($councilor['name']),
                     'position'=>'SK Councilor',
-                    'email'=>$councilor['email'] ?? null,
-                    'phone'=>$councilor['phone'] ?? null,
+                    'email'=>!empty($councilor['email']) ? trim($councilor['email']) : null,
+                    'phone'=>!empty($councilor['phone']) ? trim($councilor['phone']) : null,
                     'term'=>$councilor['term'] ?: '2023-2026',
                     'profile_img'=>'default.png',
                     'created_at'=>now(),
@@ -196,7 +261,47 @@ class LeadershipController extends Controller
 
         return redirect()
             ->route('sk_chairman.leadership')
-            ->with('success',count($validated['councilors']).' SK Councilor(s) added successfully.');
+            ->with(
+                'success',
+                count($validated['councilors']).' SK Councilor(s) added successfully.'
+            );
+    }
+
+    public function updateCouncilor(Request $request,int $councilId): RedirectResponse
+    {
+        abort_unless(auth()->check() && auth()->user()->role === 'sk_chairman',403);
+
+        $councilor=DB::table('sk_council')
+            ->where('council_id',$councilId)
+            ->where('barangay_id',auth()->user()->barangay_id)
+            ->where(function($query){
+                $query->whereRaw('LOWER(position) LIKE ?',['%councilor%'])
+                    ->orWhereRaw('LOWER(position) LIKE ?',['%kagawad%']);
+            })
+            ->first();
+
+        abort_unless($councilor,404);
+
+        $validated=$request->validateWithBag('councilorEdit',[
+            'edit_councilor_name'=>['required','string','max:255'],
+            'edit_councilor_email'=>['nullable','email','max:255'],
+            'edit_councilor_phone'=>['nullable','string','max:20'],
+            'edit_councilor_term'=>['nullable','string','max:50'],
+        ]);
+
+        DB::table('sk_council')
+            ->where('council_id',$councilId)
+            ->where('barangay_id',auth()->user()->barangay_id)
+            ->update([
+                'name'=>$validated['edit_councilor_name'],
+                'email'=>$validated['edit_councilor_email'] ?: null,
+                'phone'=>$validated['edit_councilor_phone'] ?: null,
+                'term'=>$validated['edit_councilor_term'] ?: '2023-2026',
+            ]);
+
+        return redirect()
+            ->route('sk_chairman.leadership')
+            ->with('success','SK Councilor details updated successfully.');
     }
 
     /*
@@ -243,6 +348,40 @@ class LeadershipController extends Controller
         return redirect()
             ->route('sk_chairman.leadership')
             ->with('success','SK Treasurer added successfully.');
+    }
+
+    public function updateTreasurer(Request $request,int $councilId): RedirectResponse
+    {
+        abort_unless(auth()->check() && auth()->user()->role === 'sk_chairman',403);
+
+        $treasurer=DB::table('sk_council')
+            ->where('council_id',$councilId)
+            ->where('barangay_id',auth()->user()->barangay_id)
+            ->whereRaw('LOWER(position)=?',['sk treasurer'])
+            ->first();
+
+        abort_unless($treasurer,404);
+
+        $validated=$request->validateWithBag('treasurerEdit',[
+            'edit_treasurer_name'=>['required','string','max:255'],
+            'edit_treasurer_email'=>['nullable','email','max:255'],
+            'edit_treasurer_phone'=>['nullable','string','max:20'],
+            'edit_treasurer_term'=>['nullable','string','max:50'],
+        ]);
+
+        DB::table('sk_council')
+            ->where('council_id',$councilId)
+            ->where('barangay_id',auth()->user()->barangay_id)
+            ->update([
+                'name'=>$validated['edit_treasurer_name'],
+                'email'=>$validated['edit_treasurer_email'] ?: null,
+                'phone'=>$validated['edit_treasurer_phone'] ?: null,
+                'term'=>$validated['edit_treasurer_term'] ?: '2023-2026',
+            ]);
+
+        return redirect()
+            ->route('sk_chairman.leadership')
+            ->with('success','SK Treasurer details updated successfully.');
     }
 
     /*

@@ -85,7 +85,6 @@ Route::controller(AuthController::class)->group(function () {
     Route::post('/set-password', [AuthController::class, 'setPassword'])->name('password.setup.store');
     Route::get('/set-password/{token}', [AuthController::class, 'showSetPassword'])->name('password.setup');
     Route::post('/set-password', [AuthController::class, 'setPassword'])->name('password.setup.store');
-    Route::post('/set-password/resend', 'resendSetPasswordLink')->middleware('throttle:3,10')->name('password.setup.resend');
 
 });
 
@@ -201,6 +200,8 @@ Route::middleware('auth')->prefix('sk_chairman')->name('sk_chairman.')->group(fu
     Route::post('/leadership/secretary/{userId}/resend-setup-link', [SkChairmanLeadershipController::class, 'resendSecretarySetupLink'])->middleware('throttle:3,10')->name('leadership.secretary.resend');
     Route::patch('/leadership/secretary/{userId}/toggle-status', [SkChairmanLeadershipController::class, 'toggleSecretaryStatus'])->name('leadership.secretary.toggle-status');
     Route::delete('/leadership/secretary/{userId}', [SkChairmanLeadershipController::class, 'destroySecretary'])->name('leadership.secretary.destroy');
+    Route::put('/leadership/treasurer/{councilId}', [SkChairmanLeadershipController::class, 'updateTreasurer'])->name('leadership.treasurer.update');
+    Route::put('/leadership/councilor/{councilId}', [SkChairmanLeadershipController::class, 'updateCouncilor'])->name('leadership.councilor.update');
     Route::post('/leadership/{councilId}/delete', [SkChairmanLeadershipController::class, 'destroy'])->name('leadership.destroy');
     
     Route::get('/archive', [App\Http\Controllers\sk_chairman\ArchiveController::class, 'index'])->name('archive');

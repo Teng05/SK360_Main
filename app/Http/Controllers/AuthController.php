@@ -136,6 +136,7 @@ class AuthController extends Controller
                 'token' => $token,
                 'email' => $email,
                 'linkExpired' => true,
+                'accountRole'=>$user->role,
             ]);
         }
 
@@ -143,6 +144,7 @@ class AuthController extends Controller
             'token' => $token,
             'email' => $email,
             'linkExpired' => false,
+            'accountRole'=>$user->role,
         ]);
     }
 
@@ -209,71 +211,6 @@ class AuthController extends Controller
             ->with('verified', 'Your password has been set successfully. You can now log in.');
     }
 
-    public function resendSetPasswordLink(Request $request): RedirectResponse
-    {
-        $validated = $request->validateWithBag('setupResend', [
-            'email' => ['required', 'email'],
-        ]);
-
-        $user = User::where('email', $validated['email'])->first();
-
-        if (!$user) {
-            return back()->withErrors([
-                'email' => 'Unable to send a setup link for this account.',
-            ], 'setupResend');
-        }
-
-        if ($user->role !== 'sk_chairman') {
-            return back()->withErrors([
-                'email' => 'Unable to send a setup link for this account.',
-            ], 'setupResend');
-        }
-
-        if ($user->is_verified == 1 || $user->status === 'active') {
-            return redirect()->route('login')->with(
-                'verified',
-                'Your account is already activated. You may log in.'
-            );
-        }
-
-        $token = Str::random(64);
-
-        DB::table('password_reset_tokens')->updateOrInsert(
-            ['email' => $user->email],
-            [
-                'token' => Hash::make($token),
-                'created_at' => now(),
-            ]
-        );
-
-        $setupLink = route('password.setup', [
-            'token' => $token,
-            'email' => $user->email,
-        ]);
-
-        try {
-            Mail::send('email.account-setup', [
-                'user' => $user,
-                'setupLink' => $setupLink,
-            ], function ($message) use ($user) {
-                $message->to(
-                    $user->email,
-                    trim($user->first_name . ' ' . $user->last_name)
-                )->subject('New SK360 Password Setup Link');
-            });
-        } catch (\Throwable $e) {
-            \Log::error('Setup link resend failed: '.$e->getMessage());
-
-            return back()->withErrors([
-                'email' => 'We could not send the new setup link. Please try again.',
-            ], 'setupResend');
-        }
-
-        return back()->with(
-            'resend_success',
-            'A new password setup link has been sent to '.$user->email.'.'
-        );
-    }
 
     public function verifyPhoneReset(Request $request): RedirectResponse
     {
