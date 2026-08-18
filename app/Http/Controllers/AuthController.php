@@ -14,6 +14,8 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Str;
+
 
 class AuthController extends Controller
 {
@@ -78,6 +80,199 @@ class AuthController extends Controller
         DB::table('password_reset_tokens')->where('email', $validated['email'])->delete();
 
         return redirect()->route('login')->with('verified', 'Your password has been reset. You can now log in.');
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | SHOW INITIAL PASSWORD SETUP
+    |--------------------------------------------------------------------------
+    */
+
+    public function showSetPassword(string $token)
+    {
+        $email = request('email');
+
+        if (!$email) {
+            return redirect()->route('login')->withErrors([
+                'email' => 'Invalid password setup link.',
+            ]);
+        }
+
+        $user = User::where('email', $email)->first();
+
+        if (!$user) {
+            return redirect()->route('login')->withErrors([
+                'email' => 'Invalid password setup link.',
+            ]);
+        }
+
+        // Already finished setting up the account
+        if ($user->is_verified == 1 && $user->status === 'active') {
+            return redirect()->route('login')->with(
+                'verified',
+                'Your account is already activated. You may log in.'
+            );
+        }
+
+        $reset = DB::table('password_reset_tokens')
+            ->where('email', $email)
+            ->first();
+
+        $invalid = !$reset || !Hash::check($token, $reset->token);
+
+        $expired = $reset &&
+            now()->subHours(24)->greaterThan($reset->created_at);
+
+        if ($invalid || $expired) {
+
+            // Delete only expired token
+            if ($expired) {
+                DB::table('password_reset_tokens')
+                    ->where('email', $email)
+                    ->delete();
+            }
+
+            return view('auth.set-password', [
+                'token' => $token,
+                'email' => $email,
+                'linkExpired' => true,
+            ]);
+        }
+
+        return view('auth.set-password', [
+            'token' => $token,
+            'email' => $email,
+            'linkExpired' => false,
+        ]);
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | SAVE INITIAL PASSWORD
+    |--------------------------------------------------------------------------
+    */
+
+    public function setPassword(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'email' => ['required', 'email'],
+            'token' => ['required', 'string'],
+            'password' => [
+                'required',
+                'confirmed',
+                'min:8',
+                'regex:/[A-Z]/',
+                'regex:/[a-z]/',
+                'regex:/[0-9]/',
+            ],
+        ], [
+            'password.confirmed' => 'Passwords do not match.',
+            'password.min' => 'Password must be at least 8 characters.',
+            'password.regex' => 'Password must contain uppercase, lowercase, and a number.',
+        ]);
+
+        $reset = DB::table('password_reset_tokens')
+            ->where('email', $validated['email'])
+            ->first();
+
+        if (
+            !$reset ||
+            !Hash::check($validated['token'], $reset->token) ||
+            now()->subHours(24)->greaterThan($reset->created_at)
+        ) {
+            return back()->withErrors([
+                'email' => 'This password setup link is invalid or expired.',
+            ]);
+        }
+
+        $user = User::where('email', $validated['email'])->first();
+
+        if (!$user) {
+            return back()->withErrors([
+                'email' => 'Account not found.',
+            ]);
+        }
+
+        $user->update([
+            'password' => Hash::make($validated['password']),
+            'is_verified' => 1,
+            'status' => 'active',
+        ]);
+
+        DB::table('password_reset_tokens')
+            ->where('email', $validated['email'])
+            ->delete();
+
+        return redirect()
+            ->route('login')
+            ->with('verified', 'Your password has been set successfully. You can now log in.');
+    }
+
+    public function resendSetPasswordLink(Request $request): RedirectResponse
+    {
+        $validated = $request->validateWithBag('setupResend', [
+            'email' => ['required', 'email'],
+        ]);
+
+        $user = User::where('email', $validated['email'])->first();
+
+        if (!$user) {
+            return back()->withErrors([
+                'email' => 'Unable to send a setup link for this account.',
+            ], 'setupResend');
+        }
+
+        if ($user->role !== 'sk_chairman') {
+            return back()->withErrors([
+                'email' => 'Unable to send a setup link for this account.',
+            ], 'setupResend');
+        }
+
+        if ($user->is_verified == 1 || $user->status === 'active') {
+            return redirect()->route('login')->with(
+                'verified',
+                'Your account is already activated. You may log in.'
+            );
+        }
+
+        $token = Str::random(64);
+
+        DB::table('password_reset_tokens')->updateOrInsert(
+            ['email' => $user->email],
+            [
+                'token' => Hash::make($token),
+                'created_at' => now(),
+            ]
+        );
+
+        $setupLink = route('password.setup', [
+            'token' => $token,
+            'email' => $user->email,
+        ]);
+
+        try {
+            Mail::send('email.account-setup', [
+                'user' => $user,
+                'setupLink' => $setupLink,
+            ], function ($message) use ($user) {
+                $message->to(
+                    $user->email,
+                    trim($user->first_name . ' ' . $user->last_name)
+                )->subject('New SK360 Password Setup Link');
+            });
+        } catch (\Throwable $e) {
+            \Log::error('Setup link resend failed: '.$e->getMessage());
+
+            return back()->withErrors([
+                'email' => 'We could not send the new setup link. Please try again.',
+            ], 'setupResend');
+        }
+
+        return back()->with(
+            'resend_success',
+            'A new password setup link has been sent to '.$user->email.'.'
+        );
     }
 
     public function verifyPhoneReset(Request $request): RedirectResponse

@@ -80,6 +80,13 @@ Route::controller(AuthController::class)->group(function () {
     Route::post('/password/reset', [AuthController::class, 'resetPassword'])->name('password.store');
     Route::post('/password/verify-email', [AuthController::class, 'verifyEmailReset'])->name('password.verify-email');
     Route::post('/password/verify-phone', [AuthController::class, 'verifyPhoneReset'])->name('password.verify-phone');
+
+    Route::get('/set-password/{token}', [AuthController::class, 'showSetPassword'])->name('password.setup');
+    Route::post('/set-password', [AuthController::class, 'setPassword'])->name('password.setup.store');
+    Route::get('/set-password/{token}', [AuthController::class, 'showSetPassword'])->name('password.setup');
+    Route::post('/set-password', [AuthController::class, 'setPassword'])->name('password.setup.store');
+    Route::post('/set-password/resend', 'resendSetPasswordLink')->middleware('throttle:3,10')->name('password.setup.resend');
+
 });
 
 Route::middleware('auth')->group(function () {
@@ -137,6 +144,13 @@ Route::middleware('auth')->prefix('sk_pres')->name('sk_pres.')->group(function (
 
     Route::get('/user-management', [SkPresidentUserManagementController::class, 'index'])->name('user-management');
     Route::post('/user-management/officials', [SkPresidentUserManagementController::class, 'storeOfficial'])->name('user-management.store-official');
+    Route::post('/user-management/bulk-officials', [SkPresidentUserManagementController::class, 'storeBulkOfficials'])->name('user-management.store-bulk-officials');
+    Route::post('/user-management/import', [SkPresidentUserManagementController::class, 'import'])->name('user-management.import');
+    Route::post('/user-management/{userId}/resend-setup-link', [SkPresidentUserManagementController::class, 'resendSetupLink']) ->middleware('throttle:3,10') ->name('user-management.resend-setup-link');
+    Route::put('/user-management/{userId}', [SkPresidentUserManagementController::class, 'update'])->name('user-management.update');
+    Route::patch('/user-management/{userId}/toggle-status', [SkPresidentUserManagementController::class, 'toggleStatus'])->name('user-management.toggle-status');
+    Route::delete('/user-management/{userId}', [SkPresidentUserManagementController::class, 'destroy'])->name('user-management.destroy');
+    Route::get('/user-management/csv-template', [SkPresidentUserManagementController::class, 'downloadCsvTemplate'])->name('user-management.csv-template');
 
     Route::get('/profile', fn (ProfileSettingsController $c) => $c->show('sk_president'))->name('profile');
     Route::post('/profile', fn (Request $r, ProfileSettingsController $c) => $c->update($r, 'sk_president'))->name('profile.update');
@@ -179,9 +193,16 @@ Route::middleware('auth')->prefix('sk_chairman')->name('sk_chairman.')->group(fu
     Route::get('/rankings/live', [SkChairmanRankingController::class, 'live'])->name('rankings.live');
 
     Route::get('/leadership', [SkChairmanLeadershipController::class, 'index'])->name('leadership');
-    Route::post('/leadership', [SkChairmanLeadershipController::class, 'store'])->name('leadership.store');
+    Route::post('/leadership/councilor', [SkChairmanLeadershipController::class, 'store'])->name('leadership.store');
+    Route::post('/leadership/councilors/bulk', [SkChairmanLeadershipController::class, 'storeBulkCouncilors'])->name('leadership.bulk-councilors');
+    Route::post('/leadership/treasurer', [SkChairmanLeadershipController::class, 'storeTreasurer'])->name('leadership.treasurer.store');
+    Route::post('/leadership/secretary', [SkChairmanLeadershipController::class, 'storeSecretary'])->name('leadership.secretary.store');
+    Route::put('/leadership/secretary/{userId}', [SkChairmanLeadershipController::class, 'updateSecretary'])->name('leadership.secretary.update');
+    Route::post('/leadership/secretary/{userId}/resend-setup-link', [SkChairmanLeadershipController::class, 'resendSecretarySetupLink'])->middleware('throttle:3,10')->name('leadership.secretary.resend');
+    Route::patch('/leadership/secretary/{userId}/toggle-status', [SkChairmanLeadershipController::class, 'toggleSecretaryStatus'])->name('leadership.secretary.toggle-status');
+    Route::delete('/leadership/secretary/{userId}', [SkChairmanLeadershipController::class, 'destroySecretary'])->name('leadership.secretary.destroy');
     Route::post('/leadership/{councilId}/delete', [SkChairmanLeadershipController::class, 'destroy'])->name('leadership.destroy');
-
+    
     Route::get('/archive', [App\Http\Controllers\sk_chairman\ArchiveController::class, 'index'])->name('archive');
     Route::get('/archive/download/bulk', [App\Http\Controllers\sk_chairman\ArchiveController::class, 'bulkDownload'])->name('archive.bulk-download');
     Route::get('/archive/download/{sourceType}/{sourceId}', [App\Http\Controllers\sk_chairman\ArchiveController::class, 'download'])->name('archive.download');

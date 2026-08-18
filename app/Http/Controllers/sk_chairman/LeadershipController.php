@@ -1,148 +1,591 @@
 <?php
 
-// File guide: Handles route logic and page data for app/Http/Controllers/sk_chairman/LeadershipController.php.
-
 namespace App\Http\Controllers\sk_chairman;
 
 use App\Http\Controllers\Controller;
+use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Str;
 use Illuminate\View\View;
 
 class LeadershipController extends Controller
 {
     public function index(): View
     {
-        abort_unless(auth()->check() && auth()->user()->role === 'sk_chairman', 403);
+        abort_unless(auth()->check() && auth()->user()->role === 'sk_chairman',403);
 
-        $user = auth()->user();
-        $fullName = trim(($user->first_name ?? '') . ' ' . ($user->last_name ?? '')) ?: 'User';
-        $barangayId = (int) ($user->barangay_id ?? 0);
-        $barangayName = $user->barangay->barangay_name ?? 'Barangay';
+        $user=auth()->user();
+        $fullName=trim(($user->first_name ?? '').' '.($user->last_name ?? '')) ?: 'User';
+        $barangayId=(int)($user->barangay_id ?? 0);
+        $barangayName=$user->barangay->barangay_name ?? 'Barangay';
 
-        $councilMembers = $this->councilMembers($barangayId);
+        $secretaryModel=User::query()
+            ->where('barangay_id',$barangayId)
+            ->where('role','sk_secretary')
+            ->orderByRaw("CASE WHEN status='active' OR is_verified=0 THEN 0 ELSE 1 END")
+            ->orderByDesc('created_at')
+            ->first();
 
-        $executives = $councilMembers->filter(function ($member) {
-            $position = strtolower((string) ($member['position'] ?? ''));
+        $hasCurrentSecretary=User::query()
+            ->where('barangay_id',$barangayId)
+            ->where('role','sk_secretary')
+            ->where(function($query){
+                $query->where('status','active')
+                    ->orWhere('is_verified',0);
+            })
+            ->exists();
 
-            return str_contains($position, 'chairman')
-                || str_contains($position, 'secretary')
-                || str_contains($position, 'treasurer')
-                || str_contains($position, 'president');
-        })->values();
+        $secretary=$secretaryModel ? [
+            'user_id'=>$secretaryModel->user_id,
+            'name'=>trim(($secretaryModel->first_name ?? '').' '.($secretaryModel->last_name ?? '')),
+            'first_name'=>$secretaryModel->first_name,
+            'last_name'=>$secretaryModel->last_name,
+            'position'=>'SK Secretary',
+            'email'=>$secretaryModel->email,
+            'phone'=>$secretaryModel->phone_number,
+            'term_start'=>$secretaryModel->term_start,
+            'term_end'=>$secretaryModel->term_end,
+            'term'=>$this->userTerm($secretaryModel),
+            'status'=>$secretaryModel->status,
+            'is_verified'=>(int)$secretaryModel->is_verified,
+            'source'=>'user',
+        ] : null;
 
-        $kagawads = $councilMembers->filter(function ($member) {
-            $position = strtolower((string) ($member['position'] ?? ''));
+        $treasurerRow=DB::table('sk_council')
+            ->where('barangay_id',$barangayId)
+            ->whereRaw('LOWER(position)=?',['sk treasurer'])
+            ->orderByDesc('created_at')
+            ->first();
 
-            return str_contains($position, 'councilor') || str_contains($position, 'kagawad');
-        })->values();
+        $treasurer=$treasurerRow ? [
+            'council_id'=>$treasurerRow->council_id,
+            'name'=>$treasurerRow->name,
+            'position'=>'SK Treasurer',
+            'email'=>$treasurerRow->email,
+            'phone'=>$treasurerRow->phone,
+            'term'=>$treasurerRow->term,
+            'source'=>'council',
+        ] : null;
 
-        return view('sk_chairman.leadership', [
-            'fullName' => $fullName,
-            'barangayName' => $barangayName,
-            'initials' => strtoupper(substr($user->first_name ?? 'S', 0, 1) . substr($user->last_name ?? 'K', 0, 1)),
-            'menuItems' => $this->menuItems(),
-            'currentUrl' => url()->current(),
-            'councilMembers' => $councilMembers,
-            'executives' => $executives,
-            'kagawads' => $kagawads,
+        $kagawads=DB::table('sk_council')
+            ->where('barangay_id',$barangayId)
+            ->where(function($query){
+                $query->whereRaw('LOWER(position) LIKE ?',['%councilor%'])
+                    ->orWhereRaw('LOWER(position) LIKE ?',['%kagawad%']);
+            })
+            ->orderBy('name')
+            ->get()
+            ->map(fn($row)=>[
+                'council_id'=>$row->council_id,
+                'name'=>$row->name,
+                'position'=>$row->position,
+                'email'=>$row->email,
+                'phone'=>$row->phone,
+                'term'=>$row->term,
+                'source'=>'council',
+            ]);
+
+        $chairman=[
+            'user_id'=>$user->user_id,
+            'name'=>$fullName,
+            'position'=>'SK Chairman',
+            'email'=>$user->email,
+            'phone'=>$user->phone_number,
+            'term'=>$this->userTerm($user),
+            'status'=>$user->status,
+            'is_verified'=>(int)$user->is_verified,
+            'source'=>'user',
+        ];
+
+        $executives=collect([$chairman]);
+
+        if($secretary){
+            $executives->push($secretary);
+        }
+
+        if($treasurer){
+            $executives->push($treasurer);
+        }
+
+        $councilMembers=$executives->merge($kagawads)->values();
+
+        return view('sk_chairman.leadership',[
+            'fullName'=>$fullName,
+            'barangayName'=>$barangayName,
+            'initials'=>strtoupper(substr($user->first_name ?? 'S',0,1).substr($user->last_name ?? 'K',0,1)),
+            'menuItems'=>$this->menuItems(),
+            'currentUrl'=>url()->current(),
+            'councilMembers'=>$councilMembers,
+            'executives'=>$executives,
+            'kagawads'=>$kagawads,
+            'secretary'=>$secretary,
+            'treasurer'=>$treasurer,
+            'canAddSecretary'=>!$hasCurrentSecretary,
         ]);
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | SINGLE ADD COUNCILOR
+    |--------------------------------------------------------------------------
+    */
 
     public function store(Request $request): RedirectResponse
     {
-        abort_unless(auth()->check() && auth()->user()->role === 'sk_chairman', 403);
+        abort_unless(auth()->check() && auth()->user()->role === 'sk_chairman',403);
 
-        $validated = $request->validate([
-            'name' => ['required', 'string', 'max:255'],
-            'email' => ['nullable', 'email', 'max:255'],
-            'phone' => ['nullable', 'string', 'max:20'],
-            'term' => ['nullable', 'string', 'max:50'],
+        $validated=$request->validateWithBag('councilorAdd',[
+            'name'=>['required','string','max:255'],
+            'email'=>['nullable','email','max:255'],
+            'phone'=>['nullable','string','max:20'],
+            'term'=>['nullable','string','max:50'],
         ]);
 
         DB::table('sk_council')->insert([
-            'barangay_id' => auth()->user()->barangay_id,
-            'name' => $validated['name'],
-            'position' => 'SK Councilor',
-            'email' => $validated['email'] ?? null,
-            'phone' => $validated['phone'] ?? null,
-            'term' => $validated['term'] ?: '2023-2026',
-            'profile_img' => 'default.png',
-            'created_at' => now(),
+            'barangay_id'=>auth()->user()->barangay_id,
+            'name'=>$validated['name'],
+            'position'=>'SK Councilor',
+            'email'=>$validated['email'] ?? null,
+            'phone'=>$validated['phone'] ?? null,
+            'term'=>$validated['term'] ?: '2023-2026',
+            'profile_img'=>'default.png',
+            'created_at'=>now(),
         ]);
 
-        return redirect()->route('sk_chairman.leadership')->with('status', 'added');
+        return redirect()
+            ->route('sk_chairman.leadership')
+            ->with('success','SK Councilor added successfully.');
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | BULK ADD COUNCILORS
+    |--------------------------------------------------------------------------
+    */
+
+    public function storeBulkCouncilors(Request $request): RedirectResponse
+    {
+        abort_unless(auth()->check() && auth()->user()->role === 'sk_chairman',403);
+
+        $validated=$request->validateWithBag('bulkCouncilors',[
+            'councilors'=>['required','array','min:1'],
+            'councilors.*.name'=>['required','string','max:255'],
+            'councilors.*.email'=>['nullable','email','max:255'],
+            'councilors.*.phone'=>['nullable','string','max:20'],
+            'councilors.*.term'=>['nullable','string','max:50'],
+        ]);
+
+        DB::transaction(function() use($validated){
+            foreach($validated['councilors'] as $councilor){
+                DB::table('sk_council')->insert([
+                    'barangay_id'=>auth()->user()->barangay_id,
+                    'name'=>$councilor['name'],
+                    'position'=>'SK Councilor',
+                    'email'=>$councilor['email'] ?? null,
+                    'phone'=>$councilor['phone'] ?? null,
+                    'term'=>$councilor['term'] ?: '2023-2026',
+                    'profile_img'=>'default.png',
+                    'created_at'=>now(),
+                ]);
+            }
+        });
+
+        return redirect()
+            ->route('sk_chairman.leadership')
+            ->with('success',count($validated['councilors']).' SK Councilor(s) added successfully.');
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | ADD TREASURER
+    |--------------------------------------------------------------------------
+    */
+
+    public function storeTreasurer(Request $request): RedirectResponse
+    {
+        abort_unless(auth()->check() && auth()->user()->role === 'sk_chairman',403);
+
+        $validated=$request->validateWithBag('treasurerAdd',[
+            'treasurer_name'=>['required','string','max:255'],
+            'treasurer_email'=>['nullable','email','max:255'],
+            'treasurer_phone'=>['nullable','string','max:20'],
+            'treasurer_term'=>['nullable','string','max:50'],
+        ]);
+
+        $exists=DB::table('sk_council')
+            ->where('barangay_id',auth()->user()->barangay_id)
+            ->whereRaw('LOWER(position)=?',['sk treasurer'])
+            ->exists();
+
+        if($exists){
+            return back()
+                ->withInput()
+                ->withErrors([
+                    'treasurer'=>'This barangay already has an SK Treasurer.',
+                ],'treasurerAdd');
+        }
+
+        DB::table('sk_council')->insert([
+            'barangay_id'=>auth()->user()->barangay_id,
+            'name'=>$validated['treasurer_name'],
+            'position'=>'SK Treasurer',
+            'email'=>$validated['treasurer_email'] ?? null,
+            'phone'=>$validated['treasurer_phone'] ?? null,
+            'term'=>$validated['treasurer_term'] ?: '2023-2026',
+            'profile_img'=>'default.png',
+            'created_at'=>now(),
+        ]);
+
+        return redirect()
+            ->route('sk_chairman.leadership')
+            ->with('success','SK Treasurer added successfully.');
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | ADD SECRETARY ACCOUNT
+    |--------------------------------------------------------------------------
+    */
+
+    public function storeSecretary(Request $request): RedirectResponse
+    {
+        abort_unless(auth()->check() && auth()->user()->role === 'sk_chairman',403);
+
+        $chairman=auth()->user();
+
+        $validated=$request->validateWithBag('secretaryAdd',[
+            'secretary_first_name'=>['required','string','max:100'],
+            'secretary_last_name'=>['required','string','max:100'],
+            'secretary_email'=>['required','email','max:100','unique:users,email'],
+            'secretary_phone'=>['nullable','string','max:20','unique:users,phone_number'],
+            'secretary_term_start'=>['required','date'],
+            'secretary_term_end'=>['required','date','after:secretary_term_start'],
+        ]);
+
+        $existing=User::query()
+            ->where('barangay_id',$chairman->barangay_id)
+            ->where('role','sk_secretary')
+            ->where(function($query){
+                $query->where('status','active')
+                    ->orWhere('is_verified',0);
+            })
+            ->exists();
+
+        if($existing){
+            return back()
+                ->withInput()
+                ->withErrors([
+                    'secretary'=>'Your barangay already has an active or pending SK Secretary.',
+                ],'secretaryAdd');
+        }
+
+        $token=Str::random(64);
+
+        $secretary=DB::transaction(function() use($validated,$chairman,$token){
+            $user=User::create([
+                'first_name'=>$validated['secretary_first_name'],
+                'last_name'=>$validated['secretary_last_name'],
+                'email'=>$validated['secretary_email'],
+                'phone_number'=>$validated['secretary_phone'] ?: null,
+                'barangay_id'=>$chairman->barangay_id,
+                'role'=>'sk_secretary',
+                'password'=>Hash::make(Str::random(64)),
+                'is_verified'=>0,
+                'status'=>'inactive',
+                'term_start'=>$validated['secretary_term_start'],
+                'term_end'=>$validated['secretary_term_end'],
+            ]);
+
+            DB::table('password_reset_tokens')->updateOrInsert(
+                ['email'=>$user->email],
+                [
+                    'token'=>Hash::make($token),
+                    'created_at'=>now(),
+                ]
+            );
+
+            return $user;
+        });
+
+        if(!$this->sendSetupEmail($secretary,$token)){
+            return redirect()
+                ->route('sk_chairman.leadership')
+                ->with('warning','Secretary account created, but the setup email could not be sent. You can resend it from Leadership.');
+        }
+
+        return redirect()
+            ->route('sk_chairman.leadership')
+            ->with('success','SK Secretary account created. A password setup link was sent to '.$secretary->email.'.');
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | UPDATE SECRETARY
+    |--------------------------------------------------------------------------
+    */
+
+    public function updateSecretary(Request $request,int $userId): RedirectResponse
+    {
+        abort_unless(auth()->check() && auth()->user()->role === 'sk_chairman',403);
+
+        $secretary=$this->secretaryForChairman($userId);
+        $oldEmail=$secretary->email;
+
+        $validated=$request->validateWithBag('secretaryEdit',[
+            'edit_secretary_first_name'=>['required','string','max:100'],
+            'edit_secretary_last_name'=>['required','string','max:100'],
+            'edit_secretary_email'=>['required','email','max:100','unique:users,email,'.$userId.',user_id'],
+            'edit_secretary_phone'=>['nullable','string','max:20','unique:users,phone_number,'.$userId.',user_id'],
+            'edit_secretary_term_start'=>['required','date'],
+            'edit_secretary_term_end'=>['required','date','after:edit_secretary_term_start'],
+        ]);
+
+        $emailChanged=strtolower($oldEmail) !== strtolower($validated['edit_secretary_email']);
+
+        $secretary->update([
+            'first_name'=>$validated['edit_secretary_first_name'],
+            'last_name'=>$validated['edit_secretary_last_name'],
+            'email'=>$validated['edit_secretary_email'],
+            'phone_number'=>$validated['edit_secretary_phone'] ?: null,
+            'term_start'=>$validated['edit_secretary_term_start'],
+            'term_end'=>$validated['edit_secretary_term_end'],
+        ]);
+
+        if((int)$secretary->is_verified === 0 && $emailChanged){
+            DB::table('password_reset_tokens')
+                ->where('email',$oldEmail)
+                ->delete();
+
+            $token=Str::random(64);
+
+            DB::table('password_reset_tokens')->updateOrInsert(
+                ['email'=>$secretary->email],
+                [
+                    'token'=>Hash::make($token),
+                    'created_at'=>now(),
+                ]
+            );
+
+            if(!$this->sendSetupEmail($secretary,$token)){
+                return redirect()
+                    ->route('sk_chairman.leadership')
+                    ->with('warning','Secretary details updated, but the new setup email could not be sent.');
+            }
+
+            return redirect()
+                ->route('sk_chairman.leadership')
+                ->with('success','Secretary details updated. A new setup link was sent to the new email address.');
+        }
+
+        return redirect()
+            ->route('sk_chairman.leadership')
+            ->with('success','SK Secretary details updated successfully.');
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | RESEND SECRETARY SETUP LINK
+    |--------------------------------------------------------------------------
+    */
+
+    public function resendSecretarySetupLink(int $userId): RedirectResponse
+    {
+        abort_unless(auth()->check() && auth()->user()->role === 'sk_chairman',403);
+
+        $secretary=$this->secretaryForChairman($userId);
+
+        if((int)$secretary->is_verified === 1){
+            return back()->with(
+                'warning',
+                'This SK Secretary has already activated the account.'
+            );
+        }
+
+        $token=Str::random(64);
+
+        DB::table('password_reset_tokens')->updateOrInsert(
+            ['email'=>$secretary->email],
+            [
+                'token'=>Hash::make($token),
+                'created_at'=>now(),
+            ]
+        );
+
+        if(!$this->sendSetupEmail($secretary,$token)){
+            return back()->with(
+                'warning',
+                'The new setup link could not be sent. Please try again.'
+            );
+        }
+
+        return back()->with(
+            'success',
+            'A new password setup link was sent to '.$secretary->email.'.'
+        );
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | SECRETARY ACTIVATE / DEACTIVATE
+    |--------------------------------------------------------------------------
+    */
+
+    public function toggleSecretaryStatus(int $userId): RedirectResponse
+    {
+        abort_unless(auth()->check() && auth()->user()->role === 'sk_chairman',403);
+
+        $secretary=$this->secretaryForChairman($userId);
+
+        if((int)$secretary->is_verified === 0){
+            return back()->with(
+                'warning',
+                'This secretary has not completed account setup yet. Resend the setup link instead.'
+            );
+        }
+
+        if($secretary->status === 'inactive'){
+            $anotherSecretary=User::query()
+                ->where('barangay_id',auth()->user()->barangay_id)
+                ->where('role','sk_secretary')
+                ->where('user_id','!=',$secretary->user_id)
+                ->where(function($query){
+                    $query->where('status','active')
+                        ->orWhere('is_verified',0);
+                })
+                ->exists();
+
+            if($anotherSecretary){
+                return back()->with(
+                    'warning',
+                    'Another active or pending SK Secretary already exists for this barangay.'
+                );
+            }
+        }
+
+        $secretary->status=$secretary->status === 'active' ? 'inactive' : 'active';
+        $secretary->save();
+
+        return back()->with('success','SK Secretary status updated successfully.');
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | DELETE SECRETARY
+    |--------------------------------------------------------------------------
+    */
+
+    public function destroySecretary(int $userId): RedirectResponse
+    {
+        abort_unless(auth()->check() && auth()->user()->role === 'sk_chairman',403);
+
+        $secretary=$this->secretaryForChairman($userId);
+
+        DB::transaction(function() use($secretary,$userId){
+            DB::table('email_verifications')
+                ->where('user_id',$userId)
+                ->delete();
+
+            DB::table('password_reset_tokens')
+                ->where('email',$secretary->email)
+                ->delete();
+
+            $secretary->delete();
+        });
+
+        return redirect()
+            ->route('sk_chairman.leadership')
+            ->with('success','SK Secretary account deleted successfully.');
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | DELETE TREASURER / COUNCILOR
+    |--------------------------------------------------------------------------
+    */
 
     public function destroy(int $councilId): RedirectResponse
     {
-        abort_unless(auth()->check() && auth()->user()->role === 'sk_chairman', 403);
+        abort_unless(auth()->check() && auth()->user()->role === 'sk_chairman',403);
 
         DB::table('sk_council')
-            ->where('council_id', $councilId)
-            ->where('barangay_id', auth()->user()->barangay_id)
+            ->where('council_id',$councilId)
+            ->where('barangay_id',auth()->user()->barangay_id)
             ->delete();
 
-        return redirect()->route('sk_chairman.leadership')->with('status', 'deleted');
+        return redirect()
+            ->route('sk_chairman.leadership')
+            ->with('success','Council member removed successfully.');
     }
 
-    protected function councilMembers(int $barangayId): Collection
+    /*
+    |--------------------------------------------------------------------------
+    | HELPERS
+    |--------------------------------------------------------------------------
+    */
+
+    protected function secretaryForChairman(int $userId): User
     {
-        if ($barangayId <= 0) {
-            return collect();
+        return User::query()
+            ->where('user_id',$userId)
+            ->where('barangay_id',auth()->user()->barangay_id)
+            ->where('role','sk_secretary')
+            ->firstOrFail();
+    }
+
+    protected function sendSetupEmail(User $user,string $token): bool
+    {
+        $setupLink=route('password.setup',[
+            'token'=>$token,
+            'email'=>$user->email,
+        ]);
+
+        try{
+            Mail::send('email.account-setup',[
+                'user'=>$user,
+                'setupLink'=>$setupLink,
+            ],function($message) use($user){
+                $message->to(
+                    $user->email,
+                    trim($user->first_name.' '.$user->last_name)
+                )->subject('Set Up Your SK360 Account');
+            });
+
+            return true;
+        }catch(\Throwable $e){
+            \Log::error('Secretary setup email failed for '.$user->email.': '.$e->getMessage());
+            return false;
+        }
+    }
+
+    protected function userTerm($user): string
+    {
+        if(empty($user->term_start) || empty($user->term_end)){
+            return 'N/A';
         }
 
-        $members = DB::table('users')
-            ->where('barangay_id', $barangayId)
-            ->whereIn('role', ['sk_chairman', 'sk_secretary'])
-            ->select(
-                DB::raw("CONCAT(first_name, ' ', last_name) as name"),
-                DB::raw("
-                    CASE
-                        WHEN role = 'sk_chairman' THEN 'SK Chairman'
-                        WHEN role = 'sk_secretary' THEN 'SK Secretary'
-                        ELSE role
-                    END as position
-                "),
-                'email',
-                'phone_number as phone',
-                DB::raw("'2024-2026' as term"),
-                DB::raw('NULL as council_id')
-            )
-            ->get()
-            ->map(fn ($row) => (array) $row);
+        $start=\Carbon\Carbon::parse($user->term_start)->format('Y');
+        $end=\Carbon\Carbon::parse($user->term_end)->format('Y');
 
-        if (Schema::hasTable('sk_council')) {
-            $councilRows = DB::table('sk_council')
-                ->where('barangay_id', $barangayId)
-                ->select('name', 'position', 'email', 'phone', 'term', 'council_id')
-                ->get()
-                ->map(fn ($row) => (array) $row);
-
-            $members = $members->merge($councilRows);
-        }
-
-        return $members
-            ->unique(fn ($member) => strtolower(($member['name'] ?? '') . '|' . ($member['position'] ?? '')))
-            ->values();
+        return $start.'-'.$end;
     }
 
     protected function menuItems(): array
     {
         return [
-            ['link' => route('sk_chairman.home'), 'icon' => '&#127968;', 'label' => 'Home'],
-            ['link' => route('sk_chairman.reports'), 'icon' => '&#128196;', 'label' => 'Reports'],
-            ['link' => route('sk_chairman.budget'), 'icon' => '&#128229;', 'label' => 'Budget'],
-            ['link' => route('sk_chairman.announcements'), 'icon' => '&#128226;', 'label' => 'Announcements'],
-            ['link' => route('sk_chairman.calendar'), 'icon' => '&#128197;', 'label' => 'Calendar'],
-            ['link' => route('sk_chairman.chat'), 'icon' => '&#128172;', 'label' => 'Chat'],
-            ['link' => route('sk_chairman.meetings'), 'icon' => '&#128222;', 'label' => 'Meetings'],
-            ['link' => route('sk_chairman.rankings'), 'icon' => '&#127942;', 'label' => 'Rankings'],
-            ['link' => route('sk_chairman.leadership'), 'icon' => '&#128101;', 'label' => 'Leadership'],
-            ['link' => route('sk_chairman.archive'), 'icon' => '&#128465;', 'label' => 'Archive'],
+            ['link'=>route('sk_chairman.home'),'icon'=>'&#127968;','label'=>'Home'],
+            ['link'=>route('sk_chairman.reports'),'icon'=>'&#128196;','label'=>'Reports'],
+            ['link'=>route('sk_chairman.budget'),'icon'=>'&#128229;','label'=>'Budget'],
+            ['link'=>route('sk_chairman.announcements'),'icon'=>'&#128226;','label'=>'Announcements'],
+            ['link'=>route('sk_chairman.calendar'),'icon'=>'&#128197;','label'=>'Calendar'],
+            ['link'=>route('sk_chairman.chat'),'icon'=>'&#128172;','label'=>'Chat'],
+            ['link'=>route('sk_chairman.meetings'),'icon'=>'&#128222;','label'=>'Meetings'],
+            ['link'=>route('sk_chairman.rankings'),'icon'=>'&#127942;','label'=>'Rankings'],
+            ['link'=>route('sk_chairman.leadership'),'icon'=>'&#128101;','label'=>'Leadership'],
+            ['link'=>route('sk_chairman.archive'),'icon'=>'&#128465;','label'=>'Archive'],
         ];
     }
 }
