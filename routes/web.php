@@ -102,58 +102,81 @@ Route::middleware('auth')->group(function () {
 | SK PRESIDENT
 |--------------------------------------------------------------------------
 */
-Route::middleware('auth')->prefix('sk_pres')->name('sk_pres.')->group(function () {
+Route::middleware('auth')->prefix('sk_pres')->name('sk_pres.')->group(function(){
 
-    Route::get('/home', [HomeController::class, 'index'])->name('home');
-    Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
-    Route::get('/consolidation', [ConsolidationController::class, 'index'])->name('consolidation');
-    Route::get('/consolidation/download', [ConsolidationController::class, 'download'])->name('consolidation.download');
+    Route::get('/home',[HomeController::class,'index'])->name('home');
+    Route::get('/dashboard',[DashboardController::class,'index'])->name('dashboard');
 
-    Route::get('/module', [ModuleController::class, 'index'])->name('module');
-    Route::get('/module/live', [ModuleController::class, 'live'])->name('module.live');
-    Route::post('/module/live', [ModuleController::class, 'storeLive'])->name('module.live.store');
-    Route::delete('/module/live/{slotId}', [ModuleController::class, 'destroyLive'])->name('module.live.destroy');
-    Route::post('/module', [ModuleController::class, 'store'])->name('module.store');
-    Route::post('/module/{slotId}/delete', [ModuleController::class, 'destroy'])->name('module.destroy');
+    Route::get('/consolidation',[ConsolidationController::class,'index'])->name('consolidation');
+    Route::get('/consolidation/download',[ConsolidationController::class,'download'])->name('consolidation.download');
 
-    Route::get('/announcements', [AnnouncementController::class, 'index'])->name('announcements');
-    Route::post('/announcements', [AnnouncementController::class, 'store'])->name('announcements.store');
+    Route::get('/module',[ModuleController::class,'index'])->name('module');
+    Route::get('/module/live',[ModuleController::class,'live'])->name('module.live');
+    Route::post('/module/live',[ModuleController::class,'storeLive'])->name('module.live.store');
+    Route::delete('/module/live/{slotId}',[ModuleController::class,'destroyLive'])->name('module.live.destroy');
+    Route::post('/module',[ModuleController::class,'store'])->name('module.store');
+    Route::post('/module/{slotId}/delete',[ModuleController::class,'destroy'])->name('module.destroy');
 
-    Route::get('/calendar', [CalendarController::class, 'index'])->name('calendar');
-    Route::get('/calendar/live', [CalendarController::class, 'live'])->name('calendar.live');
-    Route::post('/calendar/live', [CalendarController::class, 'storeLive'])->name('calendar.live.store');
-    Route::post('/calendar', [CalendarController::class, 'store'])->name('calendar.store');
+    Route::get('/announcements',[AnnouncementController::class,'index'])->name('announcements');
+    Route::post('/announcements',[AnnouncementController::class,'store'])->name('announcements.store');
 
-    Route::get('/chat', [SkPresidentChatController::class, 'index'])->name('chat');
-    Route::get('/chat/users', [SkPresidentChatController::class, 'searchUsers'])->name('chat.users');
+    Route::get('/calendar',[CalendarController::class,'index'])->name('calendar');
+    Route::get('/calendar/live',[CalendarController::class,'live'])->name('calendar.live');
+    Route::post('/calendar/live',[CalendarController::class,'storeLive'])->name('calendar.live.store');
+    Route::post('/calendar',[CalendarController::class,'store'])->name('calendar.store');
 
-    Route::get('/meetings', [MeetingsController::class, 'index'])->name('meetings');
-    Route::post('/meetings', [MeetingsController::class, 'store'])->name('meetings.store');
-    Route::get('/meetings/{meeting}/call', [MeetingsController::class, 'call'])->name('meetings.call');
-    Route::post('/meetings/{meeting}/agora-token', [MeetingsController::class, 'token'])->name('meetings.agora.token');
-    Route::get('/video', fn () => redirect()->route('sk_pres.meetings'))->name('video');
+    Route::get('/chat',[SkPresidentChatController::class,'index'])->name('chat');
+    Route::get('/chat/users',[SkPresidentChatController::class,'searchUsers'])->name('chat.users');
 
-    Route::get('/rankings', [SkPresidentRankingController::class, 'index'])->name('rankings');
-    Route::get('/rankings/live', [SkPresidentRankingController::class, 'live'])->name('rankings.live');
-    Route::get('/leadership', [SkPresidentLeadershipController::class, 'index'])->name('leadership');
+    Route::get('/meetings',[MeetingsController::class,'index'])->name('meetings');
+    Route::post('/meetings',[MeetingsController::class,'store'])->name('meetings.store');
+    Route::get('/meetings/{meeting}/call',[MeetingsController::class,'call'])->name('meetings.call');
+    Route::post('/meetings/{meeting}/agora-token',[MeetingsController::class,'token'])->name('meetings.agora.token');
+    Route::get('/video',fn()=>redirect()->route('sk_pres.meetings'))->name('video');
 
-    Route::get('/archive', [SkPresidentArchiveController::class, 'index'])->name('archive');
-    Route::get('/archive/download/bulk', [SkPresidentArchiveController::class, 'bulkDownload'])->name('archive.bulk-download');
-    Route::get('/archive/download/{sourceType}/{sourceId}', [SkPresidentArchiveController::class, 'download'])->name('archive.download');
+    Route::get('/rankings',[SkPresidentRankingController::class,'index'])->name('rankings');
+    Route::get('/rankings/live',[SkPresidentRankingController::class,'live'])->name('rankings.live');
 
-    Route::get('/user-management', [SkPresidentUserManagementController::class, 'index'])->name('user-management');
-    Route::post('/user-management/officials', [SkPresidentUserManagementController::class, 'storeOfficial'])->name('user-management.store-official');
-    Route::post('/user-management/bulk-officials', [SkPresidentUserManagementController::class, 'storeBulkOfficials'])->name('user-management.store-bulk-officials');
-    Route::post('/user-management/import', [SkPresidentUserManagementController::class, 'import'])->name('user-management.import');
-    Route::post('/user-management/{userId}/resend-setup-link', [SkPresidentUserManagementController::class, 'resendSetupLink']) ->middleware('throttle:3,10') ->name('user-management.resend-setup-link');
-    Route::put('/user-management/{userId}', [SkPresidentUserManagementController::class, 'update'])->name('user-management.update');
-    Route::patch('/user-management/{userId}/toggle-status', [SkPresidentUserManagementController::class, 'toggleStatus'])->name('user-management.toggle-status');
-    Route::delete('/user-management/{userId}', [SkPresidentUserManagementController::class, 'destroy'])->name('user-management.destroy');
-    Route::get('/user-management/csv-template', [SkPresidentUserManagementController::class, 'downloadCsvTemplate'])->name('user-management.csv-template');
+    Route::get('/leadership',[SkPresidentLeadershipController::class,'index'])->name('leadership');
 
-    Route::get('/profile', fn (ProfileSettingsController $c) => $c->show('sk_president'))->name('profile');
-    Route::post('/profile', fn (Request $r, ProfileSettingsController $c) => $c->update($r, 'sk_president'))->name('profile.update');
-    Route::post('/profile/password', fn (Request $r, ProfileSettingsController $c) => $c->updatePassword($r, 'sk_president'))->name('profile.password');
+    /*
+    |--------------------------------------------------------------------------
+    | DOCUMENT / REPORT ARCHIVE
+    |--------------------------------------------------------------------------
+    */
+    Route::get('/archive',[SkPresidentArchiveController::class,'index'])->name('archive');
+    Route::get('/archive/download/bulk',[SkPresidentArchiveController::class,'bulkDownload'])->name('archive.bulk-download');
+    Route::get('/archive/download/{sourceType}/{sourceId}',[SkPresidentArchiveController::class,'download'])->name('archive.download');
+
+    /*
+    |--------------------------------------------------------------------------
+    | USER MANAGEMENT
+    |--------------------------------------------------------------------------
+    */
+    Route::get('/user-management',[SkPresidentUserManagementController::class,'index'])->name('user-management');
+    Route::post('/user-management/officials',[SkPresidentUserManagementController::class,'storeOfficial'])->name('user-management.store-official');
+    Route::post('/user-management/bulk-officials',[SkPresidentUserManagementController::class,'storeBulkOfficials'])->name('user-management.store-bulk-officials');
+    Route::post('/user-management/import',[SkPresidentUserManagementController::class,'import'])->name('user-management.import');
+    Route::get('/user-management/csv-template',[SkPresidentUserManagementController::class,'downloadCsvTemplate'])->name('user-management.csv-template');
+    Route::post('/user-management/{userId}/resend-setup-link',[SkPresidentUserManagementController::class,'resendSetupLink'])->middleware('throttle:3,10')->name('user-management.resend-setup-link');
+    Route::put('/user-management/{userId}',[SkPresidentUserManagementController::class,'update'])->name('user-management.update');
+    Route::patch('/user-management/{userId}/toggle-status',[SkPresidentUserManagementController::class,'toggleStatus'])->name('user-management.toggle-status');
+    Route::patch('/user-management/{userId}/archive',[SkPresidentUserManagementController::class,'archive'])->name('user-management.archive');
+    Route::delete('/user-management/{userId}',[SkPresidentUserManagementController::class,'destroy'])->name('user-management.destroy');
+
+    /*
+    |--------------------------------------------------------------------------
+    | PROFILE
+    |--------------------------------------------------------------------------
+    */
+    Route::get('/profile',fn(ProfileSettingsController $c)=>$c->show('sk_president'))
+        ->name('profile');
+
+    Route::post('/profile',fn(Request $r,ProfileSettingsController $c)=>$c->update($r,'sk_president'))
+        ->name('profile.update');
+
+    Route::post('/profile/password',fn(Request $r,ProfileSettingsController $c)=>$c->updatePassword($r,'sk_president'))
+        ->name('profile.password');
 });
 
 

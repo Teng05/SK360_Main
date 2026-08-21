@@ -9,13 +9,13 @@ use Illuminate\Notifications\Notifiable;
 
 class User extends Authenticatable
 {
-    use HasFactory, Notifiable;
+    use HasFactory,Notifiable;
 
-    protected $table = 'users';
-    protected $primaryKey = 'user_id';
-    public $timestamps = false;
+    protected $table='users';
+    protected $primaryKey='user_id';
+    public $timestamps=false;
 
-    protected $fillable = [
+    protected $fillable=[
         'first_name',
         'last_name',
         'email',
@@ -27,23 +27,29 @@ class User extends Authenticatable
         'status',
         'term_start',
         'term_end',
+        'archived_at',
         'profile_pic',
     ];
 
-    protected $hidden = [
+    protected $hidden=[
         'password',
     ];
 
     protected function casts(): array
     {
         return [
-            'is_verified' => 'boolean',
-            'password' => 'hashed',
+            'is_verified'=>'boolean',
+            'password'=>'hashed',
+            'archived_at'=>'datetime',
         ];
     }
 
     public function barangay()
     {
-        return $this->belongsTo(Barangay::class, 'barangay_id', 'barangay_id');
+        return $this->belongsTo(
+            Barangay::class,
+            'barangay_id',
+            'barangay_id'
+        );
     }
 }

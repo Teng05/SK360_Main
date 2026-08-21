@@ -17,19 +17,43 @@ class UserManagementController extends Controller
 {
     public function index(): View
     {
-        abort_unless(auth()->check() && auth()->user()->role === 'sk_president', 403);
+        abort_unless(auth()->check() && auth()->user()->role === 'sk_president',403);
 
         $user=auth()->user();
         $fullName=trim(($user->first_name ?? '').' '.($user->last_name ?? '')) ?: 'User';
-        $status=trim((string)request('status', ''));
+        $status=trim((string)request('status',''));
+        $activeTab=request('tab') === 'history' ? 'history' : 'current';
 
-        return view('sk_pres.user-management', [
+        $historyTerms=$this->historyTerms();
+        $selectedHistoryTerm=trim((string)request('history_term',''));
+
+        if($selectedHistoryTerm === '' && $historyTerms->isNotEmpty()){
+            $selectedHistoryTerm=(string)$historyTerms->first()['value'];
+        }
+
+        $selectedHistoryBarangay=(int)request('history_barangay',0);
+        $selectedHistoryRole=trim((string)request('history_role',''));
+
+        if(!in_array($selectedHistoryRole,['','sk_president','sk_chairman','sk_secretary'],true)){
+            $selectedHistoryRole='';
+        }
+
+        $historyUsers=$this->officialHistory($selectedHistoryTerm,$selectedHistoryBarangay,$selectedHistoryRole);
+
+        return view('sk_pres.user-management',[
             'fullName'=>$fullName,
             'menuItems'=>$this->menuItems(),
             'currentUrl'=>url()->current(),
             'stats'=>$this->stats(),
             'userGroups'=>$this->userGroups($status),
             'barangays'=>Barangay::query()->orderBy('barangay_name')->get(['barangay_id','barangay_name']),
+            'activeTab'=>$activeTab,
+            'historyTerms'=>$historyTerms,
+            'selectedHistoryTerm'=>$selectedHistoryTerm,
+            'selectedHistoryBarangay'=>$selectedHistoryBarangay,
+            'selectedHistoryRole'=>$selectedHistoryRole,
+            'historyStats'=>$this->historyStats($historyUsers),
+            'historyGroups'=>$this->historyGroups($historyUsers),
         ]);
     }
 
@@ -38,32 +62,30 @@ class UserManagementController extends Controller
     | SINGLE ADD SK CHAIRMAN
     |--------------------------------------------------------------------------
     */
-
     public function storeOfficial(Request $request): RedirectResponse
     {
-        abort_unless(auth()->check() && auth()->user()->role === 'sk_president', 403);
+        abort_unless(auth()->check() && auth()->user()->role === 'sk_president',403);
 
-        $validated=$request->validate([
+        $validated=$request->validateWithBag('singleAdd',[
             'first_name'=>['required','string','max:100'],
             'last_name'=>['required','string','max:100'],
             'email'=>['required','email','max:100','unique:users,email'],
             'phone_number'=>['nullable','string','max:20','unique:users,phone_number'],
             'barangay_id'=>['required','integer','exists:barangays,barangay_id'],
+            'term_start'=>['required','date'],
+            'term_end'=>['required','date','after:term_start'],
         ]);
 
         $existingChairman=User::query()
             ->where('barangay_id',$validated['barangay_id'])
             ->where('role','sk_chairman')
-            ->where(function($query){
-                $query->where('status','active')
-                    ->orWhere('is_verified',0);
-            })
+            ->whereNull('archived_at')
             ->exists();
 
         if($existingChairman){
             return back()->withInput()->withErrors([
-                'barangay_id'=>'This barangay already has an active or pending SK Chairman.',
-            ]);
+                'barangay_id'=>'This barangay already has a current or pending SK Chairman.',
+            ],'singleAdd');
         }
 
         $user=User::create([
@@ -76,18 +98,16 @@ class UserManagementController extends Controller
             'password'=>Hash::make(Str::random(64)),
             'is_verified'=>0,
             'status'=>'inactive',
-            'term_start'=>null,
-            'term_end'=>null,
+            'term_start'=>$validated['term_start'],
+            'term_end'=>$validated['term_end'],
+            'archived_at'=>null,
         ]);
 
         $token=Str::random(64);
 
         DB::table('password_reset_tokens')->updateOrInsert(
             ['email'=>$user->email],
-            [
-                'token'=>Hash::make($token),
-                'created_at'=>now(),
-            ]
+            ['token'=>Hash::make($token),'created_at'=>now()]
         );
 
         $setupLink=route('password.setup',[
@@ -100,10 +120,8 @@ class UserManagementController extends Controller
                 'user'=>$user,
                 'setupLink'=>$setupLink,
             ],function($message) use($user){
-                $message->to(
-                    $user->email,
-                    trim($user->first_name.' '.$user->last_name)
-                )->subject('Set Up Your SK360 Account');
+                $message->to($user->email,trim($user->first_name.' '.$user->last_name))
+                    ->subject('Set Up Your SK360 Account');
             });
         }catch(\Throwable $e){
             \Log::error('Chairman setup email failed: '.$e->getMessage());
@@ -123,10 +141,9 @@ class UserManagementController extends Controller
     | BULK ADD SK CHAIRMEN
     |--------------------------------------------------------------------------
     */
-
     public function storeBulkOfficials(Request $request): RedirectResponse
     {
-        abort_unless(auth()->check() && auth()->user()->role === 'sk_president', 403);
+        abort_unless(auth()->check() && auth()->user()->role === 'sk_president',403);
 
         $validated=$request->validateWithBag('bulkAdd',[
             'officials'=>['required','array','min:1'],
@@ -138,64 +155,47 @@ class UserManagementController extends Controller
             'officials.*.term_end'=>['required','date'],
         ]);
 
-        $phones=collect($validated['officials'])
-            ->pluck('phone_number')
-            ->filter()
-            ->values();
+        $phones=collect($validated['officials'])->pluck('phone_number')->filter()->values();
 
         if($phones->duplicates()->isNotEmpty()){
-            return back()
-                ->withInput()
-                ->withErrors([
-                    'officials'=>'The same phone number cannot be used more than once.',
-                ],'bulkAdd');
+            return back()->withInput()->withErrors([
+                'officials'=>'The same phone number cannot be used more than once.',
+            ],'bulkAdd');
         }
 
         $prepared=[];
 
         foreach($validated['officials'] as $official){
             if(User::where('email',$official['email'])->exists()){
-                return back()
-                    ->withInput()
-                    ->withErrors([
-                        'officials'=>'Email '.$official['email'].' is already registered.',
-                    ],'bulkAdd');
+                return back()->withInput()->withErrors([
+                    'officials'=>'Email '.$official['email'].' is already registered.',
+                ],'bulkAdd');
             }
 
-            if(!empty($official['phone_number']) &&
-                User::where('phone_number',$official['phone_number'])->exists()){
-                return back()
-                    ->withInput()
-                    ->withErrors([
-                        'officials'=>'Phone number '.$official['phone_number'].' is already registered.',
-                    ],'bulkAdd');
+            if(!empty($official['phone_number']) && User::where('phone_number',$official['phone_number'])->exists()){
+                return back()->withInput()->withErrors([
+                    'officials'=>'Phone number '.$official['phone_number'].' is already registered.',
+                ],'bulkAdd');
             }
 
             if(strtotime($official['term_end']) <= strtotime($official['term_start'])){
-                return back()
-                    ->withInput()
-                    ->withErrors([
-                        'officials'=>'Term end must be after term start for '.$official['full_name'].'.',
-                    ],'bulkAdd');
+                return back()->withInput()->withErrors([
+                    'officials'=>'Term end must be after term start for '.$official['full_name'].'.',
+                ],'bulkAdd');
             }
 
             $existingChairman=User::query()
                 ->where('barangay_id',$official['barangay_id'])
                 ->where('role','sk_chairman')
-                ->where(function($query){
-                    $query->where('status','active')
-                        ->orWhere('is_verified',0);
-                })
+                ->whereNull('archived_at')
                 ->exists();
 
             if($existingChairman){
                 $barangay=Barangay::find($official['barangay_id']);
 
-                return back()
-                    ->withInput()
-                    ->withErrors([
-                        'officials'=>'Barangay '.($barangay->barangay_name ?? '').' already has an active or pending SK Chairman.',
-                    ],'bulkAdd');
+                return back()->withInput()->withErrors([
+                    'officials'=>'Barangay '.($barangay->barangay_name ?? '').' already has a current or pending SK Chairman.',
+                ],'bulkAdd');
             }
 
             [$firstName,$lastName]=$this->splitFullName($official['full_name']);
@@ -227,16 +227,14 @@ class UserManagementController extends Controller
                     'status'=>'inactive',
                     'term_start'=>$official['term_start'],
                     'term_end'=>$official['term_end'],
+                    'archived_at'=>null,
                 ]);
 
                 $token=Str::random(64);
 
                 DB::table('password_reset_tokens')->updateOrInsert(
                     ['email'=>$user->email],
-                    [
-                        'token'=>Hash::make($token),
-                        'created_at'=>now(),
-                    ]
+                    ['token'=>Hash::make($token),'created_at'=>now()]
                 );
 
                 $createdUsers[]=[
@@ -250,10 +248,9 @@ class UserManagementController extends Controller
 
         foreach($createdUsers as $created){
             $user=$created['user'];
-            $token=$created['token'];
 
             $setupLink=route('password.setup',[
-                'token'=>$token,
+                'token'=>$created['token'],
                 'email'=>$user->email,
             ]);
 
@@ -262,10 +259,8 @@ class UserManagementController extends Controller
                     'user'=>$user,
                     'setupLink'=>$setupLink,
                 ],function($message) use($user){
-                    $message->to(
-                        $user->email,
-                        trim($user->first_name.' '.$user->last_name)
-                    )->subject('Set Up Your SK360 Account');
+                    $message->to($user->email,trim($user->first_name.' '.$user->last_name))
+                        ->subject('Set Up Your SK360 Account');
                 });
             }catch(\Throwable $e){
                 $mailFailed++;
@@ -276,18 +271,12 @@ class UserManagementController extends Controller
         if($mailFailed > 0){
             return redirect()
                 ->route('sk_pres.user-management')
-                ->with(
-                    'warning',
-                    count($createdUsers).' account(s) were created, but '.$mailFailed.' setup email(s) failed to send.'
-                );
+                ->with('warning',count($createdUsers).' account(s) were created, but '.$mailFailed.' setup email(s) failed to send.');
         }
 
         return redirect()
             ->route('sk_pres.user-management')
-            ->with(
-                'success',
-                count($createdUsers).' SK Chairman account(s) created. Password setup links were sent successfully.'
-            );
+            ->with('success',count($createdUsers).' SK Chairman account(s) created. Password setup links were sent successfully.');
     }
 
     /*
@@ -295,7 +284,6 @@ class UserManagementController extends Controller
     | CSV TEMPLATE
     |--------------------------------------------------------------------------
     */
-
     public function downloadCsvTemplate()
     {
         abort_unless(auth()->check() && auth()->user()->role === 'sk_president',403);
@@ -336,7 +324,6 @@ class UserManagementController extends Controller
     | CSV IMPORT
     |--------------------------------------------------------------------------
     */
-
     public function import(Request $request): RedirectResponse
     {
         abort_unless(auth()->check() && auth()->user()->role === 'sk_president',403);
@@ -496,14 +483,11 @@ class UserManagementController extends Controller
                 $existingChairman=User::query()
                     ->where('barangay_id',$barangay->barangay_id)
                     ->where('role','sk_chairman')
-                    ->where(function($query){
-                        $query->where('status','active')
-                            ->orWhere('is_verified',0);
-                    })
+                    ->whereNull('archived_at')
                     ->exists();
 
                 if($existingChairman){
-                    $errors[]="Row {$line}: Barangay '{$barangay->barangay_name}' already has an active or pending SK Chairman.";
+                    $errors[]="Row {$line}: Barangay '{$barangay->barangay_name}' already has a current or pending SK Chairman.";
                     $rowHasError=true;
                 }
             }
@@ -565,16 +549,14 @@ class UserManagementController extends Controller
                     'status'=>'inactive',
                     'term_start'=>$official['term_start'],
                     'term_end'=>$official['term_end'],
+                    'archived_at'=>null,
                 ]);
 
                 $token=Str::random(64);
 
                 DB::table('password_reset_tokens')->updateOrInsert(
                     ['email'=>$user->email],
-                    [
-                        'token'=>Hash::make($token),
-                        'created_at'=>now(),
-                    ]
+                    ['token'=>Hash::make($token),'created_at'=>now()]
                 );
 
                 $createdUsers[]=[
@@ -588,10 +570,9 @@ class UserManagementController extends Controller
 
         foreach($createdUsers as $created){
             $user=$created['user'];
-            $token=$created['token'];
 
             $setupLink=route('password.setup',[
-                'token'=>$token,
+                'token'=>$created['token'],
                 'email'=>$user->email,
             ]);
 
@@ -600,10 +581,8 @@ class UserManagementController extends Controller
                     'user'=>$user,
                     'setupLink'=>$setupLink,
                 ],function($message) use($user){
-                    $message->to(
-                        $user->email,
-                        trim($user->first_name.' '.$user->last_name)
-                    )->subject('Set Up Your SK360 Account');
+                    $message->to($user->email,trim($user->first_name.' '.$user->last_name))
+                        ->subject('Set Up Your SK360 Account');
                 });
             }catch(\Throwable $e){
                 $mailFailed++;
@@ -614,18 +593,12 @@ class UserManagementController extends Controller
         if($mailFailed > 0){
             return redirect()
                 ->route('sk_pres.user-management')
-                ->with(
-                    'warning',
-                    count($createdUsers).' account(s) were imported, but '.$mailFailed.' setup email(s) failed to send.'
-                );
+                ->with('warning',count($createdUsers).' account(s) were imported, but '.$mailFailed.' setup email(s) failed to send.');
         }
 
         return redirect()
             ->route('sk_pres.user-management')
-            ->with(
-                'success',
-                count($createdUsers).' SK Chairman account(s) imported. Password setup links were sent successfully.'
-            );
+            ->with('success',count($createdUsers).' SK Chairman account(s) imported. Password setup links were sent successfully.');
     }
 
     /*
@@ -633,35 +606,29 @@ class UserManagementController extends Controller
     | RESEND SETUP LINK
     |--------------------------------------------------------------------------
     */
-
     public function resendSetupLink(int $userId): RedirectResponse
     {
         abort_unless(auth()->check() && auth()->user()->role === 'sk_president',403);
 
         $user=User::where('user_id',$userId)->firstOrFail();
 
+        if($user->archived_at){
+            return back()->with('warning','Archived accounts cannot receive password setup links.');
+        }
+
         if($user->role !== 'sk_chairman'){
-            return back()->with(
-                'warning',
-                'Setup links can only be sent to SK Chairman accounts.'
-            );
+            return back()->with('warning','Setup links can only be sent to SK Chairman accounts.');
         }
 
         if((int)$user->is_verified === 1){
-            return back()->with(
-                'warning',
-                'This SK Chairman has already activated their account.'
-            );
+            return back()->with('warning','This SK Chairman has already activated their account.');
         }
 
         $token=Str::random(64);
 
         DB::table('password_reset_tokens')->updateOrInsert(
             ['email'=>$user->email],
-            [
-                'token'=>Hash::make($token),
-                'created_at'=>now(),
-            ]
+            ['token'=>Hash::make($token),'created_at'=>now()]
         );
 
         $setupLink=route('password.setup',[
@@ -674,24 +641,16 @@ class UserManagementController extends Controller
                 'user'=>$user,
                 'setupLink'=>$setupLink,
             ],function($message) use($user){
-                $message->to(
-                    $user->email,
-                    trim($user->first_name.' '.$user->last_name)
-                )->subject('New SK360 Password Setup Link');
+                $message->to($user->email,trim($user->first_name.' '.$user->last_name))
+                    ->subject('New SK360 Password Setup Link');
             });
         }catch(\Throwable $e){
             \Log::error('Chairman setup link resend failed for '.$user->email.': '.$e->getMessage());
 
-            return back()->with(
-                'warning',
-                'The new setup link could not be sent. Please try again.'
-            );
+            return back()->with('warning','The new setup link could not be sent. Please try again.');
         }
 
-        return back()->with(
-            'success',
-            'A new password setup link was sent to '.$user->email.'.'
-        );
+        return back()->with('success','A new password setup link was sent to '.$user->email.'.');
     }
 
     /*
@@ -699,14 +658,18 @@ class UserManagementController extends Controller
     | UPDATE USER
     |--------------------------------------------------------------------------
     */
-
     public function update(Request $request,int $userId): RedirectResponse
     {
         abort_unless(auth()->check() && auth()->user()->role === 'sk_president',403);
 
         $user=User::where('user_id',$userId)->firstOrFail();
 
-        $validated=$request->validate([
+        if($user->archived_at){
+            return back()->with('warning','Official History records are read-only.');
+        }
+
+        $validated=$request->validateWithBag('editUser',[
+            'edit_user_id'=>['nullable','integer'],
             'first_name'=>['required','string','max:100'],
             'last_name'=>['required','string','max:100'],
             'email'=>['required','email','max:100','unique:users,email,'.$userId.',user_id'],
@@ -714,14 +677,38 @@ class UserManagementController extends Controller
             'barangay_id'=>['nullable','integer','exists:barangays,barangay_id'],
             'role'=>['required','in:sk_president,sk_chairman,sk_secretary'],
             'status'=>['required','in:active,inactive'],
+            'term_start'=>['nullable','date'],
+            'term_end'=>['nullable','date','after:term_start'],
         ]);
+
+        unset($validated['edit_user_id']);
 
         if($user->role === 'sk_president'){
             $validated['role']='sk_president';
             $validated['status']='active';
+            $validated['barangay_id']=null;
+        }else{
+            if(empty($validated['barangay_id'])){
+                return back()->withInput()->withErrors([
+                    'barangay_id'=>'Barangay is required for Chairman and Secretary accounts.',
+                ],'editUser');
+            }
+
+            $duplicate=User::query()
+                ->where('user_id','!=',$userId)
+                ->where('barangay_id',$validated['barangay_id'])
+                ->where('role',$validated['role'])
+                ->whereNull('archived_at')
+                ->exists();
+
+            if($duplicate){
+                return back()->withInput()->withErrors([
+                    'barangay_id'=>'This barangay already has a current '.$this->roleName($validated['role']).'.',
+                ],'editUser');
+            }
         }
 
-        if($user->role === 'sk_chairman' && (int)$user->is_verified === 0){
+        if($user->role !== 'sk_president' && (int)$user->is_verified === 0){
             $validated['status']='inactive';
         }
 
@@ -735,12 +722,15 @@ class UserManagementController extends Controller
     | ACTIVATE / DEACTIVATE
     |--------------------------------------------------------------------------
     */
-
     public function toggleStatus(int $userId): RedirectResponse
     {
         abort_unless(auth()->check() && auth()->user()->role === 'sk_president',403);
 
         $user=User::where('user_id',$userId)->firstOrFail();
+
+        if($user->archived_at){
+            return back()->with('warning','Archived accounts cannot be activated or deactivated.');
+        }
 
         if($user->role === 'sk_president'){
             return back()->withErrors([
@@ -748,11 +738,24 @@ class UserManagementController extends Controller
             ]);
         }
 
-        if($user->role === 'sk_chairman' && (int)$user->is_verified === 0){
-            return back()->with(
-                'warning',
-                'This chairman has not completed account setup yet. Resend the setup link instead.'
-            );
+        if((int)$user->is_verified === 0){
+            return back()->with('warning','This official has not completed account setup yet.');
+        }
+
+        if($user->status !== 'active'){
+            $duplicate=User::query()
+                ->where('user_id','!=',$userId)
+                ->where('barangay_id',$user->barangay_id)
+                ->where('role',$user->role)
+                ->whereNull('archived_at')
+                ->exists();
+
+            if($duplicate){
+                return back()->with(
+                    'warning',
+                    'Another current '.$this->roleName($user->role).' already exists in this barangay.'
+                );
+            }
         }
 
         $user->status=$user->status === 'active' ? 'inactive' : 'active';
@@ -763,10 +766,56 @@ class UserManagementController extends Controller
 
     /*
     |--------------------------------------------------------------------------
-    | DELETE USER
+    | END TERM / ARCHIVE
     |--------------------------------------------------------------------------
     */
+    public function archive(int $userId): RedirectResponse
+    {
+        abort_unless(auth()->check() && auth()->user()->role === 'sk_president',403);
 
+        $user=User::where('user_id',$userId)->firstOrFail();
+
+        if($user->role === 'sk_president'){
+            return back()->with('warning','The current SK President cannot be archived from this screen yet.');
+        }
+
+        if($user->archived_at){
+            return back()->with('warning','This official is already archived.');
+        }
+
+        if((int)$user->is_verified === 0){
+            return back()->with('warning','Pending accounts should be deleted instead of archived.');
+        }
+
+        if(!$user->term_start || !$user->term_end){
+            return back()->with('warning','Set the official term start and term end before archiving this account.');
+        }
+
+        DB::transaction(function() use($user){
+            $user->status='inactive';
+            $user->archived_at=now();
+            $user->save();
+
+            DB::table('password_reset_tokens')
+                ->where('email',$user->email)
+                ->delete();
+        });
+
+        $historyTerm=date('Y',strtotime($user->term_start)).'-'.date('Y',strtotime($user->term_end));
+
+        return redirect()
+            ->route('sk_pres.user-management',[
+                'tab'=>'history',
+                'history_term'=>$historyTerm,
+            ])
+            ->with('success',trim($user->first_name.' '.$user->last_name).' was moved to Official History.');
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | DELETE PENDING ACCOUNT
+    |--------------------------------------------------------------------------
+    */
     public function destroy(int $userId): RedirectResponse
     {
         abort_unless(auth()->check() && auth()->user()->role === 'sk_president',403);
@@ -777,6 +826,14 @@ class UserManagementController extends Controller
             return back()->withErrors([
                 'user'=>'The SK President account cannot be deleted.',
             ]);
+        }
+
+        if($user->archived_at){
+            return back()->with('warning','Archived officials cannot be permanently deleted from User Management.');
+        }
+
+        if((int)$user->is_verified === 1){
+            return back()->with('warning','Activated officials must use End Term / Archive instead of Delete.');
         }
 
         DB::transaction(function() use($user,$userId){
@@ -791,7 +848,7 @@ class UserManagementController extends Controller
             $user->delete();
         });
 
-        return back()->with('success','User deleted successfully.');
+        return back()->with('success','Pending account deleted successfully.');
     }
 
     /*
@@ -799,14 +856,14 @@ class UserManagementController extends Controller
     | DASHBOARD STATS
     |--------------------------------------------------------------------------
     */
-
     protected function stats(): array
     {
         return [
             [
-                'label'=>'Total Officials',
+                'label'=>'Current Officials',
                 'value'=>DB::table('users')
                     ->whereIn('role',['sk_president','sk_chairman','sk_secretary'])
+                    ->whereNull('archived_at')
                     ->count(),
                 'border'=>'border-red-300',
                 'iconBg'=>'bg-red-50',
@@ -815,7 +872,10 @@ class UserManagementController extends Controller
             ],
             [
                 'label'=>'SK Chairmen',
-                'value'=>DB::table('users')->where('role','sk_chairman')->count(),
+                'value'=>DB::table('users')
+                    ->where('role','sk_chairman')
+                    ->whereNull('archived_at')
+                    ->count(),
                 'border'=>'border-green-300',
                 'iconBg'=>'bg-green-50',
                 'icon'=>'&#128737;',
@@ -823,28 +883,41 @@ class UserManagementController extends Controller
             ],
             [
                 'label'=>'SK Secretaries',
-                'value'=>DB::table('users')->where('role','sk_secretary')->count(),
+                'value'=>DB::table('users')
+                    ->where('role','sk_secretary')
+                    ->whereNull('archived_at')
+                    ->count(),
                 'border'=>'border-blue-300',
                 'iconBg'=>'bg-blue-50',
                 'icon'=>'&#128196;',
                 'iconColor'=>'text-blue-500',
+            ],
+            [
+                'label'=>'Archived Officials',
+                'value'=>DB::table('users')
+                    ->whereIn('role',['sk_president','sk_chairman','sk_secretary'])
+                    ->whereNotNull('archived_at')
+                    ->count(),
+                'border'=>'border-gray-300',
+                'iconBg'=>'bg-gray-100',
+                'icon'=>'&#128451;',
+                'iconColor'=>'text-gray-500',
             ],
         ];
     }
 
     /*
     |--------------------------------------------------------------------------
-    | USER GROUPS
+    | CURRENT USER GROUPS
     |--------------------------------------------------------------------------
     */
-
     protected function userGroups(string $status=''): array
     {
         return [
             [
                 'label'=>'SK Federation President / System Admin',
-                'description'=>'Single unified administrative account',
-                'count'=>DB::table('users')->where('role','sk_president')->count(),
+                'description'=>'Current SK Federation President',
+                'count'=>$this->currentRoleCount('sk_president'),
                 'badgeColor'=>'bg-red-500',
                 'iconColor'=>'text-red-400',
                 'icon'=>'&#128198;',
@@ -852,8 +925,8 @@ class UserManagementController extends Controller
             ],
             [
                 'label'=>'SK Chairmen',
-                'description'=>'Barangay youth leaders with full access',
-                'count'=>DB::table('users')->where('role','sk_chairman')->count(),
+                'description'=>'Current and pending barangay youth leaders',
+                'count'=>$this->currentRoleCount('sk_chairman'),
                 'badgeColor'=>'bg-green-500',
                 'iconColor'=>'text-green-400',
                 'icon'=>'&#128737;',
@@ -861,8 +934,8 @@ class UserManagementController extends Controller
             ],
             [
                 'label'=>'SK Secretaries',
-                'description'=>'Documentation and support officers',
-                'count'=>DB::table('users')->where('role','sk_secretary')->count(),
+                'description'=>'Current and pending documentation officers',
+                'count'=>$this->currentRoleCount('sk_secretary'),
                 'badgeColor'=>'bg-blue-500',
                 'iconColor'=>'text-blue-400',
                 'icon'=>'&#128196;',
@@ -873,10 +946,9 @@ class UserManagementController extends Controller
 
     /*
     |--------------------------------------------------------------------------
-    | GET USERS BY ROLE
+    | GET CURRENT USERS BY ROLE
     |--------------------------------------------------------------------------
     */
-
     protected function usersByRole(array $roles,string $status='')
     {
         $query=DB::table('users as u')
@@ -893,19 +965,18 @@ class UserManagementController extends Controller
                 'u.is_verified',
                 'u.term_start',
                 'u.term_end',
+                'u.archived_at',
                 'u.created_at',
                 'b.barangay_name'
             )
-            ->whereIn('u.role',$roles);
+            ->whereIn('u.role',$roles)
+            ->whereNull('u.archived_at');
 
         if(in_array($status,['active','inactive'],true)){
             $query->where('u.status',$status);
         }
 
-        if(
-            in_array('sk_chairman',$roles,true) ||
-            in_array('sk_secretary',$roles,true)
-        ){
+        if(in_array('sk_chairman',$roles,true) || in_array('sk_secretary',$roles,true)){
             $query->orderByRaw('b.barangay_name IS NULL')
                 ->orderBy('b.barangay_name')
                 ->orderBy('u.first_name')
@@ -916,6 +987,171 @@ class UserManagementController extends Controller
         }
 
         return $query->get();
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | HISTORY TERMS
+    |--------------------------------------------------------------------------
+    */
+    protected function historyTerms()
+    {
+        return DB::table('users')
+            ->whereIn('role',['sk_president','sk_chairman','sk_secretary'])
+            ->where('is_verified',1)
+            ->whereNotNull('archived_at')
+            ->whereNotNull('term_start')
+            ->whereNotNull('term_end')
+            ->selectRaw('YEAR(term_start) as start_year,YEAR(term_end) as end_year')
+            ->distinct()
+            ->orderByDesc('start_year')
+            ->orderByDesc('end_year')
+            ->get()
+            ->map(fn($term)=>[
+                'value'=>$term->start_year.'-'.$term->end_year,
+                'label'=>$term->start_year.' - '.$term->end_year,
+            ]);
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | OFFICIAL HISTORY
+    |--------------------------------------------------------------------------
+    */
+    protected function officialHistory(string $term,int $barangayId=0,string $role='')
+    {
+        $query=DB::table('users as u')
+            ->leftJoin('barangays as b','u.barangay_id','=','b.barangay_id')
+            ->select(
+                'u.user_id',
+                'u.first_name',
+                'u.last_name',
+                'u.email',
+                'u.phone_number',
+                'u.barangay_id',
+                'u.role',
+                'u.status',
+                'u.is_verified',
+                'u.term_start',
+                'u.term_end',
+                'u.archived_at',
+                'u.created_at',
+                'b.barangay_name'
+            )
+            ->whereIn('u.role',['sk_president','sk_chairman','sk_secretary'])
+            ->where('u.is_verified',1)
+            ->whereNotNull('u.archived_at')
+            ->whereNotNull('u.term_start')
+            ->whereNotNull('u.term_end');
+
+        if(preg_match('/^(\d{4})-(\d{4})$/',$term,$matches)){
+            $query->whereYear('u.term_start',(int)$matches[1])
+                ->whereYear('u.term_end',(int)$matches[2]);
+        }else{
+            $query->whereRaw('1=0');
+        }
+
+        if($barangayId > 0){
+            $query->where('u.barangay_id',$barangayId);
+        }
+
+        if(in_array($role,['sk_president','sk_chairman','sk_secretary'],true)){
+            $query->where('u.role',$role);
+        }
+
+        return $query
+            ->orderByRaw("CASE WHEN u.role='sk_president' THEN 0 ELSE 1 END")
+            ->orderByRaw('b.barangay_name IS NULL')
+            ->orderBy('b.barangay_name')
+            ->orderByRaw("CASE u.role WHEN 'sk_chairman' THEN 1 WHEN 'sk_secretary' THEN 2 ELSE 3 END")
+            ->orderBy('u.first_name')
+            ->orderBy('u.last_name')
+            ->get();
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | HISTORY STATS
+    |--------------------------------------------------------------------------
+    */
+    protected function historyStats($users): array
+    {
+        return [
+            [
+                'label'=>'Barangays',
+                'value'=>$users->whereNotNull('barangay_id')->pluck('barangay_id')->unique()->count(),
+                'icon'=>'&#128205;',
+            ],
+            [
+                'label'=>'SK Chairmen',
+                'value'=>$users->where('role','sk_chairman')->count(),
+                'icon'=>'&#128737;',
+            ],
+            [
+                'label'=>'SK Secretaries',
+                'value'=>$users->where('role','sk_secretary')->count(),
+                'icon'=>'&#128196;',
+            ],
+            [
+                'label'=>'Total Officials',
+                'value'=>$users->count(),
+                'icon'=>'&#128101;',
+            ],
+        ];
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | HISTORY GROUPS
+    |--------------------------------------------------------------------------
+    */
+    protected function historyGroups($users): array
+    {
+        $groups=[];
+
+        $presidents=$users->where('role','sk_president')->values();
+
+        if($presidents->isNotEmpty()){
+            $groups[]=[
+                'key'=>'federation',
+                'label'=>'SK Federation / System Administration',
+                'users'=>$presidents,
+            ];
+        }
+
+        $barangayUsers=$users
+            ->where('role','!=','sk_president')
+            ->groupBy(fn($user)=>$user->barangay_id ?: 'unassigned');
+
+        foreach($barangayUsers as $barangayId=>$members){
+            $name=$members->first()->barangay_name ?? 'Unassigned';
+
+            $groups[]=[
+                'key'=>'barangay_'.$barangayId,
+                'label'=>'Barangay '.$name,
+                'users'=>$members->values(),
+            ];
+        }
+
+        return $groups;
+    }
+
+    protected function currentRoleCount(string $role): int
+    {
+        return DB::table('users')
+            ->where('role',$role)
+            ->whereNull('archived_at')
+            ->count();
+    }
+
+    protected function roleName(string $role): string
+    {
+        return match($role){
+            'sk_chairman'=>'SK Chairman',
+            'sk_secretary'=>'SK Secretary',
+            'sk_president'=>'SK President',
+            default=>'official',
+        };
     }
 
     protected function menuItems(): array
