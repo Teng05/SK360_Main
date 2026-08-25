@@ -16,7 +16,6 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 
-
 class AuthController extends Controller
 {
     public function showLogin()
@@ -26,9 +25,9 @@ class AuthController extends Controller
 
     public function showRegister()
     {
-        $barangays = Barangay::orderBy('barangay_name')->get();
+        $barangays=Barangay::orderBy('barangay_name')->get();
 
-        return view('auth.register', compact('barangays'));
+        return view('auth.register',compact('barangays'));
     }
 
     public function showForgotPassword()
@@ -38,13 +37,13 @@ class AuthController extends Controller
 
     public function sendPasswordReset(Request $request): RedirectResponse
     {
-        $validated = $request->validate([
-            'method' => ['required', 'in:email,phone'],
-            'email' => ['nullable', 'required_if:method,email', 'email'],
-            'phone' => ['nullable', 'required_if:method,phone', 'string', 'max:30'],
+        $validated=$request->validate([
+            'method'=>['required','in:email,phone'],
+            'email'=>['nullable','required_if:method,email','email'],
+            'phone'=>['nullable','required_if:method,phone','string','max:30'],
         ]);
 
-        if ($validated['method'] === 'email') {
+        if($validated['method'] === 'email'){
             return $this->sendEmailPasswordReset($validated['email']);
         }
 
@@ -53,33 +52,41 @@ class AuthController extends Controller
 
     public function showResetPassword(string $token)
     {
-        return view('auth.reset-password', [
-            'token' => $token,
-            'email' => request('email'),
+        return view('auth.reset-password',[
+            'token'=>$token,
+            'email'=>request('email'),
         ]);
     }
 
     public function resetPassword(Request $request): RedirectResponse
     {
-        $validated = $request->validate([
-            'email' => ['required', 'email'],
-            'token' => ['required', 'string'],
-            'password' => ['required', 'confirmed', 'min:8', 'regex:/[A-Z]/', 'regex:/[a-z]/', 'regex:/[0-9]/'],
+        $validated=$request->validate([
+            'email'=>['required','email'],
+            'token'=>['required','string'],
+            'password'=>['required','confirmed','min:8','regex:/[A-Z]/','regex:/[a-z]/','regex:/[0-9]/'],
         ]);
 
-        $reset = DB::table('password_reset_tokens')->where('email', $validated['email'])->first();
+        $reset=DB::table('password_reset_tokens')
+            ->where('email',$validated['email'])
+            ->first();
 
-        if (! $reset || ! Hash::check($validated['token'], $reset->token) || now()->subMinutes(15)->greaterThan($reset->created_at)) {
-            return back()->withErrors(['email' => 'This reset link is invalid or expired.'])->withInput();
+        if(!$reset || !Hash::check($validated['token'],$reset->token) || now()->subMinutes(15)->greaterThan($reset->created_at)){
+            return back()
+                ->withErrors(['email'=>'This reset link is invalid or expired.'])
+                ->withInput();
         }
 
-        User::where('email', $validated['email'])->update([
-            'password' => Hash::make($validated['password']),
+        User::where('email',$validated['email'])->update([
+            'password'=>Hash::make($validated['password']),
         ]);
 
-        DB::table('password_reset_tokens')->where('email', $validated['email'])->delete();
+        DB::table('password_reset_tokens')
+            ->where('email',$validated['email'])
+            ->delete();
 
-        return redirect()->route('login')->with('verified', 'Your password has been reset. You can now log in.');
+        return redirect()
+            ->route('login')
+            ->with('verified','Your password has been reset. You can now log in.');
     }
 
     /*
@@ -87,80 +94,75 @@ class AuthController extends Controller
     | SHOW INITIAL PASSWORD SETUP
     |--------------------------------------------------------------------------
     */
-
     public function showSetPassword(string $token)
     {
-        $email = request('email');
+        $email=request('email');
 
-        if (!$email) {
+        if(!$email){
             return redirect()->route('login')->withErrors([
-                'email' => 'Invalid password setup link.',
+                'email'=>'Invalid password setup link.',
             ]);
         }
 
-        $user = User::where('email', $email)->first();
+        $user=User::where('email',$email)->first();
 
-        if (!$user) {
+        if(!$user){
             return redirect()->route('login')->withErrors([
-                'email' => 'Invalid password setup link.',
+                'email'=>'Invalid password setup link.',
             ]);
         }
 
         // Already finished setting up the account
-        if ($user->is_verified == 1 && $user->status === 'active') {
+        if((int)$user->is_verified === 1 && $user->status === 'active'){
             return redirect()->route('login')->with(
                 'verified',
                 'Your account is already activated. You may log in.'
             );
         }
 
-        $reset = DB::table('password_reset_tokens')
-            ->where('email', $email)
+        $reset=DB::table('password_reset_tokens')
+            ->where('email',$email)
             ->first();
 
-        $invalid = !$reset || !Hash::check($token, $reset->token);
+        $invalid=!$reset || !Hash::check($token,$reset->token);
 
-        $expired = $reset &&
+        $expired=$reset &&
             now()->subHours(24)->greaterThan($reset->created_at);
 
-        if ($invalid || $expired) {
-
-            // Delete only expired token
-            if ($expired) {
+        if($invalid || $expired){
+            if($expired){
                 DB::table('password_reset_tokens')
-                    ->where('email', $email)
+                    ->where('email',$email)
                     ->delete();
             }
 
-            return view('auth.set-password', [
-                'token' => $token,
-                'email' => $email,
-                'linkExpired' => true,
+            return view('auth.set-password',[
+                'token'=>$token,
+                'email'=>$email,
+                'linkExpired'=>true,
                 'accountRole'=>$user->role,
             ]);
         }
 
-        return view('auth.set-password', [
-            'token' => $token,
-            'email' => $email,
-            'linkExpired' => false,
+        return view('auth.set-password',[
+            'token'=>$token,
+            'email'=>$email,
+            'linkExpired'=>false,
             'accountRole'=>$user->role,
         ]);
     }
-
 
     /*
     |--------------------------------------------------------------------------
     | SAVE INITIAL PASSWORD
     |--------------------------------------------------------------------------
     */
-
     public function setPassword(Request $request): RedirectResponse
     {
-        $validated = $request->validate([
-            'email' => ['required', 'email'],
-            'token' => ['required', 'string'],
-            'password' => [
+        $validated=$request->validate([
+            'email'=>['required','email'],
+            'token'=>['required','string'],
+            'password'=>[
                 'required',
                 'confirmed',
                 'min:8',
@@ -168,121 +170,285 @@ class AuthController extends Controller
                 'regex:/[a-z]/',
                 'regex:/[0-9]/',
             ],
-        ], [
-            'password.confirmed' => 'Passwords do not match.',
-            'password.min' => 'Password must be at least 8 characters.',
-            'password.regex' => 'Password must contain uppercase, lowercase, and a number.',
+        ],[
+            'password.confirmed'=>'Passwords do not match.',
+            'password.min'=>'Password must be at least 8 characters.',
+            'password.regex'=>'Password must contain uppercase, lowercase, and a number.',
         ]);
 
-        $reset = DB::table('password_reset_tokens')
-            ->where('email', $validated['email'])
+        $reset=DB::table('password_reset_tokens')
+            ->where('email',$validated['email'])
             ->first();
 
-        if (
+        if(
             !$reset ||
-            !Hash::check($validated['token'], $reset->token) ||
+            !Hash::check($validated['token'],$reset->token) ||
             now()->subHours(24)->greaterThan($reset->created_at)
-        ) {
+        ){
             return back()->withErrors([
-                'email' => 'This password setup link is invalid or expired.',
+                'email'=>'This password setup link is invalid or expired.',
             ]);
         }
 
-        $user = User::where('email', $validated['email'])->first();
+        $user=User::where('email',$validated['email'])->first();
 
-        if (!$user) {
+        if(!$user){
             return back()->withErrors([
-                'email' => 'Account not found.',
+                'email'=>'Account not found.',
             ]);
         }
 
-        $user->update([
-            'password' => Hash::make($validated['password']),
-            'is_verified' => 1,
-            'status' => 'active',
-        ]);
+        $pendingAssignment=DB::table('official_terms')
+            ->where('user_id',$user->user_id)
+            ->where('status','pending')
+            ->orderByDesc('official_term_id')
+            ->first();
 
-        DB::table('password_reset_tokens')
-            ->where('email', $validated['email'])
-            ->delete();
+        $endedPresidentUserIds=[];
+
+        DB::transaction(function() use($user,$validated,$pendingAssignment,&$endedPresidentUserIds){
+
+            /*
+            |--------------------------------------------------------------------------
+            | ACTIVATE ACCOUNT
+            |--------------------------------------------------------------------------
+            */
+            $user->update([
+                'password'=>Hash::make($validated['password']),
+                'is_verified'=>1,
+                'status'=>'active',
+                'archived_at'=>null,
+            ]);
+
+            /*
+            |--------------------------------------------------------------------------
+            | PRESIDENT SUCCESSION
+            |--------------------------------------------------------------------------
+            */
+            if(
+                $user->role === 'sk_president' &&
+                $pendingAssignment &&
+                $pendingAssignment->role === 'sk_president'
+            ){
+                /*
+                |--------------------------------------------------------------------------
+                | FIND CURRENT CARETAKER PRESIDENT
+                |--------------------------------------------------------------------------
+                */
+                $caretakerTerms=DB::table('official_terms')
+                    ->where('term_id',$pendingAssignment->term_id)
+                    ->where('role','sk_president')
+                    ->where('status','current')
+                    ->where('user_id','!=',$user->user_id)
+                    ->get();
+
+                $endedPresidentUserIds=$caretakerTerms
+                    ->pluck('user_id')
+                    ->unique()
+                    ->values()
+                    ->all();
+
+                /*
+                |--------------------------------------------------------------------------
+                | COMPLETE CARETAKER PRESIDENT TERM
+                |--------------------------------------------------------------------------
+                */
+                if($caretakerTerms->isNotEmpty()){
+                    DB::table('official_terms')
+                        ->whereIn(
+                            'official_term_id',
+                            $caretakerTerms->pluck('official_term_id')->all()
+                        )
+                        ->update([
+                            'status'=>'completed',
+                            'completed_at'=>now(),
+                        ]);
+                }
+
+                /*
+                |--------------------------------------------------------------------------
+                | ARCHIVE OUTGOING PRESIDENT ACCOUNT
+                |--------------------------------------------------------------------------
+                */
+                if(!empty($endedPresidentUserIds)){
+                    DB::table('users')
+                        ->whereIn('user_id',$endedPresidentUserIds)
+                        ->where('role','sk_president')
+                        ->update([
+                            'status'=>'inactive',
+                            'archived_at'=>now(),
+                        ]);
+                }
+
+                /*
+                |--------------------------------------------------------------------------
+                | ACTIVATE NEW PRESIDENT TERM
+                |--------------------------------------------------------------------------
+                */
+                DB::table('official_terms')
+                    ->where('official_term_id',$pendingAssignment->official_term_id)
+                    ->update([
+                        'status'=>'current',
+                        'started_at'=>now(),
+                        'completed_at'=>null,
+                    ]);
+            }else{
+                /*
+                |--------------------------------------------------------------------------
+                | ACTIVATE CHAIRMAN / SECRETARY TERM
+                |--------------------------------------------------------------------------
+                */
+                DB::table('official_terms')
+                    ->where('user_id',$user->user_id)
+                    ->where('status','pending')
+                    ->update([
+                        'status'=>'current',
+                        'started_at'=>now(),
+                    ]);
+            }
+
+            /*
+            |--------------------------------------------------------------------------
+            | DELETE USED SETUP TOKEN
+            |--------------------------------------------------------------------------
+            */
+            DB::table('password_reset_tokens')
+                ->where('email',$validated['email'])
+                ->delete();
+        });
+
+        /*
+        |--------------------------------------------------------------------------
+        | LOG OUT OLD PRESIDENT DATABASE SESSIONS
+        |--------------------------------------------------------------------------
+        */
+        if(!empty($endedPresidentUserIds)){
+            $this->invalidateDatabaseSessions($endedPresidentUserIds);
+        }
+
+        if($user->role === 'sk_president' && $pendingAssignment){
+            return redirect()
+                ->route('login')
+                ->with(
+                    'verified',
+                    'Your SK President account has been activated successfully. The President handover is complete and you may now log in.'
+                );
+        }
 
         return redirect()
             ->route('login')
-            ->with('verified', 'Your password has been set successfully. You can now log in.');
+            ->with(
+                'verified',
+                'Your password has been set successfully. You can now log in.'
+            );
     }
-
 
     public function verifyPhoneReset(Request $request): RedirectResponse
     {
-        $validated = $request->validate([
-            'code' => ['required', 'digits:6'],
-            'password' => ['required', 'confirmed', 'min:8', 'regex:/[A-Z]/', 'regex:/[a-z]/', 'regex:/[0-9]/'],
+        $validated=$request->validate([
+            'code'=>['required','digits:6'],
+            'password'=>['required','confirmed','min:8','regex:/[A-Z]/','regex:/[a-z]/','regex:/[0-9]/'],
         ]);
 
-        $phone = session('reset_phone');
-        $userId = session('reset_user_id');
+        $phone=session('reset_phone');
+        $userId=session('reset_user_id');
 
-        if (! $phone || ! $userId) {
-            return redirect()->route('password.request')->withErrors(['phone' => 'Please request a reset code first.']);
+        if(!$phone || !$userId){
+            return redirect()
+                ->route('password.request')
+                ->withErrors([
+                    'phone'=>'Please request a reset code first.',
+                ]);
         }
 
-        $response = $this->twilioRequest('VerificationCheck', [
-            'To' => $phone,
-            'Code' => $validated['code'],
+        $response=$this->twilioRequest('VerificationCheck',[
+            'To'=>$phone,
+            'Code'=>$validated['code'],
         ]);
 
-        if (! ($response['ok'] ?? false) || ($response['json']['status'] ?? null) !== 'approved') {
-            return back()->withErrors(['code' => 'Invalid or expired reset code.'])->withInput();
+        if(!($response['ok'] ?? false) || ($response['json']['status'] ?? null) !== 'approved'){
+            return back()
+                ->withErrors([
+                    'code'=>'Invalid or expired reset code.',
+                ])
+                ->withInput();
         }
 
-        User::where('user_id', $userId)->update([
-            'password' => Hash::make($validated['password']),
+        User::where('user_id',$userId)->update([
+            'password'=>Hash::make($validated['password']),
         ]);
 
-        session()->forget(['reset_phone', 'reset_user_id']);
+        session()->forget([
+            'reset_phone',
+            'reset_user_id',
+        ]);
 
-        return redirect()->route('login')->with('verified', 'Your password has been reset. You can now log in.');
+        return redirect()
+            ->route('login')
+            ->with('verified','Your password has been reset. You can now log in.');
     }
 
     public function verifyEmailReset(Request $request): RedirectResponse
     {
-        $validated = $request->validate([
-            'code' => ['required', 'digits:6'],
-            'password' => ['required', 'confirmed', 'min:8', 'regex:/[A-Z]/', 'regex:/[a-z]/', 'regex:/[0-9]/'],
+        $validated=$request->validate([
+            'code'=>['required','digits:6'],
+            'password'=>['required','confirmed','min:8','regex:/[A-Z]/','regex:/[a-z]/','regex:/[0-9]/'],
         ]);
 
-        $email = session('reset_email');
-        $userId = session('reset_user_id');
+        $email=session('reset_email');
+        $userId=session('reset_user_id');
 
-        if (! $email || ! $userId) {
-            return redirect()->route('password.request')->withErrors(['email' => 'Please request a reset code first.']);
+        if(!$email || !$userId){
+            return redirect()
+                ->route('password.request')
+                ->withErrors([
+                    'email'=>'Please request a reset code first.',
+                ]);
         }
 
-        $reset = DB::table('password_reset_tokens')->where('email', $email)->first();
+        $reset=DB::table('password_reset_tokens')
+            ->where('email',$email)
+            ->first();
 
-        if (! $reset || ! Hash::check($validated['code'], $reset->token) || now()->subMinutes(15)->greaterThan($reset->created_at)) {
-            return back()->withErrors(['code' => 'Invalid or expired reset code.'])->withInput();
+        if(
+            !$reset ||
+            !Hash::check($validated['code'],$reset->token) ||
+            now()->subMinutes(15)->greaterThan($reset->created_at)
+        ){
+            return back()
+                ->withErrors([
+                    'code'=>'Invalid or expired reset code.',
+                ])
+                ->withInput();
         }
 
-        User::where('user_id', $userId)->update([
-            'password' => Hash::make($validated['password']),
+        User::where('user_id',$userId)->update([
+            'password'=>Hash::make($validated['password']),
         ]);
 
-        DB::table('password_reset_tokens')->where('email', $email)->delete();
-        session()->forget(['reset_email', 'reset_user_id']);
+        DB::table('password_reset_tokens')
+            ->where('email',$email)
+            ->delete();
 
-        return redirect()->route('login')->with('verified', 'Your password has been reset. You can now log in.');
+        session()->forget([
+            'reset_email',
+            'reset_user_id',
+        ]);
+
+        return redirect()
+            ->route('login')
+            ->with('verified','Your password has been reset. You can now log in.');
     }
 
     public function register(Request $request): RedirectResponse
     {
         $request->validate([
-            'first_name' => ['required', 'string', 'max:50'],
-            'last_name' => ['required', 'string', 'max:50'],
-            'email' => ['required', 'email', 'max:100', 'unique:users,email'],
-            'phone_number' => ['required', 'regex:/^\d{10,11}$/'],
-            'barangay_id' => ['required', 'exists:barangays,barangay_id'],
-            'password' => [
+            'first_name'=>['required','string','max:50'],
+            'last_name'=>['required','string','max:50'],
+            'email'=>['required','email','max:100','unique:users,email'],
+            'phone_number'=>['required','regex:/^\d{10,11}$/'],
+            'barangay_id'=>['required','exists:barangays,barangay_id'],
+            'password'=>[
                 'required',
                 'confirmed',
                 'min:8',
@@ -290,366 +456,442 @@ class AuthController extends Controller
                 'regex:/[a-z]/',
                 'regex:/[0-9]/',
             ],
-        ], [
-            'email.unique' => 'Email is already registered.',
-            'phone_number.regex' => 'Phone number must be 10–11 digits.',
-            'password.confirmed' => 'Passwords do not match.',
-            'barangay_id.exists' => 'Selected barangay is invalid.',
+        ],[
+            'email.unique'=>'Email is already registered.',
+            'phone_number.regex'=>'Phone number must be 10–11 digits.',
+            'password.confirmed'=>'Passwords do not match.',
+            'barangay_id.exists'=>'Selected barangay is invalid.',
         ]);
 
-        try {
+        try{
             DB::beginTransaction();
 
-            $user = User::create([
-                'first_name' => trim($request->first_name),
-                'last_name' => trim($request->last_name),
-                'email' => trim($request->email),
-                'phone_number' => trim($request->phone_number),
-                'password' => $request->password,
-                'barangay_id' => $request->barangay_id,
-                'role' => 'youth',
-                'is_verified' => 0,
-                'status' => 'inactive',
+            $user=User::create([
+                'first_name'=>trim($request->first_name),
+                'last_name'=>trim($request->last_name),
+                'email'=>trim($request->email),
+                'phone_number'=>trim($request->phone_number),
+                'password'=>$request->password,
+                'barangay_id'=>$request->barangay_id,
+                'role'=>'youth',
+                'is_verified'=>0,
+                'status'=>'inactive',
             ]);
 
-            $verificationCode = (string) random_int(100000, 999999);
+            $verificationCode=(string)random_int(100000,999999);
 
-            EmailVerification::where('user_id', $user->user_id)->delete();
+            EmailVerification::where('user_id',$user->user_id)->delete();
 
             EmailVerification::create([
-                'user_id' => $user->user_id,
-                'verification_code' => $verificationCode,
-                'expires_at' => now()->addHour(),
-                'created_at' => now(),
+                'user_id'=>$user->user_id,
+                'verification_code'=>$verificationCode,
+                'expires_at'=>now()->addHour(),
+                'created_at'=>now(),
             ]);
 
             DB::commit();
 
             session([
-                'user_id' => $user->user_id,
-                'verify_email' => $user->email,
+                'user_id'=>$user->user_id,
+                'verify_email'=>$user->email,
             ]);
 
-            Mail::send('email.verification-code', [
-                'first_name' => $user->first_name,
-                'verification_code' => $verificationCode,
-            ], function ($message) use ($user) {
-                $message->to($user->email, $user->first_name . ' ' . $user->last_name)
-                    ->subject('SK360 Verification Code');
+            Mail::send('email.verification-code',[
+                'first_name'=>$user->first_name,
+                'verification_code'=>$verificationCode,
+            ],function($message) use($user){
+                $message->to(
+                    $user->email,
+                    $user->first_name.' '.$user->last_name
+                )->subject('SK360 Verification Code');
             });
 
             return redirect()->route('verify.notice');
 
-        } catch (\Exception $e) {
+        }catch(\Exception $e){
             DB::rollBack();
-            \Log::error('Registration error: ' . $e->getMessage());
+
+            \Log::error('Registration error: '.$e->getMessage());
 
             return back()
-                ->withInput($request->except(['password', 'password_confirmation']))
+                ->withInput(
+                    $request->except([
+                        'password',
+                        'password_confirmation',
+                    ])
+                )
                 ->withErrors([
-                    'email' => 'Registration failed. Please try again.',
+                    'email'=>'Registration failed. Please try again.',
                 ]);
         }
     }
 
     public function showVerify()
     {
-        if (!session()->has('user_id')) {
+        if(!session()->has('user_id')){
             return redirect()->route('register');
         }
 
-        return view('auth.verify', [
-            'email' => session('verify_email'),
+        return view('auth.verify',[
+            'email'=>session('verify_email'),
         ]);
     }
 
     public function verifyCode(Request $request): RedirectResponse
     {
-        if (!session()->has('user_id')) {
+        if(!session()->has('user_id')){
             return redirect()->route('register');
         }
 
         $request->validate([
-            'code' => ['required', 'array', 'size:6'],
-            'code.*' => ['required', 'digits:1'],
-        ], [
-            'code.required' => 'Please enter the complete 6-digit code.',
-            'code.size' => 'Please enter the complete 6-digit code.',
-            'code.*.digits' => 'Each code field must contain exactly 1 digit.',
+            'code'=>['required','array','size:6'],
+            'code.*'=>['required','digits:1'],
+        ],[
+            'code.required'=>'Please enter the complete 6-digit code.',
+            'code.size'=>'Please enter the complete 6-digit code.',
+            'code.*.digits'=>'Each code field must contain exactly 1 digit.',
         ]);
 
-        $code = implode('', $request->code);
-        $userId = session('user_id');
+        $code=implode('',$request->code);
+        $userId=session('user_id');
 
-        $verification = EmailVerification::where('user_id', $userId)
-            ->where('verification_code', $code)
-            ->where('expires_at', '>', now())
+        $verification=EmailVerification::where('user_id',$userId)
+            ->where('verification_code',$code)
+            ->where('expires_at','>',now())
             ->latest('verification_id')
             ->first();
 
-        if (! $verification) {
+        if(!$verification){
             return back()->withErrors([
-                'code' => 'Invalid or expired code.',
+                'code'=>'Invalid or expired code.',
             ]);
         }
 
-        User::where('user_id', $userId)->update([
-            'is_verified' => 1,
-            'status' => 'active',
+        User::where('user_id',$userId)->update([
+            'is_verified'=>1,
+            'status'=>'active',
         ]);
 
-        EmailVerification::where('user_id', $userId)->delete();
+        EmailVerification::where('user_id',$userId)->delete();
 
-        session()->forget(['user_id', 'verify_email']);
+        session()->forget([
+            'user_id',
+            'verify_email',
+        ]);
 
-        return redirect()->route('login')->with('verified', 'Your account has been verified. You can now log in.');
+        return redirect()
+            ->route('login')
+            ->with('verified','Your account has been verified. You can now log in.');
     }
 
     public function resendVerificationCode(): RedirectResponse
     {
-        $userId = session('user_id');
+        $userId=session('user_id');
 
-        if (! $userId) {
+        if(!$userId){
             return redirect()->route('register');
         }
 
-        $user = User::where('user_id', $userId)->first();
+        $user=User::where('user_id',$userId)->first();
 
-        if (! $user) {
-            return redirect()->route('register')->withErrors([
-                'email' => 'User not found.',
-            ]);
+        if(!$user){
+            return redirect()
+                ->route('register')
+                ->withErrors([
+                    'email'=>'User not found.',
+                ]);
         }
 
-        $newCode = (string) random_int(100000, 999999);
+        $newCode=(string)random_int(100000,999999);
 
-        try {
+        try{
             EmailVerification::updateOrCreate(
-                ['user_id' => $user->user_id],
+                ['user_id'=>$user->user_id],
                 [
-                    'verification_code' => $newCode,
-                    'expires_at' => now()->addHour(),
-                    'created_at' => now(),
+                    'verification_code'=>$newCode,
+                    'expires_at'=>now()->addHour(),
+                    'created_at'=>now(),
                 ]
             );
 
-            Mail::send('email.verification-code', [
-                'first_name' => $user->first_name,
-                'verification_code' => $newCode,
-            ], function ($message) use ($user) {
-                $message->to($user->email, $user->first_name . ' ' . $user->last_name)
-                    ->subject('SK360 Verification Code');
+            Mail::send('email.verification-code',[
+                'first_name'=>$user->first_name,
+                'verification_code'=>$newCode,
+            ],function($message) use($user){
+                $message->to(
+                    $user->email,
+                    $user->first_name.' '.$user->last_name
+                )->subject('SK360 Verification Code');
             });
 
-            return back()->with('success', 'A new code has been sent to your email.');
+            return back()->with(
+                'success',
+                'A new code has been sent to your email.'
+            );
 
-        } catch (\Exception $e) {
-            \Log::error('Resend verification error: ' . $e->getMessage());
+        }catch(\Exception $e){
+            \Log::error('Resend verification error: '.$e->getMessage());
 
             return back()->withErrors([
-                'email' => 'Failed to send verification email.',
+                'email'=>'Failed to send verification email.',
             ]);
         }
     }
 
     protected function sendEmailPasswordReset(string $email): RedirectResponse
     {
-        $user = User::where('email', $email)->first();
+        $user=User::where('email',$email)->first();
 
-        if (! $user) {
-            return back()->withErrors(['email' => 'No account found with this email.'])->withInput();
+        if(!$user){
+            return back()
+                ->withErrors([
+                    'email'=>'No account found with this email.',
+                ])
+                ->withInput();
         }
 
-        $code = (string) random_int(100000, 999999);
+        $code=(string)random_int(100000,999999);
 
         DB::table('password_reset_tokens')->updateOrInsert(
-            ['email' => $user->email],
+            ['email'=>$user->email],
             [
-                'token' => Hash::make($code),
-                'created_at' => now(),
+                'token'=>Hash::make($code),
+                'created_at'=>now(),
             ]
         );
 
-        Mail::send('email.password-reset', [
-            'first_name' => $user->first_name,
-            'reset_code' => $code,
-        ], function ($message) use ($user) {
-            $message->to($user->email, trim($user->first_name.' '.$user->last_name))
-                ->subject('SK360 Password Reset');
+        Mail::send('email.password-reset',[
+            'first_name'=>$user->first_name,
+            'reset_code'=>$code,
+        ],function($message) use($user){
+            $message->to(
+                $user->email,
+                trim($user->first_name.' '.$user->last_name)
+            )->subject('SK360 Password Reset');
         });
 
         session([
-            'reset_email' => $user->email,
-            'reset_user_id' => $user->user_id,
+            'reset_email'=>$user->email,
+            'reset_user_id'=>$user->user_id,
         ]);
 
         return back()
-            ->with('reset_success', 'Reset code sent. Please check your email.')
-            ->with('reset_method', 'email')
-            ->with('show_email_verify', true)
-            ->with('reset_target', $user->email);
+            ->with('reset_success','Reset code sent. Please check your email.')
+            ->with('reset_method','email')
+            ->with('show_email_verify',true)
+            ->with('reset_target',$user->email);
     }
 
     protected function sendPhonePasswordReset(string $phone): RedirectResponse
     {
-        $user = $this->findUserByPhone($phone);
+        $user=$this->findUserByPhone($phone);
 
-        if (! $user) {
-            return back()->withErrors(['phone' => 'No account found with this phone number.'])->withInput();
+        if(!$user){
+            return back()
+                ->withErrors([
+                    'phone'=>'No account found with this phone number.',
+                ])
+                ->withInput();
         }
 
-        $e164Phone = $this->toE164Phone($phone);
+        $e164Phone=$this->toE164Phone($phone);
 
-        if (! $e164Phone) {
-            return back()->withErrors(['phone' => 'Use a valid Philippine phone number like +639123456789.'])->withInput();
+        if(!$e164Phone){
+            return back()
+                ->withErrors([
+                    'phone'=>'Use a valid Philippine phone number like +639123456789.',
+                ])
+                ->withInput();
         }
 
-        $response = $this->twilioRequest('Verification', [
-            'To' => $e164Phone,
-            'Channel' => 'sms',
+        $response=$this->twilioRequest('Verification',[
+            'To'=>$e164Phone,
+            'Channel'=>'sms',
         ]);
 
-        if (! ($response['ok'] ?? false)) {
-            return back()->withErrors([
-                'phone' => $response['message'] ?? 'Failed to send SMS reset code.',
-            ])->withInput();
+        if(!($response['ok'] ?? false)){
+            return back()
+                ->withErrors([
+                    'phone'=>$response['message'] ?? 'Failed to send SMS reset code.',
+                ])
+                ->withInput();
         }
 
         session([
-            'reset_phone' => $e164Phone,
-            'reset_user_id' => $user->user_id,
+            'reset_phone'=>$e164Phone,
+            'reset_user_id'=>$user->user_id,
         ]);
 
         return back()
-            ->with('reset_success', 'Reset code sent. Please check your phone.')
-            ->with('reset_method', 'phone')
-            ->with('show_phone_verify', true)
-            ->with('reset_target', $e164Phone);
+            ->with('reset_success','Reset code sent. Please check your phone.')
+            ->with('reset_method','phone')
+            ->with('show_phone_verify',true)
+            ->with('reset_target',$e164Phone);
     }
 
-    protected function twilioRequest(string $type, array $payload): array
+    protected function twilioRequest(string $type,array $payload): array
     {
-        $sid = config('services.twilio.sid');
-        $token = config('services.twilio.token');
-        $serviceSid = config('services.twilio.verify_service_sid');
+        $sid=config('services.twilio.sid');
+        $token=config('services.twilio.token');
+        $serviceSid=config('services.twilio.verify_service_sid');
 
-        if (! filled($sid) || ! filled($token) || ! filled($serviceSid)) {
+        if(!filled($sid) || !filled($token) || !filled($serviceSid)){
             return [
-                'ok' => false,
-                'message' => 'Twilio is not configured. Add TWILIO_SID, TWILIO_AUTH_TOKEN, and TWILIO_VERIFY_SERVICE_SID to .env.',
+                'ok'=>false,
+                'message'=>'Twilio is not configured. Add TWILIO_SID, TWILIO_AUTH_TOKEN, and TWILIO_VERIFY_SERVICE_SID to .env.',
             ];
         }
 
-        $endpoint = $type === 'VerificationCheck'
+        $endpoint=$type === 'VerificationCheck'
             ? "https://verify.twilio.com/v2/Services/{$serviceSid}/VerificationCheck"
             : "https://verify.twilio.com/v2/Services/{$serviceSid}/Verifications";
 
-        try {
-            $response = Http::asForm()
-                ->withBasicAuth($sid, $token)
-                ->post($endpoint, $payload);
+        try{
+            $response=Http::asForm()
+                ->withBasicAuth($sid,$token)
+                ->post($endpoint,$payload);
 
             return [
-                'ok' => $response->successful(),
-                'json' => $response->json() ?: [],
-                'message' => $response->json('message') ?: 'Twilio request failed.',
+                'ok'=>$response->successful(),
+                'json'=>$response->json() ?: [],
+                'message'=>$response->json('message') ?: 'Twilio request failed.',
             ];
-        } catch (\Throwable $exception) {
-            \Log::error('Twilio reset error: '.$exception->getMessage());
+
+        }catch(\Throwable $exception){
+            \Log::error(
+                'Twilio reset error: '.$exception->getMessage()
+            );
 
             return [
-                'ok' => false,
-                'message' => 'Failed to connect to Twilio. Please try again.',
+                'ok'=>false,
+                'message'=>'Failed to connect to Twilio. Please try again.',
             ];
         }
     }
 
     protected function findUserByPhone(string $phone): ?User
     {
-        $target = $this->phoneDigits($phone);
+        $target=$this->phoneDigits($phone);
 
-        return User::whereNotNull('phone_number')->get()
-            ->first(fn (User $user) => $this->phoneNumbersMatch($target, $this->phoneDigits((string) $user->phone_number)));
+        return User::whereNotNull('phone_number')
+            ->get()
+            ->first(
+                fn(User $user)=>
+                    $this->phoneNumbersMatch(
+                        $target,
+                        $this->phoneDigits(
+                            (string)$user->phone_number
+                        )
+                    )
+            );
     }
 
-    protected function phoneNumbersMatch(string $target, string $stored): bool
+    protected function phoneNumbersMatch(string $target,string $stored): bool
     {
-        if ($target === '' || $stored === '') {
+        if($target === '' || $stored === ''){
             return false;
         }
 
-        return $target === $stored || substr($target, -10) === substr($stored, -10);
+        return $target === $stored ||
+            substr($target,-10) === substr($stored,-10);
     }
 
     protected function phoneDigits(string $phone): string
     {
-        return preg_replace('/\D+/', '', $phone) ?: '';
+        return preg_replace('/\D+/','',$phone) ?: '';
     }
 
     protected function toE164Phone(string $phone): ?string
     {
-        $digits = $this->phoneDigits($phone);
+        $digits=$this->phoneDigits($phone);
 
-        if (str_starts_with($digits, '63') && strlen($digits) === 12) {
+        if(str_starts_with($digits,'63') && strlen($digits) === 12){
             return '+'.$digits;
         }
 
-        if (str_starts_with($digits, '09') && strlen($digits) === 11) {
-            return '+63'.substr($digits, 1);
+        if(str_starts_with($digits,'09') && strlen($digits) === 11){
+            return '+63'.substr($digits,1);
         }
 
-        if (str_starts_with($digits, '9') && strlen($digits) === 10) {
+        if(str_starts_with($digits,'9') && strlen($digits) === 10){
             return '+63'.$digits;
         }
 
         return null;
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | INVALIDATE OUTGOING PRESIDENT DATABASE SESSIONS
+    |--------------------------------------------------------------------------
+    */
+    protected function invalidateDatabaseSessions(array $userIds): void
+    {
+        if(empty($userIds) || config('session.driver') !== 'database'){
+            return;
+        }
+
+        try{
+            DB::table(config('session.table','sessions'))
+                ->whereIn('user_id',$userIds)
+                ->delete();
+
+        }catch(\Throwable $e){
+            \Log::warning(
+                'Unable to remove outgoing President database sessions: '.
+                $e->getMessage()
+            );
+        }
+    }
+
     public function login(Request $request): RedirectResponse
     {
-        $credentials = $request->validate([
-            'email' => ['required', 'email'],
-            'password' => ['required'],
+        $credentials=$request->validate([
+            'email'=>['required','email'],
+            'password'=>['required'],
         ]);
 
-        $user = User::where('email', $credentials['email'])->first();
+        $user=User::where('email',$credentials['email'])->first();
 
-        if (! $user) {
+        if(!$user){
             return back()
                 ->withErrors([
-                    'email' => 'No account found with this email.',
+                    'email'=>'No account found with this email.',
                 ])
                 ->onlyInput('email');
         }
 
-        if ($user->status !== 'active') {
+        if($user->status !== 'active'){
             return back()
                 ->withErrors([
-                    'email' => 'Your account is inactive. Contact admin.',
+                    'email'=>'Your account is inactive. Contact admin.',
                 ])
                 ->onlyInput('email');
         }
 
-        if (! $user->is_verified) {
+        if(!$user->is_verified){
             return back()
                 ->withErrors([
-                    'email' => 'Email not verified. Please check your inbox.',
+                    'email'=>'Email not verified. Please check your inbox.',
                 ])
                 ->onlyInput('email');
         }
 
-        if (! Hash::check($credentials['password'], $user->password)) {
+        if(!Hash::check($credentials['password'],$user->password)){
             return back()
                 ->withErrors([
-                    'email' => 'Incorrect password.',
+                    'email'=>'Incorrect password.',
                 ])
                 ->onlyInput('email');
         }
 
-        Auth::login($user, false);
+        Auth::login($user,false);
         $request->session()->regenerate();
 
-        return redirect()->intended($this->redirectPathForRole($user->role));
+        return redirect()
+            ->intended(
+                $this->redirectPathForRole($user->role)
+            );
     }
 
     public function logout(Request $request): RedirectResponse
@@ -664,12 +906,12 @@ class AuthController extends Controller
 
     protected function redirectPathForRole(?string $role): string
     {
-        return match ($role) {
-            'youth' => route('youth.home'),
-            'sk_president' => route('sk_pres.home'),
-            'sk_chairman' => route('sk_chairman.home'),
-            'sk_secretary' => route('sk_secretary.home'),
-            default => '/',
+        return match($role){
+            'youth'=>route('youth.home'),
+            'sk_president'=>route('sk_pres.home'),
+            'sk_chairman'=>route('sk_chairman.home'),
+            'sk_secretary'=>route('sk_secretary.home'),
+            default=>'/',
         };
     }
 }

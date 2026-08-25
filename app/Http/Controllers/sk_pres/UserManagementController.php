@@ -23,6 +23,8 @@ class UserManagementController extends Controller
         $fullName=trim(($user->first_name ?? '').' '.($user->last_name ?? '')) ?: 'User';
         $status=trim((string)request('status',''));
         $activeTab=request('tab') === 'history' ? 'history' : 'current';
+        $currentAdministration=$this->currentAdministrationTerm();
+        $pendingPresident=$this->pendingPresidentForTerm($currentAdministration?->term_id);
 
         $historyTerms=$this->historyTerms();
         $selectedHistoryTerm=trim((string)request('history_term',''));
@@ -47,6 +49,8 @@ class UserManagementController extends Controller
             'stats'=>$this->stats(),
             'userGroups'=>$this->userGroups($status),
             'barangays'=>Barangay::query()->orderBy('barangay_name')->get(['barangay_id','barangay_name']),
+            'currentAdministration'=>$currentAdministration,
+            'pendingPresident'=>$pendingPresident,
             'activeTab'=>$activeTab,
             'historyTerms'=>$historyTerms,
             'selectedHistoryTerm'=>$selectedHistoryTerm,
@@ -66,14 +70,18 @@ class UserManagementController extends Controller
     {
         abort_unless(auth()->check() && auth()->user()->role === 'sk_president',403);
 
+        $currentTerm=$this->currentAdministrationTerm();
+
+        if(!$currentTerm){
+            return back()->withInput()->with('warning','There is no active administration term. Start a new administration term first.');
+        }
+
         $validated=$request->validateWithBag('singleAdd',[
             'first_name'=>['required','string','max:100'],
             'last_name'=>['required','string','max:100'],
             'email'=>['required','email','max:100','unique:users,email'],
             'phone_number'=>['nullable','string','max:20','unique:users,phone_number'],
             'barangay_id'=>['required','integer','exists:barangays,barangay_id'],
-            'term_start'=>['required','date'],
-            'term_end'=>['required','date','after:term_start'],
         ]);
 
         $existingChairman=User::query()
@@ -88,27 +96,40 @@ class UserManagementController extends Controller
             ],'singleAdd');
         }
 
-        $user=User::create([
-            'first_name'=>$validated['first_name'],
-            'last_name'=>$validated['last_name'],
-            'email'=>$validated['email'],
-            'phone_number'=>$validated['phone_number'] ?: null,
-            'barangay_id'=>$validated['barangay_id'],
-            'role'=>'sk_chairman',
-            'password'=>Hash::make(Str::random(64)),
-            'is_verified'=>0,
-            'status'=>'inactive',
-            'term_start'=>$validated['term_start'],
-            'term_end'=>$validated['term_end'],
-            'archived_at'=>null,
-        ]);
-
         $token=Str::random(64);
+        $user=null;
 
-        DB::table('password_reset_tokens')->updateOrInsert(
-            ['email'=>$user->email],
-            ['token'=>Hash::make($token),'created_at'=>now()]
-        );
+        DB::transaction(function() use($validated,$currentTerm,$token,&$user){
+            $user=User::create([
+                'first_name'=>$validated['first_name'],
+                'last_name'=>$validated['last_name'],
+                'email'=>$validated['email'],
+                'phone_number'=>$validated['phone_number'] ?: null,
+                'barangay_id'=>$validated['barangay_id'],
+                'role'=>'sk_chairman',
+                'password'=>Hash::make(Str::random(64)),
+                'is_verified'=>0,
+                'status'=>'inactive',
+                'term_start'=>null,
+                'term_end'=>null,
+                'archived_at'=>null,
+            ]);
+
+            DB::table('official_terms')->insert([
+                'user_id'=>$user->user_id,
+                'term_id'=>$currentTerm->term_id,
+                'barangay_id'=>$user->barangay_id,
+                'role'=>'sk_chairman',
+                'status'=>'pending',
+                'started_at'=>null,
+                'completed_at'=>null,
+            ]);
+
+            DB::table('password_reset_tokens')->updateOrInsert(
+                ['email'=>$user->email],
+                ['token'=>Hash::make($token),'created_at'=>now()]
+            );
+        });
 
         $setupLink=route('password.setup',[
             'token'=>$token,
@@ -133,7 +154,7 @@ class UserManagementController extends Controller
 
         return redirect()
             ->route('sk_pres.user-management')
-            ->with('success','SK Chairman account created. A password setup link was sent to '.$user->email.'.');
+            ->with('success','SK Chairman account created for the '.$currentTerm->start_year.' - '.$currentTerm->end_year.' administration. A password setup link was sent to '.$user->email.'.');
     }
 
     /*
@@ -145,14 +166,18 @@ class UserManagementController extends Controller
     {
         abort_unless(auth()->check() && auth()->user()->role === 'sk_president',403);
 
+        $currentTerm=$this->currentAdministrationTerm();
+
+        if(!$currentTerm){
+            return back()->withInput()->with('warning','There is no active administration term. Start a new administration term first.');
+        }
+
         $validated=$request->validateWithBag('bulkAdd',[
             'officials'=>['required','array','min:1'],
             'officials.*.full_name'=>['required','string','max:120'],
             'officials.*.email'=>['required','email','max:100','distinct'],
             'officials.*.phone_number'=>['nullable','string','max:20'],
             'officials.*.barangay_id'=>['required','integer','exists:barangays,barangay_id','distinct'],
-            'officials.*.term_start'=>['required','date'],
-            'officials.*.term_end'=>['required','date'],
         ]);
 
         $phones=collect($validated['officials'])->pluck('phone_number')->filter()->values();
@@ -178,12 +203,6 @@ class UserManagementController extends Controller
                 ],'bulkAdd');
             }
 
-            if(strtotime($official['term_end']) <= strtotime($official['term_start'])){
-                return back()->withInput()->withErrors([
-                    'officials'=>'Term end must be after term start for '.$official['full_name'].'.',
-                ],'bulkAdd');
-            }
-
             $existingChairman=User::query()
                 ->where('barangay_id',$official['barangay_id'])
                 ->where('role','sk_chairman')
@@ -206,14 +225,12 @@ class UserManagementController extends Controller
                 'email'=>$official['email'],
                 'phone_number'=>$official['phone_number'] ?: null,
                 'barangay_id'=>$official['barangay_id'],
-                'term_start'=>$official['term_start'],
-                'term_end'=>$official['term_end'],
             ];
         }
 
         $createdUsers=[];
 
-        DB::transaction(function() use($prepared,&$createdUsers){
+        DB::transaction(function() use($prepared,$currentTerm,&$createdUsers){
             foreach($prepared as $official){
                 $user=User::create([
                     'first_name'=>$official['first_name'],
@@ -225,9 +242,19 @@ class UserManagementController extends Controller
                     'password'=>Hash::make(Str::random(64)),
                     'is_verified'=>0,
                     'status'=>'inactive',
-                    'term_start'=>$official['term_start'],
-                    'term_end'=>$official['term_end'],
+                    'term_start'=>null,
+                    'term_end'=>null,
                     'archived_at'=>null,
+                ]);
+
+                DB::table('official_terms')->insert([
+                    'user_id'=>$user->user_id,
+                    'term_id'=>$currentTerm->term_id,
+                    'barangay_id'=>$user->barangay_id,
+                    'role'=>'sk_chairman',
+                    'status'=>'pending',
+                    'started_at'=>null,
+                    'completed_at'=>null,
                 ]);
 
                 $token=Str::random(64);
@@ -271,12 +298,12 @@ class UserManagementController extends Controller
         if($mailFailed > 0){
             return redirect()
                 ->route('sk_pres.user-management')
-                ->with('warning',count($createdUsers).' account(s) were created, but '.$mailFailed.' setup email(s) failed to send.');
+                ->with('warning',count($createdUsers).' account(s) were created for the '.$currentTerm->start_year.' - '.$currentTerm->end_year.' administration, but '.$mailFailed.' setup email(s) failed to send.');
         }
 
         return redirect()
             ->route('sk_pres.user-management')
-            ->with('success',count($createdUsers).' SK Chairman account(s) created. Password setup links were sent successfully.');
+            ->with('success',count($createdUsers).' SK Chairman account(s) created for the '.$currentTerm->start_year.' - '.$currentTerm->end_year.' administration. Password setup links were sent successfully.');
     }
 
     /*
@@ -299,8 +326,6 @@ class UserManagementController extends Controller
                 'email',
                 'phone_number',
                 'barangay',
-                'term_start',
-                'term_end',
             ]);
 
             fputcsv($file,[
@@ -309,8 +334,6 @@ class UserManagementController extends Controller
                 'juan@example.com',
                 '09123456789',
                 'Adya',
-                '2025-06-30',
-                '2028-06-30',
             ]);
 
             fclose($file);
@@ -327,6 +350,12 @@ class UserManagementController extends Controller
     public function import(Request $request): RedirectResponse
     {
         abort_unless(auth()->check() && auth()->user()->role === 'sk_president',403);
+
+        $currentTerm=$this->currentAdministrationTerm();
+
+        if(!$currentTerm){
+            return back()->with('warning','There is no active administration term. Start a new administration term first.');
+        }
 
         $validated=$request->validateWithBag('csvImport',[
             'csv_file'=>['required','file','mimes:csv,txt','max:5120'],
@@ -362,8 +391,6 @@ class UserManagementController extends Controller
             'email',
             'phone_number',
             'barangay',
-            'term_start',
-            'term_end',
         ];
 
         $missingHeaders=array_diff($requiredHeaders,$headers);
@@ -492,24 +519,6 @@ class UserManagementController extends Controller
                 }
             }
 
-            $termStart=$this->parseCsvDate($row['term_start']);
-            $termEnd=$this->parseCsvDate($row['term_end']);
-
-            if(!$termStart){
-                $errors[]="Row {$line}: Term start '{$row['term_start']}' is invalid.";
-                $rowHasError=true;
-            }
-
-            if(!$termEnd){
-                $errors[]="Row {$line}: Term end '{$row['term_end']}' is invalid.";
-                $rowHasError=true;
-            }
-
-            if($termStart && $termEnd && $termEnd <= $termStart){
-                $errors[]="Row {$line}: Term end must be after term start.";
-                $rowHasError=true;
-            }
-
             if(!$rowHasError && $barangay){
                 $prepared[]=[
                     'first_name'=>$row['first_name'],
@@ -517,8 +526,6 @@ class UserManagementController extends Controller
                     'email'=>$row['email'],
                     'phone_number'=>$row['phone_number'] ?: null,
                     'barangay_id'=>$barangay->barangay_id,
-                    'term_start'=>$termStart,
-                    'term_end'=>$termEnd,
                 ];
             }
         }
@@ -535,7 +542,7 @@ class UserManagementController extends Controller
 
         $createdUsers=[];
 
-        DB::transaction(function() use($prepared,&$createdUsers){
+        DB::transaction(function() use($prepared,$currentTerm,&$createdUsers){
             foreach($prepared as $official){
                 $user=User::create([
                     'first_name'=>$official['first_name'],
@@ -547,9 +554,19 @@ class UserManagementController extends Controller
                     'password'=>Hash::make(Str::random(64)),
                     'is_verified'=>0,
                     'status'=>'inactive',
-                    'term_start'=>$official['term_start'],
-                    'term_end'=>$official['term_end'],
+                    'term_start'=>null,
+                    'term_end'=>null,
                     'archived_at'=>null,
+                ]);
+
+                DB::table('official_terms')->insert([
+                    'user_id'=>$user->user_id,
+                    'term_id'=>$currentTerm->term_id,
+                    'barangay_id'=>$user->barangay_id,
+                    'role'=>'sk_chairman',
+                    'status'=>'pending',
+                    'started_at'=>null,
+                    'completed_at'=>null,
                 ]);
 
                 $token=Str::random(64);
@@ -593,12 +610,12 @@ class UserManagementController extends Controller
         if($mailFailed > 0){
             return redirect()
                 ->route('sk_pres.user-management')
-                ->with('warning',count($createdUsers).' account(s) were imported, but '.$mailFailed.' setup email(s) failed to send.');
+                ->with('warning',count($createdUsers).' account(s) were imported for the '.$currentTerm->start_year.' - '.$currentTerm->end_year.' administration, but '.$mailFailed.' setup email(s) failed to send.');
         }
 
         return redirect()
             ->route('sk_pres.user-management')
-            ->with('success',count($createdUsers).' SK Chairman account(s) imported. Password setup links were sent successfully.');
+            ->with('success',count($createdUsers).' SK Chairman account(s) imported for the '.$currentTerm->start_year.' - '.$currentTerm->end_year.' administration. Password setup links were sent successfully.');
     }
 
     /*
@@ -616,12 +633,23 @@ class UserManagementController extends Controller
             return back()->with('warning','Archived accounts cannot receive password setup links.');
         }
 
-        if($user->role !== 'sk_chairman'){
-            return back()->with('warning','Setup links can only be sent to SK Chairman accounts.');
+        if(!in_array($user->role,['sk_chairman','sk_president'],true)){
+            return back()->with('warning','Setup links can only be sent to pending SK Chairman or SK President accounts from this screen.');
         }
 
         if((int)$user->is_verified === 1){
-            return back()->with('warning','This SK Chairman has already activated their account.');
+            return back()->with('warning','This account has already been activated.');
+        }
+
+        $pendingTerm=DB::table('official_terms')
+            ->where('user_id',$user->user_id)
+            ->where('role',$user->role)
+            ->where('status','pending')
+            ->orderByDesc('official_term_id')
+            ->first();
+
+        if(!$pendingTerm){
+            return back()->with('warning','This account is not connected to a pending administration assignment.');
         }
 
         $token=Str::random(64);
@@ -645,8 +673,7 @@ class UserManagementController extends Controller
                     ->subject('New SK360 Password Setup Link');
             });
         }catch(\Throwable $e){
-            \Log::error('Chairman setup link resend failed for '.$user->email.': '.$e->getMessage());
-
+            \Log::error('Setup link resend failed for '.$user->email.': '.$e->getMessage());
             return back()->with('warning','The new setup link could not be sent. Please try again.');
         }
 
@@ -668,6 +695,8 @@ class UserManagementController extends Controller
             return back()->with('warning','Official History records are read-only.');
         }
 
+        $oldEmail=$user->email;
+
         $validated=$request->validateWithBag('editUser',[
             'edit_user_id'=>['nullable','integer'],
             'first_name'=>['required','string','max:100'],
@@ -675,19 +704,29 @@ class UserManagementController extends Controller
             'email'=>['required','email','max:100','unique:users,email,'.$userId.',user_id'],
             'phone_number'=>['nullable','string','max:20','unique:users,phone_number,'.$userId.',user_id'],
             'barangay_id'=>['nullable','integer','exists:barangays,barangay_id'],
-            'role'=>['required','in:sk_president,sk_chairman,sk_secretary'],
+            'role'=>['required','string'],
             'status'=>['required','in:active,inactive'],
-            'term_start'=>['nullable','date'],
-            'term_end'=>['nullable','date','after:term_start'],
         ]);
 
         unset($validated['edit_user_id']);
 
         if($user->role === 'sk_president'){
+            if($validated['role'] !== 'sk_president'){
+                return back()->withInput()->withErrors([
+                    'role'=>'The SK President role can only be changed through the President succession process.',
+                ],'editUser');
+            }
+
             $validated['role']='sk_president';
-            $validated['status']='active';
             $validated['barangay_id']=null;
+            $validated['status']=(int)$user->is_verified === 0 ? 'inactive' : 'active';
         }else{
+            if(!in_array($validated['role'],['sk_chairman','sk_secretary'],true)){
+                return back()->withInput()->withErrors([
+                    'role'=>'SK President can only be assigned through the President succession process.',
+                ],'editUser');
+            }
+
             if(empty($validated['barangay_id'])){
                 return back()->withInput()->withErrors([
                     'barangay_id'=>'Barangay is required for Chairman and Secretary accounts.',
@@ -706,13 +745,55 @@ class UserManagementController extends Controller
                     'barangay_id'=>'This barangay already has a current '.$this->roleName($validated['role']).'.',
                 ],'editUser');
             }
+
+            if((int)$user->is_verified === 0){
+                $validated['status']='inactive';
+            }
         }
 
-        if($user->role !== 'sk_president' && (int)$user->is_verified === 0){
-            $validated['status']='inactive';
-        }
+        $emailChanged=strtolower($oldEmail) !== strtolower($validated['email']);
+        $newToken=null;
 
-        $user->update($validated);
+        DB::transaction(function() use($user,$validated,$oldEmail,$emailChanged,&$newToken){
+            $user->update($validated);
+
+            DB::table('official_terms')
+                ->where('user_id',$user->user_id)
+                ->whereIn('status',['pending','current'])
+                ->update([
+                    'role'=>$user->role,
+                    'barangay_id'=>$user->barangay_id,
+                ]);
+
+            if((int)$user->is_verified === 0 && $emailChanged){
+                DB::table('password_reset_tokens')->where('email',$oldEmail)->delete();
+                $newToken=Str::random(64);
+
+                DB::table('password_reset_tokens')->updateOrInsert(
+                    ['email'=>$user->email],
+                    ['token'=>Hash::make($newToken),'created_at'=>now()]
+                );
+            }
+        });
+
+        if($newToken){
+            $setupLink=route('password.setup',['token'=>$newToken,'email'=>$user->email]);
+
+            try{
+                Mail::send('email.account-setup',[
+                    'user'=>$user,
+                    'setupLink'=>$setupLink,
+                ],function($message) use($user){
+                    $message->to($user->email,trim($user->first_name.' '.$user->last_name))
+                        ->subject('New SK360 Password Setup Link');
+                });
+            }catch(\Throwable $e){
+                \Log::error('Updated setup email failed for '.$user->email.': '.$e->getMessage());
+                return back()->with('warning','User details were updated, but the new setup email could not be sent. Use Resend Setup Link.');
+            }
+
+            return back()->with('success','User details updated. A new setup link was sent to the new email address.');
+        }
 
         return back()->with('success','User details updated successfully.');
     }
@@ -766,6 +847,357 @@ class UserManagementController extends Controller
 
     /*
     |--------------------------------------------------------------------------
+    | START NEW ADMINISTRATION TERM
+    |--------------------------------------------------------------------------
+    */
+    public function startNewTerm(Request $request): RedirectResponse
+    {
+        abort_unless(auth()->check() && auth()->user()->role === 'sk_president',403);
+
+        $validated=$request->validateWithBag('newTerm',[
+            'start_year'=>['required','integer','digits:4','min:2000','max:2100'],
+            'end_year'=>['required','integer','digits:4','min:2000','max:2100'],
+            'president_mode'=>['required','in:continue,assign_new'],
+            'new_president_first_name'=>['nullable','required_if:president_mode,assign_new','string','max:100'],
+            'new_president_last_name'=>['nullable','required_if:president_mode,assign_new','string','max:100'],
+            'new_president_email'=>['nullable','required_if:president_mode,assign_new','email','max:100','unique:users,email'],
+            'new_president_phone'=>['nullable','string','max:20','unique:users,phone_number'],
+        ]);
+
+        if((int)$validated['end_year'] <= (int)$validated['start_year']){
+            return back()->withInput()->withErrors([
+                'end_year'=>'End year must be after the start year.',
+            ],'newTerm');
+        }
+
+        $existingTerm=DB::table('administration_terms')
+            ->where('start_year',$validated['start_year'])
+            ->where('end_year',$validated['end_year'])
+            ->exists();
+
+        if($existingTerm){
+            return back()->withInput()->withErrors([
+                'start_year'=>'This administration term already exists.',
+            ],'newTerm');
+        }
+
+        $currentTerm=$this->currentAdministrationTerm();
+        $president=auth()->user();
+
+        if($currentTerm){
+            $pendingCount=DB::table('official_terms')
+                ->where('term_id',$currentTerm->term_id)
+                ->where('status','pending')
+                ->count();
+
+            if($pendingCount > 0){
+                return back()->withInput()->withErrors([
+                    'start_year'=>'Resolve or delete all pending official accounts before starting a new administration term.',
+                ],'newTerm');
+            }
+
+            $unlinkedOfficials=DB::table('users as u')
+                ->whereIn('u.role',['sk_chairman','sk_secretary'])
+                ->whereNull('u.archived_at')
+                ->whereNotExists(function($query) use($currentTerm){
+                    $query->select(DB::raw(1))
+                        ->from('official_terms as ot')
+                        ->whereColumn('ot.user_id','u.user_id')
+                        ->where('ot.term_id',$currentTerm->term_id)
+                        ->whereIn('ot.status',['pending','current']);
+                })
+                ->count();
+
+            if($unlinkedOfficials > 0){
+                return back()->withInput()->withErrors([
+                    'start_year'=>$unlinkedOfficials.' current official account(s) are not connected to the current administration term yet.',
+                ],'newTerm');
+            }
+
+            $unlinkedCouncil=DB::table('sk_council')
+                ->where('status','current')
+                ->where(function($query) use($currentTerm){
+                    $query->whereNull('term_id')
+                        ->orWhere('term_id','!=',$currentTerm->term_id);
+                })
+                ->count();
+
+            if($unlinkedCouncil > 0){
+                return back()->withInput()->withErrors([
+                    'start_year'=>$unlinkedCouncil.' current Treasurer/Councilor record(s) are not connected to the current administration term yet.',
+                ],'newTerm');
+            }
+        }
+
+        $existingPendingPresident=DB::table('official_terms')
+            ->where('role','sk_president')
+            ->where('status','pending')
+            ->exists();
+
+        if($existingPendingPresident){
+            return back()->withInput()->withErrors([
+                'president_mode'=>'Resolve the existing pending President succession before starting another administration.',
+            ],'newTerm');
+        }
+
+        $successor=null;
+        $successorToken=null;
+        $newTermId=null;
+
+        DB::transaction(function() use($validated,$currentTerm,$president,&$successor,&$successorToken,&$newTermId){
+            if($currentTerm){
+                $endingOfficials=DB::table('official_terms')
+                    ->where('term_id',$currentTerm->term_id)
+                    ->where('status','current')
+                    ->whereIn('role',['sk_chairman','sk_secretary'])
+                    ->get(['official_term_id','user_id']);
+
+                $officialTermIds=$endingOfficials->pluck('official_term_id')->all();
+                $userIds=$endingOfficials->pluck('user_id')->unique()->all();
+
+                if(!empty($officialTermIds)){
+                    DB::table('official_terms')
+                        ->whereIn('official_term_id',$officialTermIds)
+                        ->update([
+                            'status'=>'completed',
+                            'completed_at'=>now(),
+                        ]);
+                }
+
+                if(!empty($userIds)){
+                    DB::table('users')
+                        ->whereIn('user_id',$userIds)
+                        ->whereIn('role',['sk_chairman','sk_secretary'])
+                        ->update([
+                            'status'=>'inactive',
+                            'archived_at'=>now(),
+                        ]);
+                }
+
+                DB::table('sk_council')
+                    ->where('term_id',$currentTerm->term_id)
+                    ->where('status','current')
+                    ->update([
+                        'status'=>'completed',
+                        'completed_at'=>now(),
+                    ]);
+
+                DB::table('official_terms')
+                    ->where('user_id',$president->user_id)
+                    ->where('term_id',$currentTerm->term_id)
+                    ->where('role','sk_president')
+                    ->where('status','current')
+                    ->update([
+                        'status'=>'completed',
+                        'completed_at'=>now(),
+                    ]);
+
+                DB::table('administration_terms')
+                    ->where('term_id',$currentTerm->term_id)
+                    ->update([
+                        'status'=>'completed',
+                        'completed_at'=>now(),
+                    ]);
+            }
+
+            $newTermId=DB::table('administration_terms')->insertGetId([
+                'start_year'=>$validated['start_year'],
+                'end_year'=>$validated['end_year'],
+                'status'=>'current',
+                'created_at'=>now(),
+                'completed_at'=>null,
+            ]);
+
+            if($validated['president_mode'] === 'continue'){
+                $president->status='active';
+                $president->archived_at=null;
+                $president->save();
+
+                DB::table('official_terms')->insert([
+                    'user_id'=>$president->user_id,
+                    'term_id'=>$newTermId,
+                    'barangay_id'=>null,
+                    'role'=>'sk_president',
+                    'status'=>'current',
+                    'started_at'=>now(),
+                    'completed_at'=>null,
+                ]);
+            }else{
+                $successor=User::create([
+                    'first_name'=>$validated['new_president_first_name'],
+                    'last_name'=>$validated['new_president_last_name'],
+                    'email'=>$validated['new_president_email'],
+                    'phone_number'=>$validated['new_president_phone'] ?: null,
+                    'barangay_id'=>null,
+                    'role'=>'sk_president',
+                    'password'=>Hash::make(Str::random(64)),
+                    'is_verified'=>0,
+                    'status'=>'inactive',
+                    'term_start'=>null,
+                    'term_end'=>null,
+                    'archived_at'=>null,
+                ]);
+
+                DB::table('official_terms')->insert([
+                    'user_id'=>$successor->user_id,
+                    'term_id'=>$newTermId,
+                    'barangay_id'=>null,
+                    'role'=>'sk_president',
+                    'status'=>'pending',
+                    'started_at'=>null,
+                    'completed_at'=>null,
+                ]);
+
+                $successorToken=Str::random(64);
+
+                DB::table('password_reset_tokens')->updateOrInsert(
+                    ['email'=>$successor->email],
+                    ['token'=>Hash::make($successorToken),'created_at'=>now()]
+                );
+
+                DB::table('official_terms')->insert([
+                    'user_id'=>$president->user_id,
+                    'term_id'=>$newTermId,
+                    'barangay_id'=>null,
+                    'role'=>'sk_president',
+                    'status'=>'current',
+                    'started_at'=>now(),
+                    'completed_at'=>null,
+                ]);
+
+                $president->status='active';
+                $president->archived_at=null;
+                $president->save();
+            }
+        });
+
+        if($validated['president_mode'] === 'assign_new' && $successor && $successorToken){
+            $setupLink=route('password.setup',[
+                'token'=>$successorToken,
+                'email'=>$successor->email,
+            ]);
+
+            try{
+                Mail::send('email.account-setup',[
+                    'user'=>$successor,
+                    'setupLink'=>$setupLink,
+                ],function($message) use($successor){
+                    $message->to($successor->email,trim($successor->first_name.' '.$successor->last_name))
+                        ->subject('Set Up Your SK360 President Account');
+                });
+            }catch(\Throwable $e){
+                \Log::error('President succession setup email failed: '.$e->getMessage());
+
+                return redirect()
+                    ->route('sk_pres.user-management',['tab'=>'current'])
+                    ->with('warning','The '.$validated['start_year'].' - '.$validated['end_year'].' administration is active and the new President account was created, but the setup email failed. Your current President account remains active. Use Resend Setup Link.');
+            }
+
+            return redirect()
+                ->route('sk_pres.user-management',['tab'=>'current'])
+                ->with('success','The '.$validated['start_year'].' - '.$validated['end_year'].' administration is active. The new President is pending account setup, and your current President account will remain active until the handover is completed.');
+        }
+
+        return redirect()
+            ->route('sk_pres.user-management',['tab'=>'current'])
+            ->with('success','The '.$validated['start_year'].' - '.$validated['end_year'].' administration is now active and the current SK President will continue for the new term.');
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | REAPPOINT SK CHAIRMAN
+    |--------------------------------------------------------------------------
+    */
+    public function reappoint(int $officialTermId): RedirectResponse
+    {
+        abort_unless(auth()->check() && auth()->user()->role === 'sk_president',403);
+
+        $previousTerm=DB::table('official_terms')
+            ->where('official_term_id',$officialTermId)
+            ->where('status','completed')
+            ->first();
+
+        if(!$previousTerm){
+            return back()->with('warning','The selected historical official record was not found.');
+        }
+
+        if($previousTerm->role !== 'sk_chairman'){
+            return back()->with('warning','Only SK Chairmen can be reappointed from this screen.');
+        }
+
+        $currentTerm=$this->currentAdministrationTerm();
+
+        if(!$currentTerm){
+            return back()->with('warning','There is no active administration term.');
+        }
+
+        if((int)$previousTerm->term_id === (int)$currentTerm->term_id){
+            return back()->with('warning','This record already belongs to the current administration.');
+        }
+
+        $user=User::where('user_id',$previousTerm->user_id)->firstOrFail();
+
+        if((int)$user->is_verified !== 1){
+            return back()->with('warning','This account must be verified before it can be reappointed.');
+        }
+
+        $existingChairmanRecord=DB::table('official_terms')
+            ->where('user_id',$user->user_id)
+            ->where('term_id',$currentTerm->term_id)
+            ->where('role','sk_chairman')
+            ->exists();
+
+        if($existingChairmanRecord){
+            return back()->with('warning','This official already has an SK Chairman record in the current administration.');
+        }
+
+        $existingAssignment=DB::table('official_terms')
+            ->where('user_id',$user->user_id)
+            ->where('term_id',$currentTerm->term_id)
+            ->whereIn('status',['pending','current'])
+            ->exists();
+
+        if($existingAssignment){
+            return back()->with('warning','This official already has another active assignment in the current administration.');
+        }
+
+        $barangayOccupied=DB::table('official_terms')
+            ->where('term_id',$currentTerm->term_id)
+            ->where('barangay_id',$previousTerm->barangay_id)
+            ->where('role','sk_chairman')
+            ->whereIn('status',['pending','current'])
+            ->exists();
+
+        if($barangayOccupied){
+            return back()->with('warning','This barangay already has a current or pending SK Chairman.');
+        }
+
+        DB::transaction(function() use($user,$previousTerm,$currentTerm){
+            $user->update([
+                'role'=>'sk_chairman',
+                'barangay_id'=>$previousTerm->barangay_id,
+                'status'=>'active',
+                'archived_at'=>null,
+            ]);
+
+            DB::table('official_terms')->insert([
+                'user_id'=>$user->user_id,
+                'term_id'=>$currentTerm->term_id,
+                'barangay_id'=>$previousTerm->barangay_id,
+                'role'=>'sk_chairman',
+                'status'=>'current',
+                'started_at'=>now(),
+                'completed_at'=>null,
+            ]);
+        });
+
+        return redirect()
+            ->route('sk_pres.user-management',['tab'=>'current'])
+            ->with('success',trim($user->first_name.' '.$user->last_name).' was reappointed as SK Chairman for the '.$currentTerm->start_year.' - '.$currentTerm->end_year.' administration.');
+    }
+
+    /*
+    |--------------------------------------------------------------------------
     | END TERM / ARCHIVE
     |--------------------------------------------------------------------------
     */
@@ -787,11 +1219,29 @@ class UserManagementController extends Controller
             return back()->with('warning','Pending accounts should be deleted instead of archived.');
         }
 
-        if(!$user->term_start || !$user->term_end){
-            return back()->with('warning','Set the official term start and term end before archiving this account.');
+        $officialTerm=DB::table('official_terms')
+            ->where('user_id',$user->user_id)
+            ->where('role',$user->role)
+            ->where('status','current')
+            ->orderByDesc('official_term_id')
+            ->first();
+
+        if(!$officialTerm){
+            return back()->with('warning','This official is not connected to a current administration term yet.');
         }
 
-        DB::transaction(function() use($user){
+        $administration=DB::table('administration_terms')
+            ->where('term_id',$officialTerm->term_id)
+            ->first();
+
+        DB::transaction(function() use($user,$officialTerm){
+            DB::table('official_terms')
+                ->where('official_term_id',$officialTerm->official_term_id)
+                ->update([
+                    'status'=>'completed',
+                    'completed_at'=>now(),
+                ]);
+
             $user->status='inactive';
             $user->archived_at=now();
             $user->save();
@@ -801,7 +1251,9 @@ class UserManagementController extends Controller
                 ->delete();
         });
 
-        $historyTerm=date('Y',strtotime($user->term_start)).'-'.date('Y',strtotime($user->term_end));
+        $historyTerm=$administration
+            ? $administration->start_year.'-'.$administration->end_year
+            : '';
 
         return redirect()
             ->route('sk_pres.user-management',[
@@ -822,12 +1274,6 @@ class UserManagementController extends Controller
 
         $user=User::where('user_id',$userId)->firstOrFail();
 
-        if($user->role === 'sk_president'){
-            return back()->withErrors([
-                'user'=>'The SK President account cannot be deleted.',
-            ]);
-        }
-
         if($user->archived_at){
             return back()->with('warning','Archived officials cannot be permanently deleted from User Management.');
         }
@@ -836,15 +1282,58 @@ class UserManagementController extends Controller
             return back()->with('warning','Activated officials must use End Term / Archive instead of Delete.');
         }
 
+        if($user->role === 'sk_president'){
+            $pendingTerm=DB::table('official_terms')
+                ->where('user_id',$user->user_id)
+                ->where('role','sk_president')
+                ->where('status','pending')
+                ->orderByDesc('official_term_id')
+                ->first();
+
+            if(!$pendingTerm){
+                return back()->with('warning','The active SK President account cannot be deleted.');
+            }
+
+            $outgoingPresident=auth()->user();
+
+            DB::transaction(function() use($user,$pendingTerm,$outgoingPresident){
+                DB::table('password_reset_tokens')->where('email',$user->email)->delete();
+                DB::table('official_terms')->where('official_term_id',$pendingTerm->official_term_id)->delete();
+                $user->delete();
+
+                $existingContinuation=DB::table('official_terms')
+                    ->where('user_id',$outgoingPresident->user_id)
+                    ->where('term_id',$pendingTerm->term_id)
+                    ->where('role','sk_president')
+                    ->exists();
+
+                if(!$existingContinuation){
+                    DB::table('official_terms')->insert([
+                        'user_id'=>$outgoingPresident->user_id,
+                        'term_id'=>$pendingTerm->term_id,
+                        'barangay_id'=>null,
+                        'role'=>'sk_president',
+                        'status'=>'current',
+                        'started_at'=>now(),
+                        'completed_at'=>null,
+                    ]);
+                }
+
+                $outgoingPresident->status='active';
+                $outgoingPresident->archived_at=null;
+                $outgoingPresident->save();
+            });
+
+            return back()->with('success','Pending President succession cancelled. Your current President account will continue for this administration.');
+        }
+
         DB::transaction(function() use($user,$userId){
-            DB::table('email_verifications')
+            DB::table('email_verifications')->where('user_id',$userId)->delete();
+            DB::table('password_reset_tokens')->where('email',$user->email)->delete();
+            DB::table('official_terms')
                 ->where('user_id',$userId)
+                ->whereIn('status',['pending','current'])
                 ->delete();
-
-            DB::table('password_reset_tokens')
-                ->where('email',$user->email)
-                ->delete();
-
             $user->delete();
         });
 
@@ -916,7 +1405,7 @@ class UserManagementController extends Controller
         return [
             [
                 'label'=>'SK Federation President / System Admin',
-                'description'=>'Current SK Federation President',
+                'description'=>'Current/caretaker President and any pending successor',
                 'count'=>$this->currentRoleCount('sk_president'),
                 'badgeColor'=>'bg-red-500',
                 'iconColor'=>'text-red-400',
@@ -953,6 +1442,11 @@ class UserManagementController extends Controller
     {
         $query=DB::table('users as u')
             ->leftJoin('barangays as b','u.barangay_id','=','b.barangay_id')
+            ->leftJoin('official_terms as ot',function($join){
+                $join->on('ot.user_id','=','u.user_id')
+                    ->whereIn('ot.status',['pending','current']);
+            })
+            ->leftJoin('administration_terms as t','ot.term_id','=','t.term_id')
             ->select(
                 'u.user_id',
                 'u.first_name',
@@ -963,11 +1457,11 @@ class UserManagementController extends Controller
                 'u.role',
                 'u.status',
                 'u.is_verified',
-                'u.term_start',
-                'u.term_end',
                 'u.archived_at',
                 'u.created_at',
-                'b.barangay_name'
+                'b.barangay_name',
+                't.start_year as admin_start_year',
+                't.end_year as admin_end_year'
             )
             ->whereIn('u.role',$roles)
             ->whereNull('u.archived_at');
@@ -996,16 +1490,13 @@ class UserManagementController extends Controller
     */
     protected function historyTerms()
     {
-        return DB::table('users')
-            ->whereIn('role',['sk_president','sk_chairman','sk_secretary'])
-            ->where('is_verified',1)
-            ->whereNotNull('archived_at')
-            ->whereNotNull('term_start')
-            ->whereNotNull('term_end')
-            ->selectRaw('YEAR(term_start) as start_year,YEAR(term_end) as end_year')
+        return DB::table('administration_terms as t')
+            ->join('official_terms as ot','t.term_id','=','ot.term_id')
+            ->where('ot.status','completed')
+            ->select('t.term_id','t.start_year','t.end_year')
             ->distinct()
-            ->orderByDesc('start_year')
-            ->orderByDesc('end_year')
+            ->orderByDesc('t.start_year')
+            ->orderByDesc('t.end_year')
             ->get()
             ->map(fn($term)=>[
                 'value'=>$term->start_year.'-'.$term->end_year,
@@ -1020,50 +1511,49 @@ class UserManagementController extends Controller
     */
     protected function officialHistory(string $term,int $barangayId=0,string $role='')
     {
-        $query=DB::table('users as u')
-            ->leftJoin('barangays as b','u.barangay_id','=','b.barangay_id')
+        $query=DB::table('official_terms as ot')
+            ->join('administration_terms as t','ot.term_id','=','t.term_id')
+            ->join('users as u','ot.user_id','=','u.user_id')
+            ->leftJoin('barangays as b','ot.barangay_id','=','b.barangay_id')
             ->select(
-                'u.user_id',
+                'ot.official_term_id',
+                'ot.user_id',
+                'ot.barangay_id',
+                'ot.role',
+                'ot.status as term_status',
+                'ot.started_at',
+                'ot.completed_at',
+                't.term_id',
+                't.start_year',
+                't.end_year',
                 'u.first_name',
                 'u.last_name',
                 'u.email',
                 'u.phone_number',
-                'u.barangay_id',
-                'u.role',
-                'u.status',
-                'u.is_verified',
-                'u.term_start',
-                'u.term_end',
-                'u.archived_at',
-                'u.created_at',
                 'b.barangay_name'
             )
-            ->whereIn('u.role',['sk_president','sk_chairman','sk_secretary'])
-            ->where('u.is_verified',1)
-            ->whereNotNull('u.archived_at')
-            ->whereNotNull('u.term_start')
-            ->whereNotNull('u.term_end');
+            ->where('ot.status','completed');
 
         if(preg_match('/^(\d{4})-(\d{4})$/',$term,$matches)){
-            $query->whereYear('u.term_start',(int)$matches[1])
-                ->whereYear('u.term_end',(int)$matches[2]);
+            $query->where('t.start_year',(int)$matches[1])
+                ->where('t.end_year',(int)$matches[2]);
         }else{
             $query->whereRaw('1=0');
         }
 
         if($barangayId > 0){
-            $query->where('u.barangay_id',$barangayId);
+            $query->where('ot.barangay_id',$barangayId);
         }
 
         if(in_array($role,['sk_president','sk_chairman','sk_secretary'],true)){
-            $query->where('u.role',$role);
+            $query->where('ot.role',$role);
         }
 
         return $query
-            ->orderByRaw("CASE WHEN u.role='sk_president' THEN 0 ELSE 1 END")
+            ->orderByRaw("CASE WHEN ot.role='sk_president' THEN 0 ELSE 1 END")
             ->orderByRaw('b.barangay_name IS NULL')
             ->orderBy('b.barangay_name')
-            ->orderByRaw("CASE u.role WHEN 'sk_chairman' THEN 1 WHEN 'sk_secretary' THEN 2 ELSE 3 END")
+            ->orderByRaw("CASE ot.role WHEN 'sk_chairman' THEN 1 WHEN 'sk_secretary' THEN 2 ELSE 3 END")
             ->orderBy('u.first_name')
             ->orderBy('u.last_name')
             ->get();
@@ -1134,6 +1624,34 @@ class UserManagementController extends Controller
         }
 
         return $groups;
+    }
+
+    protected function pendingPresidentForTerm(?int $termId)
+    {
+        if(!$termId){
+            return null;
+        }
+
+        return DB::table('official_terms as ot')
+            ->join('users as u','ot.user_id','=','u.user_id')
+            ->where('ot.term_id',$termId)
+            ->where('ot.role','sk_president')
+            ->where('ot.status','pending')
+            ->select('u.user_id','u.first_name','u.last_name','u.email','u.phone_number','ot.official_term_id')
+            ->first();
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | CURRENT ADMINISTRATION TERM
+    |--------------------------------------------------------------------------
+    */
+    protected function currentAdministrationTerm()
+    {
+        return DB::table('administration_terms')
+            ->where('status','current')
+            ->orderByDesc('term_id')
+            ->first();
     }
 
     protected function currentRoleCount(string $role): int

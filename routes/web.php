@@ -163,7 +163,8 @@ Route::middleware('auth')->prefix('sk_pres')->name('sk_pres.')->group(function()
     Route::patch('/user-management/{userId}/toggle-status',[SkPresidentUserManagementController::class,'toggleStatus'])->name('user-management.toggle-status');
     Route::patch('/user-management/{userId}/archive',[SkPresidentUserManagementController::class,'archive'])->name('user-management.archive');
     Route::delete('/user-management/{userId}',[SkPresidentUserManagementController::class,'destroy'])->name('user-management.destroy');
-
+    Route::post('/user-management/start-new-term',[SkPresidentUserManagementController::class,'startNewTerm'])->name('user-management.start-new-term');
+    Route::post('/user-management/history/{officialTermId}/reappoint',[SkPresidentUserManagementController::class,'reappoint'])->name('user-management.reappoint');
     /*
     |--------------------------------------------------------------------------
     | PROFILE

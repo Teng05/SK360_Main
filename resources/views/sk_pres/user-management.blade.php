@@ -97,6 +97,12 @@
 
                 @if(($activeTab ?? 'current') === 'current')
                     <div class="flex items-center gap-2">
+
+                        <button id="openNewTermModal" type="button"
+                            class="rounded-lg bg-blue-600 px-4 py-2 text-xs font-bold text-white hover:bg-blue-700 transition flex items-center gap-1">
+                            <span>&#128197;</span> Start New Term
+                        </button>
+
                         <button id="openBulkModal" type="button"
                             class="rounded-lg bg-green-600 px-4 py-2 text-xs font-bold text-white hover:bg-green-700 transition flex items-center gap-1">
                             <span>&#128101;</span> Bulk Add
@@ -169,6 +175,26 @@
                     &#128220; Official History
                 </a>
             </div>
+
+            <!-- Pending President Handover -->
+            @if($pendingPresident)
+                <div class="mb-6 rounded-2xl border border-yellow-200 bg-yellow-50 px-5 py-4">
+                    <div class="flex items-start gap-3">
+                        <span class="text-xl">&#9888;</span>
+
+                        <div>
+                            <p class="text-sm font-black text-yellow-800">President Handover Pending</p>
+
+                            <p class="mt-1 text-xs text-yellow-700">
+                                {{ trim($pendingPresident->first_name.' '.$pendingPresident->last_name) }}
+                                must complete the password setup for the
+                                {{ $currentAdministration ? $currentAdministration->start_year.' - '.$currentAdministration->end_year : 'current' }}
+                                administration. Your current President account remains active as caretaker until the setup is completed.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            @endif
 
             @if(($activeTab ?? 'current') === 'current')
 
@@ -246,12 +272,21 @@
                                         };
 
                                         $isPresident=($groupUser->role ?? '') === 'sk_president';
-                                        $isPending=!$isPresident && (int)($groupUser->is_verified ?? 0) === 0;
-                                        $statusLabel=$isPending ? 'pending' : ($groupUser->status ?? 'inactive');
+                                        $isPending=(int)($groupUser->is_verified ?? 0) === 0;
 
-                                        $termLabel=($groupUser->term_start && $groupUser->term_end)
-                                            ? \Carbon\Carbon::parse($groupUser->term_start)->format('Y').' - '.\Carbon\Carbon::parse($groupUser->term_end)->format('Y')
-                                            : 'Term not set';
+                                        $isCaretaker=
+                                            $isPresident &&
+                                            !$isPending &&
+                                            $pendingPresident &&
+                                            (int)$pendingPresident->user_id !== (int)$userId;
+
+                                        $statusLabel=$isPending
+                                            ? 'pending'
+                                            : ($isCaretaker ? 'caretaker' : ($groupUser->status ?? 'inactive'));
+
+                                        $termLabel=($groupUser->admin_start_year && $groupUser->admin_end_year)
+                                            ? $groupUser->admin_start_year.' - '.$groupUser->admin_end_year
+                                            : 'No administration term';
 
                                         $joinedDate=$groupUser->created_at
                                             ? \Carbon\Carbon::parse($groupUser->created_at)->format('M j, Y')
@@ -291,8 +326,6 @@
                                             'phone_number'=>$groupUser->phone_number ?? '',
                                             'status'=>$groupUser->status ?? 'inactive',
                                             'is_verified'=>(int)($groupUser->is_verified ?? 0),
-                                            'term_start'=>$groupUser->term_start ?? '',
-                                            'term_end'=>$groupUser->term_end ?? '',
                                         ]);
                                     @endphp
 
@@ -318,6 +351,10 @@
                                                         @if($isPending)
                                                             <span class="rounded-full bg-yellow-100 text-yellow-700 px-2 py-0.5 text-[9px] font-bold uppercase">
                                                                 Pending
+                                                            </span>
+                                                        @elseif($isCaretaker)
+                                                            <span class="rounded-full bg-orange-100 text-orange-700 px-2 py-0.5 text-[9px] font-bold uppercase">
+                                                                Caretaker
                                                             </span>
                                                         @else
                                                             <span class="rounded-full {{ ($groupUser->status ?? '') === 'active' ? 'bg-green-100 text-green-600' : 'bg-gray-200 text-gray-600' }} px-2 py-0.5 text-[9px] font-bold uppercase">
@@ -363,7 +400,7 @@
 
                                                     @if($isPending)
 
-                                                        @if(($groupUser->role ?? '') === 'sk_chairman')
+                                                        @if(in_array(($groupUser->role ?? ''),['sk_chairman','sk_president'],true))
                                                             <form action="{{ route('sk_pres.user-management.resend-setup-link',$userId) }}"
                                                                 method="POST"
                                                                 onsubmit="return confirm('Send a new password setup link to {{ $groupUser->email }}?');">
@@ -380,13 +417,13 @@
 
                                                         <form action="{{ route('sk_pres.user-management.destroy',$userId) }}"
                                                             method="POST"
-                                                            onsubmit="return confirm('Delete this pending account permanently?');">
+                                                            onsubmit="return confirm('{{ $isPresident ? 'Cancel this pending President succession? The current President will continue for this administration.' : 'Delete this pending account permanently?' }}');">
                                                             @csrf
                                                             @method('DELETE')
 
                                                             <button type="submit"
                                                                 class="block w-full px-4 py-2 text-left text-xs font-semibold text-red-600 hover:bg-red-50 transition">
-                                                                Delete Pending Account
+                                                                {{ $isPresident ? 'Cancel Succession' : 'Delete Pending Account' }}
                                                             </button>
                                                         </form>
 
@@ -448,7 +485,7 @@
                     <div class="mb-4">
                         <h2 class="text-xl font-black text-gray-800">Official History</h2>
                         <p class="text-xs text-gray-500 mt-1">
-                            Choose a term, barangay or role. Historical records are read-only.
+                            Historical records are read-only. Reappointing an official creates a new record for the current administration.
                         </p>
                     </div>
 
@@ -494,7 +531,6 @@
 
                             <select name="history_role"
                                 class="history-auto-filter w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-3 text-xs text-gray-700 focus:outline-none">
-
                                 <option value="" {{ $selectedHistoryRole === '' ? 'selected' : '' }}>All Officials</option>
                                 <option value="sk_president" {{ $selectedHistoryRole === 'sk_president' ? 'selected' : '' }}>SK President</option>
                                 <option value="sk_chairman" {{ $selectedHistoryRole === 'sk_chairman' ? 'selected' : '' }}>SK Chairman</option>
@@ -594,11 +630,13 @@
                                             substr($historyUser->last_name ?? '',0,1)
                                         );
 
-                                        $historyTerm=($historyUser->term_start && $historyUser->term_end)
-                                            ? \Carbon\Carbon::parse($historyUser->term_start)->format('Y').' - '.\Carbon\Carbon::parse($historyUser->term_end)->format('Y')
+                                        $historyTerm=($historyUser->start_year && $historyUser->end_year)
+                                            ? $historyUser->start_year.' - '.$historyUser->end_year
                                             : 'N/A';
 
-                                        $historyArchived=!empty($historyUser->archived_at);
+                                        $serviceEnded=$historyUser->completed_at
+                                            ? \Carbon\Carbon::parse($historyUser->completed_at)->format('M j, Y')
+                                            : 'N/A';
 
                                         $historySearch=strtolower(
                                             $historyName.' '.
@@ -606,8 +644,7 @@
                                             ($historyUser->email ?? '').' '.
                                             ($historyUser->phone_number ?? '').' '.
                                             ($historyUser->barangay_name ?? '').' '.
-                                            $historyTerm.' '.
-                                            ($historyArchived ? 'archived former' : 'current')
+                                            $historyTerm.' archived former completed'
                                         );
                                     @endphp
 
@@ -631,7 +668,7 @@
                                                     </span>
 
                                                     <span class="rounded-full bg-gray-800 px-2 py-0.5 text-[9px] font-black uppercase text-white">
-                                                        Term Completed
+                                                        Former Official
                                                     </span>
                                                 </div>
 
@@ -653,10 +690,27 @@
                                                     Term: {{ $historyTerm }}
                                                 </p>
 
-                                                @if($historyArchived)
-                                                    <p class="mt-1 text-[10px] text-gray-400">
-                                                        Archived: {{ \Carbon\Carbon::parse($historyUser->archived_at)->format('M j, Y') }}
-                                                    </p>
+                                                <p class="mt-1 text-[10px] text-gray-400">
+                                                    Service ended: {{ $serviceEnded }}
+                                                </p>
+
+                                                @if(
+                                                    ($historyUser->role ?? '') === 'sk_chairman' &&
+                                                    $currentAdministration &&
+                                                    (int)$historyUser->term_id !== (int)$currentAdministration->term_id
+                                                )
+                                                    <form action="{{ route('sk_pres.user-management.reappoint',$historyUser->official_term_id) }}"
+                                                        method="POST"
+                                                        class="mt-3"
+                                                        onsubmit="return confirm('Reappoint {{ $historyName }} as SK Chairman for {{ $currentAdministration->start_year }} - {{ $currentAdministration->end_year }}?');">
+
+                                                        @csrf
+
+                                                        <button type="submit"
+                                                            class="rounded-lg bg-green-600 px-3 py-2 text-[10px] font-black uppercase text-white hover:bg-green-700 transition">
+                                                            Reappoint to {{ $currentAdministration->start_year }} - {{ $currentAdministration->end_year }}
+                                                        </button>
+                                                    </form>
                                                 @endif
                                             </div>
                                         </div>
@@ -679,7 +733,7 @@
                             </p>
 
                             <p class="mt-1 text-xs text-gray-400">
-                                Add term dates to verified officials or choose another term/filter.
+                                No completed officials were found for this administration or filter.
                             </p>
                         </div>
                     @endforelse
@@ -692,6 +746,147 @@
 
             @endif
         </main>
+    </div>
+</div>
+
+<!-- Modal: Start New Administration Term -->
+<div id="newTermModal"
+    class="fixed inset-0 z-50 hidden items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+
+    <div class="w-full max-w-xl rounded-3xl bg-white p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
+
+        <div class="mb-6 flex items-center justify-between">
+            <div>
+                <h2 class="text-2xl font-black text-gray-900">Start New Term</h2>
+                <p class="text-xs text-gray-500">Create the next SK administration and choose the President handover.</p>
+            </div>
+
+            <button id="closeNewTermModal" type="button"
+                class="text-2xl text-gray-400 hover:text-red-500 transition">
+                &times;
+            </button>
+        </div>
+
+        @if($currentAdministration)
+            <div class="mb-4 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
+                <p class="text-[10px] font-black uppercase text-gray-400">Current Administration</p>
+                <p class="mt-1 text-lg font-black text-gray-800">
+                    {{ $currentAdministration->start_year }} - {{ $currentAdministration->end_year }}
+                </p>
+            </div>
+        @endif
+
+        @if($errors->newTerm->any())
+            <div class="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-xs text-red-600">
+                @foreach($errors->newTerm->all() as $error)
+                    <p>{{ $error }}</p>
+                @endforeach
+            </div>
+        @endif
+
+        <form action="{{ route('sk_pres.user-management.start-new-term') }}" method="POST"
+            onsubmit="return confirm('Start this new administration? Current Chairman, Secretary, Treasurer and Councilor assignments will be completed.');"
+            class="space-y-4">
+
+            @csrf
+
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="mb-1.5 block text-xs font-black uppercase text-gray-500">Start Year</label>
+                    <input type="number" name="start_year"
+                        value="{{ old('start_year',$currentAdministration ? $currentAdministration->end_year : now()->year) }}"
+                        min="2000" max="2100"
+                        class="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300" required>
+                </div>
+
+                <div>
+                    <label class="mb-1.5 block text-xs font-black uppercase text-gray-500">End Year</label>
+                    <input type="number" name="end_year"
+                        value="{{ old('end_year',$currentAdministration ? ((int)$currentAdministration->end_year+3) : (now()->year+3)) }}"
+                        min="2000" max="2100"
+                        class="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300" required>
+                </div>
+            </div>
+
+            <div>
+                <p class="mb-2 text-xs font-black uppercase text-gray-500">President for the New Administration</p>
+
+                <label class="mb-2 flex cursor-pointer items-start gap-3 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
+                    <input type="radio" name="president_mode" value="continue" class="mt-1"
+                        {{ old('president_mode','continue') === 'continue' ? 'checked' : '' }}>
+
+                    <span>
+                        <span class="block text-xs font-black text-gray-800">Continue Current President</span>
+                        <span class="mt-1 block text-[10px] text-gray-500">
+                            Keep the current account and create a new President service record for the new administration.
+                        </span>
+                    </span>
+                </label>
+
+                <label class="flex cursor-pointer items-start gap-3 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
+                    <input type="radio" name="president_mode" value="assign_new" class="mt-1"
+                        {{ old('president_mode') === 'assign_new' ? 'checked' : '' }}>
+
+                    <span>
+                        <span class="block text-xs font-black text-gray-800">Assign New President</span>
+                        <span class="mt-1 block text-[10px] text-gray-500">
+                            Create a pending President account and send a password setup link. The current President remains active until the successor completes setup.
+                        </span>
+                    </span>
+                </label>
+            </div>
+
+            <!-- New President Fields -->
+            <div id="newPresidentFields"
+                class="{{ old('president_mode') === 'assign_new' ? '' : 'hidden' }} space-y-3 rounded-2xl border border-blue-100 bg-blue-50/40 p-4">
+
+                <p class="text-xs font-black text-blue-700">New President Account</p>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="mb-1 block text-[10px] font-black uppercase text-gray-500">First Name</label>
+                        <input type="text" name="new_president_first_name"
+                            value="{{ old('new_president_first_name') }}"
+                            class="new-president-input w-full rounded-xl border border-blue-100 bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300">
+                    </div>
+
+                    <div>
+                        <label class="mb-1 block text-[10px] font-black uppercase text-gray-500">Last Name</label>
+                        <input type="text" name="new_president_last_name"
+                            value="{{ old('new_president_last_name') }}"
+                            class="new-president-input w-full rounded-xl border border-blue-100 bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="mb-1 block text-[10px] font-black uppercase text-gray-500">Email Address</label>
+                    <input type="email" name="new_president_email"
+                        value="{{ old('new_president_email') }}"
+                        class="new-president-input w-full rounded-xl border border-blue-100 bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300">
+                </div>
+
+                <div>
+                    <label class="mb-1 block text-[10px] font-black uppercase text-gray-500">Phone Number</label>
+                    <input type="text" name="new_president_phone"
+                        value="{{ old('new_president_phone') }}"
+                        class="w-full rounded-xl border border-blue-100 bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+                        placeholder="09xxxxxxxxx (Optional)">
+                </div>
+            </div>
+
+            <div class="rounded-xl border border-yellow-200 bg-yellow-50 px-4 py-3">
+                <p class="text-xs font-bold text-yellow-700">Before continuing</p>
+
+                <p class="mt-1 text-[10px] leading-5 text-yellow-600">
+                    Current SK Chairmen, Secretaries, Treasurer and Councilors will end their current assignment. Pending official accounts must be resolved first. If you assign a new President, the current President remains active as caretaker until the new President completes account setup.
+                </p>
+            </div>
+
+            <button type="submit"
+                class="w-full rounded-xl bg-blue-600 px-4 py-3 text-sm font-bold text-white hover:bg-blue-700 transition shadow-md">
+                Start New Administration
+            </button>
+        </form>
     </div>
 </div>
 
@@ -768,23 +963,21 @@
                     placeholder="09xxxxxxxxx (Optional)">
             </div>
 
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                    <label class="mb-1.5 block text-xs font-black uppercase text-gray-500">Term Start</label>
-                    <input type="date" name="term_start" value="{{ old('term_start') }}"
-                        class="w-full rounded-xl border border-red-100 bg-red-50/50 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-300" required>
-                </div>
+            <div>
+                <label class="mb-1.5 block text-xs font-black uppercase text-gray-500">Administration Term</label>
 
-                <div>
-                    <label class="mb-1.5 block text-xs font-black uppercase text-gray-500">Term End</label>
-                    <input type="date" name="term_end" value="{{ old('term_end') }}"
-                        class="w-full rounded-xl border border-red-100 bg-red-50/50 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-300" required>
+                <div class="w-full rounded-xl border border-green-100 bg-green-50 px-4 py-3">
+                    @if($currentAdministration)
+                        <p class="text-sm font-black text-green-700">
+                            {{ $currentAdministration->start_year }} - {{ $currentAdministration->end_year }}
+                        </p>
+
+                        <p class="mt-1 text-[10px] text-green-600">Current administration term</p>
+                    @else
+                        <p class="text-sm font-bold text-red-600">No active administration term</p>
+                    @endif
                 </div>
             </div>
-
-            <p class="text-[10px] text-gray-400">
-                Official History will display only the years, for example 2025 - 2028.
-            </p>
 
             <div class="pt-2">
                 <button type="submit"
@@ -835,10 +1028,14 @@
                     <select id="edit_role" name="role"
                         class="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-300" required>
 
-                        <option value="sk_president">SK President</option>
+                        <option id="editPresidentRoleOption" value="sk_president" disabled>SK President</option>
                         <option value="sk_chairman">SK Chairman</option>
                         <option value="sk_secretary">SK Secretary</option>
                     </select>
+
+                    <p class="mt-1 text-[10px] text-gray-400">
+                        President assignment is controlled by the succession process.
+                    </p>
                 </div>
 
                 <div>
@@ -898,20 +1095,6 @@
                     placeholder="09xxxxxxxxx">
             </div>
 
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                    <label class="mb-1.5 block text-xs font-black uppercase text-gray-500">Term Start</label>
-                    <input type="date" id="edit_term_start" name="term_start"
-                        class="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-300">
-                </div>
-
-                <div>
-                    <label class="mb-1.5 block text-xs font-black uppercase text-gray-500">Term End</label>
-                    <input type="date" id="edit_term_end" name="term_end"
-                        class="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-300">
-                </div>
-            </div>
-
             <div class="pt-2">
                 <button type="submit"
                     class="w-full rounded-xl bg-red-600 px-4 py-3 text-sm font-bold text-white hover:bg-red-700 transition shadow-md hover:shadow-lg">
@@ -943,8 +1126,23 @@
         <div class="mb-4">
             <a href="{{ route('sk_pres.user-management.csv-template') }}"
                 class="inline-flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-xs font-bold text-red-600 hover:bg-red-100 transition">
+
                 <span>&#128229;</span> Download CSV Template
             </a>
+        </div>
+
+        <div class="mb-4 rounded-xl border border-green-100 bg-green-50 px-4 py-3">
+            @if($currentAdministration)
+                <p class="text-xs font-black text-green-700">
+                    Administration: {{ $currentAdministration->start_year }} - {{ $currentAdministration->end_year }}
+                </p>
+
+                <p class="mt-1 text-[10px] text-green-600">
+                    All imported Chairmen will be assigned to the current administration.
+                </p>
+            @else
+                <p class="text-xs font-bold text-red-600">No active administration term.</p>
+            @endif
         </div>
 
         @if($errors->csvImport->any())
@@ -992,8 +1190,6 @@
             'email'=>'',
             'phone_number'=>'',
             'barangay_id'=>'',
-            'term_start'=>'',
-            'term_end'=>'',
         ]
     ]);
 
@@ -1034,6 +1230,20 @@
 
         <form action="{{ route('sk_pres.user-management.store-bulk-officials') }}" method="POST">
             @csrf
+
+            <div class="mb-4 rounded-xl border border-green-100 bg-green-50 px-4 py-3">
+                @if($currentAdministration)
+                    <p class="text-xs font-black text-green-700">
+                        Administration: {{ $currentAdministration->start_year }} - {{ $currentAdministration->end_year }}
+                    </p>
+
+                    <p class="mt-1 text-[10px] text-green-600">
+                        All Chairmen below will be assigned to the current administration.
+                    </p>
+                @else
+                    <p class="text-xs font-bold text-red-600">No active administration term.</p>
+                @endif
+            </div>
 
             <div id="bulkRows" class="space-y-4">
                 @foreach($oldOfficials as $index=>$official)
@@ -1092,20 +1302,6 @@
                                 </select>
                             </div>
 
-                            <div>
-                                <label class="mb-1.5 block text-xs font-black uppercase text-gray-500">Term Start</label>
-                                <input type="date" name="officials[{{ $index }}][term_start]"
-                                    value="{{ $official['term_start'] ?? '' }}"
-                                    class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm" required>
-                            </div>
-
-                            <div>
-                                <label class="mb-1.5 block text-xs font-black uppercase text-gray-500">Term End</label>
-                                <input type="date" name="officials[{{ $index }}][term_end]"
-                                    value="{{ $official['term_end'] ?? '' }}"
-                                    class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm" required>
-                            </div>
-
                         </div>
                     </div>
 
@@ -1133,6 +1329,12 @@
 document.addEventListener('DOMContentLoaded',()=>{
     const profileDropdownBtn=document.getElementById('profileDropdownBtn');
     const profileMenu=document.getElementById('profileMenu');
+
+    const openNewTermModal=document.getElementById('openNewTermModal');
+    const newTermModal=document.getElementById('newTermModal');
+    const closeNewTermModal=document.getElementById('closeNewTermModal');
+    const presidentModeInputs=document.querySelectorAll('input[name="president_mode"]');
+    const newPresidentFields=document.getElementById('newPresidentFields');
 
     const openOfficialModal=document.getElementById('openOfficialModal');
     const officialModal=document.getElementById('officialModal');
@@ -1180,6 +1382,33 @@ document.addEventListener('DOMContentLoaded',()=>{
     }
 
     // Modal Controls
+    if(openNewTermModal){
+        openNewTermModal.addEventListener('click',()=>showModal(newTermModal));
+    }
+
+    if(closeNewTermModal){
+        closeNewTermModal.addEventListener('click',()=>hideModal(newTermModal));
+    }
+
+    const syncPresidentFields=()=>{
+        const selected=document.querySelector('input[name="president_mode"]:checked')?.value || 'continue';
+        const assigningNew=selected==='assign_new';
+
+        if(newPresidentFields){
+            newPresidentFields.classList.toggle('hidden',!assigningNew);
+
+            newPresidentFields.querySelectorAll('.new-president-input').forEach((field)=>{
+                field.required=assigningNew;
+            });
+        }
+    };
+
+    presidentModeInputs.forEach((input)=>{
+        input.addEventListener('change',syncPresidentFields);
+    });
+
+    syncPresidentFields();
+
     if(openOfficialModal){
         openOfficialModal.addEventListener('click',()=>showModal(officialModal));
     }
@@ -1230,19 +1459,28 @@ document.addEventListener('DOMContentLoaded',()=>{
             document.getElementById('edit_first_name').value=userData.first_name || '';
             document.getElementById('edit_last_name').value=userData.last_name || '';
             document.getElementById('edit_email').value=userData.email || '';
-            document.getElementById('edit_role').value=userData.role || 'sk_chairman';
-            document.getElementById('edit_barangay_id').value=userData.barangay_id || '';
             document.getElementById('edit_phone_number').value=userData.phone_number || '';
-            document.getElementById('edit_term_start').value=userData.term_start || '';
-            document.getElementById('edit_term_end').value=userData.term_end || '';
 
+            const roleSelect=document.getElementById('edit_role');
+            const barangaySelect=document.getElementById('edit_barangay_id');
             const statusSelect=document.getElementById('edit_status');
             const pendingStatusNote=document.getElementById('pendingStatusNote');
-            const activeOption=statusSelect.querySelector('option[value="active"]');
 
-            const isPending=
-                userData.role!=='sk_president' &&
-                Number(userData.is_verified)===0;
+            const isPresident=userData.role==='sk_president';
+            const isPending=Number(userData.is_verified)===0;
+
+            roleSelect.querySelectorAll('option').forEach((option)=>{
+                option.disabled=isPresident
+                    ? option.value!=='sk_president'
+                    : option.value==='sk_president';
+            });
+
+            roleSelect.value=userData.role || 'sk_chairman';
+
+            barangaySelect.disabled=isPresident;
+            barangaySelect.value=userData.barangay_id || '';
+
+            const activeOption=statusSelect.querySelector('option[value="active"]');
 
             if(activeOption){
                 activeOption.disabled=isPending;
@@ -1267,7 +1505,7 @@ document.addEventListener('DOMContentLoaded',()=>{
     });
 
     // Close Modals on Backdrop
-    [officialModal,importModal,editUserModal,bulkModal].forEach((modal)=>{
+    [newTermModal,officialModal,importModal,editUserModal,bulkModal].forEach((modal)=>{
         if(modal){
             modal.addEventListener('click',(e)=>{
                 if(e.target===modal){
@@ -1280,6 +1518,7 @@ document.addEventListener('DOMContentLoaded',()=>{
     // Close Modals on Escape
     window.addEventListener('keydown',(e)=>{
         if(e.key==='Escape'){
+            hideModal(newTermModal);
             hideModal(officialModal);
             hideModal(importModal);
             hideModal(editUserModal);
@@ -1517,7 +1756,10 @@ document.addEventListener('DOMContentLoaded',()=>{
     });
 
     // Open correct modal after validation error
-    @if($errors->csvImport->any())
+    @if($errors->newTerm->any())
+        showModal(newTermModal);
+
+    @elseif($errors->csvImport->any())
         showModal(importModal);
 
     @elseif($errors->bulkAdd->any())
@@ -1537,12 +1779,26 @@ document.addEventListener('DOMContentLoaded',()=>{
             document.getElementById('edit_first_name').value=@json(old('first_name',''));
             document.getElementById('edit_last_name').value=@json(old('last_name',''));
             document.getElementById('edit_email').value=@json(old('email',''));
-            document.getElementById('edit_role').value=@json(old('role','sk_chairman'));
-            document.getElementById('edit_barangay_id').value=@json(old('barangay_id',''));
             document.getElementById('edit_phone_number').value=@json(old('phone_number',''));
-            document.getElementById('edit_term_start').value=@json(old('term_start',''));
-            document.getElementById('edit_term_end').value=@json(old('term_end',''));
-            document.getElementById('edit_status').value=@json(old('status','inactive'));
+
+            const failedRole=@json(old('role','sk_chairman'));
+            const failedRoleSelect=document.getElementById('edit_role');
+            const failedBarangaySelect=document.getElementById('edit_barangay_id');
+            const failedIsPresident=failedRole==='sk_president';
+
+            failedRoleSelect.querySelectorAll('option').forEach((option)=>{
+                option.disabled=failedIsPresident
+                    ? option.value!=='sk_president'
+                    : option.value==='sk_president';
+            });
+
+            failedRoleSelect.value=failedRole;
+
+            failedBarangaySelect.disabled=failedIsPresident;
+            failedBarangaySelect.value=@json(old('barangay_id',''));
+
+            const failedStatusSelect=document.getElementById('edit_status');
+            failedStatusSelect.value=@json(old('status','inactive'));
 
             showModal(editUserModal);
         @endif

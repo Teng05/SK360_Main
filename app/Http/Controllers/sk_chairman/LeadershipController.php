@@ -22,21 +22,19 @@ class LeadershipController extends Controller
         $fullName=trim(($user->first_name ?? '').' '.($user->last_name ?? '')) ?: 'User';
         $barangayId=(int)($user->barangay_id ?? 0);
         $barangayName=$user->barangay->barangay_name ?? 'Barangay';
+        $currentAdministration=$this->currentAdministrationTerm();
 
         $secretaryModel=User::query()
             ->where('barangay_id',$barangayId)
             ->where('role','sk_secretary')
-            ->orderByRaw("CASE WHEN status='active' OR is_verified=0 THEN 0 ELSE 1 END")
+            ->whereNull('archived_at')
             ->orderByDesc('created_at')
             ->first();
 
         $hasCurrentSecretary=User::query()
             ->where('barangay_id',$barangayId)
             ->where('role','sk_secretary')
-            ->where(function($query){
-                $query->where('status','active')
-                    ->orWhere('is_verified',0);
-            })
+            ->whereNull('archived_at')
             ->exists();
 
         $secretary=$secretaryModel ? [
@@ -47,19 +45,44 @@ class LeadershipController extends Controller
             'position'=>'SK Secretary',
             'email'=>$secretaryModel->email,
             'phone'=>$secretaryModel->phone_number,
-            'term_start'=>$secretaryModel->term_start,
-            'term_end'=>$secretaryModel->term_end,
-            'term'=>$this->userTerm($secretaryModel),
+            'term'=>$this->officialTermLabel($secretaryModel),
             'status'=>$secretaryModel->status,
             'is_verified'=>(int)$secretaryModel->is_verified,
             'source'=>'user',
         ] : null;
 
-        $treasurerRow=DB::table('sk_council')
-            ->where('barangay_id',$barangayId)
-            ->whereRaw('LOWER(position)=?',['sk treasurer'])
-            ->orderByDesc('created_at')
-            ->first();
+        $treasurerRow=null;
+        $kagawads=collect();
+
+        if($currentAdministration){
+            $treasurerRow=DB::table('sk_council')
+                ->where('barangay_id',$barangayId)
+                ->where('term_id',$currentAdministration->term_id)
+                ->where('status','current')
+                ->whereRaw('LOWER(position)=?',['sk treasurer'])
+                ->orderByDesc('created_at')
+                ->first();
+
+            $kagawads=DB::table('sk_council')
+                ->where('barangay_id',$barangayId)
+                ->where('term_id',$currentAdministration->term_id)
+                ->where('status','current')
+                ->where(function($query){
+                    $query->whereRaw('LOWER(position) LIKE ?',['%councilor%'])
+                        ->orWhereRaw('LOWER(position) LIKE ?',['%kagawad%']);
+                })
+                ->orderBy('name')
+                ->get()
+                ->map(fn($row)=>[
+                    'council_id'=>$row->council_id,
+                    'name'=>$row->name,
+                    'position'=>$row->position,
+                    'email'=>$row->email,
+                    'phone'=>$row->phone,
+                    'term'=>$row->term,
+                    'source'=>'council',
+                ]);
+        }
 
         $treasurer=$treasurerRow ? [
             'council_id'=>$treasurerRow->council_id,
@@ -71,31 +94,13 @@ class LeadershipController extends Controller
             'source'=>'council',
         ] : null;
 
-        $kagawads=DB::table('sk_council')
-            ->where('barangay_id',$barangayId)
-            ->where(function($query){
-                $query->whereRaw('LOWER(position) LIKE ?',['%councilor%'])
-                    ->orWhereRaw('LOWER(position) LIKE ?',['%kagawad%']);
-            })
-            ->orderBy('name')
-            ->get()
-            ->map(fn($row)=>[
-                'council_id'=>$row->council_id,
-                'name'=>$row->name,
-                'position'=>$row->position,
-                'email'=>$row->email,
-                'phone'=>$row->phone,
-                'term'=>$row->term,
-                'source'=>'council',
-            ]);
-
         $chairman=[
             'user_id'=>$user->user_id,
             'name'=>$fullName,
             'position'=>'SK Chairman',
             'email'=>$user->email,
             'phone'=>$user->phone_number,
-            'term'=>$this->userTerm($user),
+            'term'=>$this->officialTermLabel($user),
             'status'=>$user->status,
             'is_verified'=>(int)$user->is_verified,
             'source'=>'user',
@@ -125,6 +130,7 @@ class LeadershipController extends Controller
             'secretary'=>$secretary,
             'treasurer'=>$treasurer,
             'canAddSecretary'=>!$hasCurrentSecretary,
+            'currentAdministration'=>$currentAdministration,
         ]);
     }
 
@@ -133,32 +139,60 @@ class LeadershipController extends Controller
     | SINGLE ADD COUNCILOR
     |--------------------------------------------------------------------------
     */
-
     public function store(Request $request): RedirectResponse
     {
         abort_unless(auth()->check() && auth()->user()->role === 'sk_chairman',403);
+
+        $currentTerm=$this->currentAdministrationTerm();
+
+        if(!$currentTerm){
+            return back()->withInput()->with('warning','There is no active administration term.');
+        }
 
         $validated=$request->validateWithBag('councilorAdd',[
             'name'=>['required','string','max:255'],
             'email'=>['nullable','email','max:255'],
             'phone'=>['nullable','string','max:20'],
-            'term'=>['nullable','string','max:50'],
         ]);
+
+        $normalizedName=strtolower(trim(preg_replace('/\s+/',' ',$validated['name'])));
+
+        $existing=DB::table('sk_council')
+            ->where('barangay_id',auth()->user()->barangay_id)
+            ->where('term_id',$currentTerm->term_id)
+            ->where('status','current')
+            ->where(function($query){
+                $query->whereRaw('LOWER(position) LIKE ?',['%councilor%'])
+                    ->orWhereRaw('LOWER(position) LIKE ?',['%kagawad%']);
+            })
+            ->whereRaw('LOWER(TRIM(name))=?',[$normalizedName])
+            ->exists();
+
+        if($existing){
+            return back()
+                ->withInput()
+                ->withErrors([
+                    'name'=>'This person is already listed as an SK Councilor for the current administration.',
+                ],'councilorAdd');
+        }
 
         DB::table('sk_council')->insert([
             'barangay_id'=>auth()->user()->barangay_id,
-            'name'=>$validated['name'],
+            'term_id'=>$currentTerm->term_id,
+            'name'=>trim($validated['name']),
             'position'=>'SK Councilor',
             'email'=>$validated['email'] ?? null,
             'phone'=>$validated['phone'] ?? null,
-            'term'=>$validated['term'] ?: '2023-2026',
+            'term'=>$currentTerm->start_year.'-'.$currentTerm->end_year,
+            'status'=>'current',
             'profile_img'=>'default.png',
             'created_at'=>now(),
+            'completed_at'=>null,
         ]);
 
         return redirect()
             ->route('sk_chairman.leadership')
-            ->with('success','SK Councilor added successfully.');
+            ->with('success','SK Councilor added for the '.$currentTerm->start_year.' - '.$currentTerm->end_year.' administration.');
     }
 
     /*
@@ -166,49 +200,47 @@ class LeadershipController extends Controller
     | BULK ADD COUNCILORS
     |--------------------------------------------------------------------------
     */
-
     public function storeBulkCouncilors(Request $request): RedirectResponse
     {
         abort_unless(auth()->check() && auth()->user()->role === 'sk_chairman',403);
+
+        $currentTerm=$this->currentAdministrationTerm();
+
+        if(!$currentTerm){
+            return back()->withInput()->with('warning','There is no active administration term.');
+        }
 
         $validated=$request->validateWithBag('bulkCouncilors',[
             'councilors'=>['required','array','min:1'],
             'councilors.*.name'=>['required','string','max:255'],
             'councilors.*.email'=>['nullable','email','max:255'],
             'councilors.*.phone'=>['nullable','string','max:20'],
-            'councilors.*.term'=>['nullable','string','max:50'],
         ]);
 
         $barangayId=auth()->user()->barangay_id;
-
         $names=[];
         $emails=[];
         $phones=[];
 
         foreach($validated['councilors'] as $index=>$councilor){
             $rowNumber=$index+1;
-
             $normalizedName=strtolower(trim(preg_replace('/\s+/',' ',$councilor['name'])));
             $email=strtolower(trim($councilor['email'] ?? ''));
             $phone=preg_replace('/\D+/','',$councilor['phone'] ?? '');
 
             if(in_array($normalizedName,$names,true)){
-                return back()
-                    ->withInput()
-                    ->withErrors([
-                        'councilors'=>"Councilor #{$rowNumber} has the same name as another councilor in this bulk form.",
-                    ],'bulkCouncilors');
+                return back()->withInput()->withErrors([
+                    'councilors'=>"Councilor #{$rowNumber} has the same name as another councilor in this bulk form.",
+                ],'bulkCouncilors');
             }
 
             $names[]=$normalizedName;
 
             if($email !== ''){
                 if(in_array($email,$emails,true)){
-                    return back()
-                        ->withInput()
-                        ->withErrors([
-                            'councilors'=>"Councilor #{$rowNumber} has a duplicate email in this bulk form.",
-                        ],'bulkCouncilors');
+                    return back()->withInput()->withErrors([
+                        'councilors'=>"Councilor #{$rowNumber} has a duplicate email in this bulk form.",
+                    ],'bulkCouncilors');
                 }
 
                 $emails[]=$email;
@@ -216,11 +248,9 @@ class LeadershipController extends Controller
 
             if($phone !== ''){
                 if(in_array($phone,$phones,true)){
-                    return back()
-                        ->withInput()
-                        ->withErrors([
-                            'councilors'=>"Councilor #{$rowNumber} has a duplicate phone number in this bulk form.",
-                        ],'bulkCouncilors');
+                    return back()->withInput()->withErrors([
+                        'councilors'=>"Councilor #{$rowNumber} has a duplicate phone number in this bulk form.",
+                    ],'bulkCouncilors');
                 }
 
                 $phones[]=$phone;
@@ -228,6 +258,8 @@ class LeadershipController extends Controller
 
             $existing=DB::table('sk_council')
                 ->where('barangay_id',$barangayId)
+                ->where('term_id',$currentTerm->term_id)
+                ->where('status','current')
                 ->where(function($query){
                     $query->whereRaw('LOWER(position) LIKE ?',['%councilor%'])
                         ->orWhereRaw('LOWER(position) LIKE ?',['%kagawad%']);
@@ -236,44 +268,53 @@ class LeadershipController extends Controller
                 ->exists();
 
             if($existing){
-                return back()
-                    ->withInput()
-                    ->withErrors([
-                        'councilors'=>"{$councilor['name']} is already listed as an SK Councilor.",
-                    ],'bulkCouncilors');
+                return back()->withInput()->withErrors([
+                    'councilors'=>"{$councilor['name']} is already listed as an SK Councilor for the current administration.",
+                ],'bulkCouncilors');
             }
         }
 
-        DB::transaction(function() use($validated,$barangayId){
+        DB::transaction(function() use($validated,$barangayId,$currentTerm){
             foreach($validated['councilors'] as $councilor){
                 DB::table('sk_council')->insert([
                     'barangay_id'=>$barangayId,
+                    'term_id'=>$currentTerm->term_id,
                     'name'=>trim($councilor['name']),
                     'position'=>'SK Councilor',
                     'email'=>!empty($councilor['email']) ? trim($councilor['email']) : null,
                     'phone'=>!empty($councilor['phone']) ? trim($councilor['phone']) : null,
-                    'term'=>$councilor['term'] ?: '2023-2026',
+                    'term'=>$currentTerm->start_year.'-'.$currentTerm->end_year,
+                    'status'=>'current',
                     'profile_img'=>'default.png',
                     'created_at'=>now(),
+                    'completed_at'=>null,
                 ]);
             }
         });
 
         return redirect()
             ->route('sk_chairman.leadership')
-            ->with(
-                'success',
-                count($validated['councilors']).' SK Councilor(s) added successfully.'
-            );
+            ->with('success',count($validated['councilors']).' SK Councilor(s) added for the '.$currentTerm->start_year.' - '.$currentTerm->end_year.' administration.');
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | UPDATE COUNCILOR
+    |--------------------------------------------------------------------------
+    */
     public function updateCouncilor(Request $request,int $councilId): RedirectResponse
     {
         abort_unless(auth()->check() && auth()->user()->role === 'sk_chairman',403);
 
+        $currentTerm=$this->currentAdministrationTerm();
+
+        abort_unless($currentTerm,404);
+
         $councilor=DB::table('sk_council')
             ->where('council_id',$councilId)
             ->where('barangay_id',auth()->user()->barangay_id)
+            ->where('term_id',$currentTerm->term_id)
+            ->where('status','current')
             ->where(function($query){
                 $query->whereRaw('LOWER(position) LIKE ?',['%councilor%'])
                     ->orWhereRaw('LOWER(position) LIKE ?',['%kagawad%']);
@@ -286,17 +327,14 @@ class LeadershipController extends Controller
             'edit_councilor_name'=>['required','string','max:255'],
             'edit_councilor_email'=>['nullable','email','max:255'],
             'edit_councilor_phone'=>['nullable','string','max:20'],
-            'edit_councilor_term'=>['nullable','string','max:50'],
         ]);
 
         DB::table('sk_council')
             ->where('council_id',$councilId)
-            ->where('barangay_id',auth()->user()->barangay_id)
             ->update([
                 'name'=>$validated['edit_councilor_name'],
                 'email'=>$validated['edit_councilor_email'] ?: null,
                 'phone'=>$validated['edit_councilor_phone'] ?: null,
-                'term'=>$validated['edit_councilor_term'] ?: '2023-2026',
             ]);
 
         return redirect()
@@ -309,20 +347,26 @@ class LeadershipController extends Controller
     | ADD TREASURER
     |--------------------------------------------------------------------------
     */
-
     public function storeTreasurer(Request $request): RedirectResponse
     {
         abort_unless(auth()->check() && auth()->user()->role === 'sk_chairman',403);
+
+        $currentTerm=$this->currentAdministrationTerm();
+
+        if(!$currentTerm){
+            return back()->withInput()->with('warning','There is no active administration term.');
+        }
 
         $validated=$request->validateWithBag('treasurerAdd',[
             'treasurer_name'=>['required','string','max:255'],
             'treasurer_email'=>['nullable','email','max:255'],
             'treasurer_phone'=>['nullable','string','max:20'],
-            'treasurer_term'=>['nullable','string','max:50'],
         ]);
 
         $exists=DB::table('sk_council')
             ->where('barangay_id',auth()->user()->barangay_id)
+            ->where('term_id',$currentTerm->term_id)
+            ->where('status','current')
             ->whereRaw('LOWER(position)=?',['sk treasurer'])
             ->exists();
 
@@ -330,33 +374,47 @@ class LeadershipController extends Controller
             return back()
                 ->withInput()
                 ->withErrors([
-                    'treasurer'=>'This barangay already has an SK Treasurer.',
+                    'treasurer'=>'This barangay already has an SK Treasurer for the current administration.',
                 ],'treasurerAdd');
         }
 
         DB::table('sk_council')->insert([
             'barangay_id'=>auth()->user()->barangay_id,
+            'term_id'=>$currentTerm->term_id,
             'name'=>$validated['treasurer_name'],
             'position'=>'SK Treasurer',
             'email'=>$validated['treasurer_email'] ?? null,
             'phone'=>$validated['treasurer_phone'] ?? null,
-            'term'=>$validated['treasurer_term'] ?: '2023-2026',
+            'term'=>$currentTerm->start_year.'-'.$currentTerm->end_year,
+            'status'=>'current',
             'profile_img'=>'default.png',
             'created_at'=>now(),
+            'completed_at'=>null,
         ]);
 
         return redirect()
             ->route('sk_chairman.leadership')
-            ->with('success','SK Treasurer added successfully.');
+            ->with('success','SK Treasurer added for the '.$currentTerm->start_year.' - '.$currentTerm->end_year.' administration.');
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | UPDATE TREASURER
+    |--------------------------------------------------------------------------
+    */
     public function updateTreasurer(Request $request,int $councilId): RedirectResponse
     {
         abort_unless(auth()->check() && auth()->user()->role === 'sk_chairman',403);
 
+        $currentTerm=$this->currentAdministrationTerm();
+
+        abort_unless($currentTerm,404);
+
         $treasurer=DB::table('sk_council')
             ->where('council_id',$councilId)
             ->where('barangay_id',auth()->user()->barangay_id)
+            ->where('term_id',$currentTerm->term_id)
+            ->where('status','current')
             ->whereRaw('LOWER(position)=?',['sk treasurer'])
             ->first();
 
@@ -366,17 +424,14 @@ class LeadershipController extends Controller
             'edit_treasurer_name'=>['required','string','max:255'],
             'edit_treasurer_email'=>['nullable','email','max:255'],
             'edit_treasurer_phone'=>['nullable','string','max:20'],
-            'edit_treasurer_term'=>['nullable','string','max:50'],
         ]);
 
         DB::table('sk_council')
             ->where('council_id',$councilId)
-            ->where('barangay_id',auth()->user()->barangay_id)
             ->update([
                 'name'=>$validated['edit_treasurer_name'],
                 'email'=>$validated['edit_treasurer_email'] ?: null,
                 'phone'=>$validated['edit_treasurer_phone'] ?: null,
-                'term'=>$validated['edit_treasurer_term'] ?: '2023-2026',
             ]);
 
         return redirect()
@@ -389,42 +444,52 @@ class LeadershipController extends Controller
     | ADD SECRETARY ACCOUNT
     |--------------------------------------------------------------------------
     */
-
     public function storeSecretary(Request $request): RedirectResponse
     {
         abort_unless(auth()->check() && auth()->user()->role === 'sk_chairman',403);
 
         $chairman=auth()->user();
+        $currentTerm=$this->currentAdministrationTerm();
+
+        if(!$currentTerm){
+            return back()->withInput()->with('warning','There is no active administration term.');
+        }
+
+        $chairmanAssignment=DB::table('official_terms')
+            ->where('user_id',$chairman->user_id)
+            ->where('term_id',$currentTerm->term_id)
+            ->where('role','sk_chairman')
+            ->where('status','current')
+            ->exists();
+
+        if(!$chairmanAssignment){
+            return back()->withInput()->with('warning','Your Chairman account is not connected to the current administration term.');
+        }
 
         $validated=$request->validateWithBag('secretaryAdd',[
             'secretary_first_name'=>['required','string','max:100'],
             'secretary_last_name'=>['required','string','max:100'],
             'secretary_email'=>['required','email','max:100','unique:users,email'],
             'secretary_phone'=>['nullable','string','max:20','unique:users,phone_number'],
-            'secretary_term_start'=>['required','date'],
-            'secretary_term_end'=>['required','date','after:secretary_term_start'],
         ]);
 
         $existing=User::query()
             ->where('barangay_id',$chairman->barangay_id)
             ->where('role','sk_secretary')
-            ->where(function($query){
-                $query->where('status','active')
-                    ->orWhere('is_verified',0);
-            })
+            ->whereNull('archived_at')
             ->exists();
 
         if($existing){
             return back()
                 ->withInput()
                 ->withErrors([
-                    'secretary'=>'Your barangay already has an active or pending SK Secretary.',
+                    'secretary'=>'Your barangay already has a current or pending SK Secretary.',
                 ],'secretaryAdd');
         }
 
         $token=Str::random(64);
 
-        $secretary=DB::transaction(function() use($validated,$chairman,$token){
+        $secretary=DB::transaction(function() use($validated,$chairman,$currentTerm,$token){
             $user=User::create([
                 'first_name'=>$validated['secretary_first_name'],
                 'last_name'=>$validated['secretary_last_name'],
@@ -435,8 +500,19 @@ class LeadershipController extends Controller
                 'password'=>Hash::make(Str::random(64)),
                 'is_verified'=>0,
                 'status'=>'inactive',
-                'term_start'=>$validated['secretary_term_start'],
-                'term_end'=>$validated['secretary_term_end'],
+                'term_start'=>null,
+                'term_end'=>null,
+                'archived_at'=>null,
+            ]);
+
+            DB::table('official_terms')->insert([
+                'user_id'=>$user->user_id,
+                'term_id'=>$currentTerm->term_id,
+                'barangay_id'=>$chairman->barangay_id,
+                'role'=>'sk_secretary',
+                'status'=>'pending',
+                'started_at'=>null,
+                'completed_at'=>null,
             ]);
 
             DB::table('password_reset_tokens')->updateOrInsert(
@@ -458,7 +534,7 @@ class LeadershipController extends Controller
 
         return redirect()
             ->route('sk_chairman.leadership')
-            ->with('success','SK Secretary account created. A password setup link was sent to '.$secretary->email.'.');
+            ->with('success','SK Secretary account created for the '.$currentTerm->start_year.' - '.$currentTerm->end_year.' administration. A password setup link was sent to '.$secretary->email.'.');
     }
 
     /*
@@ -466,7 +542,6 @@ class LeadershipController extends Controller
     | UPDATE SECRETARY
     |--------------------------------------------------------------------------
     */
-
     public function updateSecretary(Request $request,int $userId): RedirectResponse
     {
         abort_unless(auth()->check() && auth()->user()->role === 'sk_chairman',403);
@@ -479,8 +554,6 @@ class LeadershipController extends Controller
             'edit_secretary_last_name'=>['required','string','max:100'],
             'edit_secretary_email'=>['required','email','max:100','unique:users,email,'.$userId.',user_id'],
             'edit_secretary_phone'=>['nullable','string','max:20','unique:users,phone_number,'.$userId.',user_id'],
-            'edit_secretary_term_start'=>['required','date'],
-            'edit_secretary_term_end'=>['required','date','after:edit_secretary_term_start'],
         ]);
 
         $emailChanged=strtolower($oldEmail) !== strtolower($validated['edit_secretary_email']);
@@ -490,8 +563,6 @@ class LeadershipController extends Controller
             'last_name'=>$validated['edit_secretary_last_name'],
             'email'=>$validated['edit_secretary_email'],
             'phone_number'=>$validated['edit_secretary_phone'] ?: null,
-            'term_start'=>$validated['edit_secretary_term_start'],
-            'term_end'=>$validated['edit_secretary_term_end'],
         ]);
 
         if((int)$secretary->is_verified === 0 && $emailChanged){
@@ -530,7 +601,6 @@ class LeadershipController extends Controller
     | RESEND SECRETARY SETUP LINK
     |--------------------------------------------------------------------------
     */
-
     public function resendSecretarySetupLink(int $userId): RedirectResponse
     {
         abort_unless(auth()->check() && auth()->user()->role === 'sk_chairman',403);
@@ -572,7 +642,6 @@ class LeadershipController extends Controller
     | SECRETARY ACTIVATE / DEACTIVATE
     |--------------------------------------------------------------------------
     */
-
     public function toggleSecretaryStatus(int $userId): RedirectResponse
     {
         abort_unless(auth()->check() && auth()->user()->role === 'sk_chairman',403);
@@ -591,6 +660,7 @@ class LeadershipController extends Controller
                 ->where('barangay_id',auth()->user()->barangay_id)
                 ->where('role','sk_secretary')
                 ->where('user_id','!=',$secretary->user_id)
+                ->whereNull('archived_at')
                 ->where(function($query){
                     $query->where('status','active')
                         ->orWhere('is_verified',0);
@@ -613,15 +683,18 @@ class LeadershipController extends Controller
 
     /*
     |--------------------------------------------------------------------------
-    | DELETE SECRETARY
+    | DELETE PENDING SECRETARY
     |--------------------------------------------------------------------------
     */
-
     public function destroySecretary(int $userId): RedirectResponse
     {
         abort_unless(auth()->check() && auth()->user()->role === 'sk_chairman',403);
 
         $secretary=$this->secretaryForChairman($userId);
+
+        if((int)$secretary->is_verified === 1){
+            return back()->with('warning','Activated Secretary accounts cannot be permanently deleted.');
+        }
 
         DB::transaction(function() use($secretary,$userId){
             DB::table('email_verifications')
@@ -632,12 +705,17 @@ class LeadershipController extends Controller
                 ->where('email',$secretary->email)
                 ->delete();
 
+            DB::table('official_terms')
+                ->where('user_id',$userId)
+                ->whereIn('status',['pending','current'])
+                ->delete();
+
             $secretary->delete();
         });
 
         return redirect()
             ->route('sk_chairman.leadership')
-            ->with('success','SK Secretary account deleted successfully.');
+            ->with('success','Pending SK Secretary account deleted successfully.');
     }
 
     /*
@@ -645,15 +723,26 @@ class LeadershipController extends Controller
     | DELETE TREASURER / COUNCILOR
     |--------------------------------------------------------------------------
     */
-
     public function destroy(int $councilId): RedirectResponse
     {
         abort_unless(auth()->check() && auth()->user()->role === 'sk_chairman',403);
 
-        DB::table('sk_council')
+        $currentTerm=$this->currentAdministrationTerm();
+
+        if(!$currentTerm){
+            return back()->with('warning','There is no active administration term.');
+        }
+
+        $deleted=DB::table('sk_council')
             ->where('council_id',$councilId)
             ->where('barangay_id',auth()->user()->barangay_id)
+            ->where('term_id',$currentTerm->term_id)
+            ->where('status','current')
             ->delete();
+
+        if(!$deleted){
+            return back()->with('warning','Only current administration council members can be removed.');
+        }
 
         return redirect()
             ->route('sk_chairman.leadership')
@@ -665,13 +754,13 @@ class LeadershipController extends Controller
     | HELPERS
     |--------------------------------------------------------------------------
     */
-
     protected function secretaryForChairman(int $userId): User
     {
         return User::query()
             ->where('user_id',$userId)
             ->where('barangay_id',auth()->user()->barangay_id)
             ->where('role','sk_secretary')
+            ->whereNull('archived_at')
             ->firstOrFail();
     }
 
@@ -700,16 +789,27 @@ class LeadershipController extends Controller
         }
     }
 
-    protected function userTerm($user): string
+    protected function officialTermLabel(User $user): string
     {
-        if(empty($user->term_start) || empty($user->term_end)){
-            return 'N/A';
-        }
+        $term=DB::table('official_terms as ot')
+            ->join('administration_terms as t','ot.term_id','=','t.term_id')
+            ->where('ot.user_id',$user->user_id)
+            ->whereIn('ot.status',['pending','current'])
+            ->orderByDesc('ot.official_term_id')
+            ->select('t.start_year','t.end_year')
+            ->first();
 
-        $start=\Carbon\Carbon::parse($user->term_start)->format('Y');
-        $end=\Carbon\Carbon::parse($user->term_end)->format('Y');
+        return $term
+            ? $term->start_year.'-'.$term->end_year
+            : 'N/A';
+    }
 
-        return $start.'-'.$end;
+    protected function currentAdministrationTerm()
+    {
+        return DB::table('administration_terms')
+            ->where('status','current')
+            ->orderByDesc('term_id')
+            ->first();
     }
 
     protected function menuItems(): array

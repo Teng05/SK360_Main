@@ -53,10 +53,16 @@
                 Position: SK Councilor
             </div>
 
-            <div class="space-y-1">
-                <label class="text-[10px] font-black text-gray-400 uppercase">Term Period</label>
-                <input type="text" name="term" value="{{ old('term','2023-2026') }}"
-                    class="w-full border-b-2 border-gray-100 focus:border-red-500 outline-none py-1 text-sm font-bold">
+            <div class="rounded-xl bg-green-50 border border-green-100 px-4 py-3">
+                <p class="text-[10px] font-black text-green-600 uppercase">Administration Term</p>
+
+                @if($currentAdministration)
+                    <p class="mt-1 text-sm font-black text-green-700">
+                        {{ $currentAdministration->start_year }} - {{ $currentAdministration->end_year }}
+                    </p>
+                @else
+                    <p class="mt-1 text-xs font-bold text-red-600">No active administration term</p>
+                @endif
             </div>
 
             <div class="flex gap-3 pt-4">
@@ -81,7 +87,6 @@
             'name'=>'',
             'email'=>'',
             'phone'=>'',
-            'term'=>'2023-2026',
         ]
     ]);
 
@@ -114,6 +119,21 @@
                 </div>
             @endif
 
+            <div class="mb-4 rounded-xl bg-green-50 border border-green-100 px-4 py-3">
+                <p class="text-[10px] font-black text-green-600 uppercase">Administration Term</p>
+
+                @if($currentAdministration)
+                    <p class="mt-1 text-sm font-black text-green-700">
+                        {{ $currentAdministration->start_year }} - {{ $currentAdministration->end_year }}
+                    </p>
+                    <p class="mt-1 text-[9px] text-green-600">
+                        All Councilors below will be assigned to this administration.
+                    </p>
+                @else
+                    <p class="mt-1 text-xs font-bold text-red-600">No active administration term</p>
+                @endif
+            </div>
+
             <div id="bulkCouncilorRows" class="space-y-4">
                 @foreach($oldCouncilors as $index=>$councilor)
                     <div class="bulk-councilor-row rounded-2xl border bg-gray-50 p-4">
@@ -128,7 +148,7 @@
                             </button>
                         </div>
 
-                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
                             <input type="text"
                                 name="councilors[{{ $index }}][name]"
                                 value="{{ $councilor['name'] ?? '' }}"
@@ -146,12 +166,6 @@
                                 name="councilors[{{ $index }}][phone]"
                                 value="{{ $councilor['phone'] ?? '' }}"
                                 placeholder="Phone"
-                                class="rounded-xl border px-3 py-2 text-sm">
-
-                            <input type="text"
-                                name="councilors[{{ $index }}][term]"
-                                value="{{ $councilor['term'] ?? '2023-2026' }}"
-                                placeholder="Term"
                                 class="rounded-xl border px-3 py-2 text-sm">
                         </div>
                     </div>
@@ -231,24 +245,16 @@
                     class="w-full border-b-2 border-gray-100 focus:border-blue-500 outline-none py-2 text-sm font-bold">
             </div>
 
-            <div class="grid grid-cols-2 gap-3">
-                <div>
-                    <label class="text-[10px] font-black text-gray-400 uppercase">Term Start</label>
-                    <input type="date"
-                        name="secretary_term_start"
-                        value="{{ old('secretary_term_start') }}"
-                        required
-                        class="w-full border-b-2 border-gray-100 focus:border-blue-500 outline-none py-2 text-sm font-bold">
-                </div>
+            <div class="rounded-xl bg-green-50 border border-green-100 px-4 py-3">
+                <p class="text-[10px] font-black text-green-600 uppercase">Administration Term</p>
 
-                <div>
-                    <label class="text-[10px] font-black text-gray-400 uppercase">Term End</label>
-                    <input type="date"
-                        name="secretary_term_end"
-                        value="{{ old('secretary_term_end') }}"
-                        required
-                        class="w-full border-b-2 border-gray-100 focus:border-blue-500 outline-none py-2 text-sm font-bold">
-                </div>
+                @if($currentAdministration)
+                    <p class="mt-1 text-sm font-black text-green-700">
+                        {{ $currentAdministration->start_year }} - {{ $currentAdministration->end_year }}
+                    </p>
+                @else
+                    <p class="mt-1 text-xs font-bold text-red-600">No active administration term</p>
+                @endif
             </div>
 
             <div class="rounded-xl bg-blue-50 px-4 py-3 text-xs text-blue-700">
@@ -330,24 +336,16 @@
                     class="w-full border-b-2 border-gray-100 focus:border-blue-500 outline-none py-2 text-sm font-bold">
             </div>
 
-            <div class="grid grid-cols-2 gap-3">
-                <div>
-                    <label class="text-[10px] font-black text-gray-400 uppercase">Term Start</label>
-                    <input type="date"
-                        name="edit_secretary_term_start"
-                        value="{{ old('edit_secretary_term_start',$secretary['term_start']) }}"
-                        required
-                        class="w-full border-b-2 border-gray-100 focus:border-blue-500 outline-none py-2 text-sm font-bold">
-                </div>
+            <div class="rounded-xl bg-gray-50 border border-gray-100 px-4 py-3">
+                <p class="text-[10px] font-black text-gray-400 uppercase">Administration Term</p>
 
-                <div>
-                    <label class="text-[10px] font-black text-gray-400 uppercase">Term End</label>
-                    <input type="date"
-                        name="edit_secretary_term_end"
-                        value="{{ old('edit_secretary_term_end',$secretary['term_end']) }}"
-                        required
-                        class="w-full border-b-2 border-gray-100 focus:border-blue-500 outline-none py-2 text-sm font-bold">
-                </div>
+                <p class="mt-1 text-sm font-black text-gray-700">
+                    {{ $secretary['term'] ?? 'N/A' }}
+                </p>
+
+                <p class="mt-1 text-[9px] text-gray-400">
+                    Administration term cannot be changed from Edit Details.
+                </p>
             </div>
 
             <div class="flex gap-3 pt-3">
@@ -414,12 +412,16 @@
                 </div>
             </div>
 
-            <div>
-                <label class="text-[10px] font-black text-gray-400 uppercase">Term</label>
-                <input type="text"
-                    name="treasurer_term"
-                    value="{{ old('treasurer_term','2023-2026') }}"
-                    class="w-full border-b-2 border-gray-100 focus:border-yellow-500 outline-none py-2 text-sm font-bold">
+            <div class="rounded-xl bg-green-50 border border-green-100 px-4 py-3">
+                <p class="text-[10px] font-black text-green-600 uppercase">Administration Term</p>
+
+                @if($currentAdministration)
+                    <p class="mt-1 text-sm font-black text-green-700">
+                        {{ $currentAdministration->start_year }} - {{ $currentAdministration->end_year }}
+                    </p>
+                @else
+                    <p class="mt-1 text-xs font-bold text-red-600">No active administration term</p>
+                @endif
             </div>
 
             <div class="flex gap-3 pt-3">
@@ -487,12 +489,16 @@
                 </div>
             </div>
 
-            <div>
-                <label class="text-[10px] font-black text-gray-400 uppercase">Term</label>
-                <input type="text"
-                    name="edit_treasurer_term"
-                    value="{{ old('edit_treasurer_term',$treasurer['term']) }}"
-                    class="w-full border-b-2 border-gray-100 focus:border-yellow-500 outline-none py-2 text-sm font-bold">
+            <div class="rounded-xl bg-gray-50 border border-gray-100 px-4 py-3">
+                <p class="text-[10px] font-black text-gray-400 uppercase">Administration Term</p>
+
+                <p class="mt-1 text-sm font-black text-gray-700">
+                    {{ $treasurer['term'] ?? 'N/A' }}
+                </p>
+
+                <p class="mt-1 text-[9px] text-gray-400">
+                    Administration term cannot be changed from Edit Details.
+                </p>
             </div>
 
             <div class="flex gap-3 pt-3">
@@ -564,15 +570,6 @@
                         value="{{ old('edit_councilor_phone') }}"
                         class="w-full border-b-2 border-gray-100 focus:border-red-500 outline-none py-2 text-sm font-bold">
                 </div>
-            </div>
-
-            <div>
-                <label class="text-[10px] font-black text-gray-400 uppercase">Term</label>
-                <input type="text"
-                    id="edit_councilor_term"
-                    name="edit_councilor_term"
-                    value="{{ old('edit_councilor_term') }}"
-                    class="w-full border-b-2 border-gray-100 focus:border-red-500 outline-none py-2 text-sm font-bold">
             </div>
 
             <div class="flex gap-3 pt-3">
@@ -653,6 +650,7 @@
 
                     <div id="notifDropdown"
                         class="hidden absolute right-0 mt-3 w-72 bg-white rounded-2xl shadow-xl border z-50 overflow-hidden">
+
                         <div class="px-4 py-3 font-semibold border-b text-gray-800">
                             Notifications
                         </div>
@@ -749,6 +747,12 @@
                         <p class="text-xs opacity-80 font-medium">
                             Current SK Administration
                         </p>
+
+                        @if($currentAdministration)
+                            <p class="mt-1 text-sm font-black">
+                                {{ $currentAdministration->start_year }} - {{ $currentAdministration->end_year }}
+                            </p>
+                        @endif
                     </div>
                 </div>
 
@@ -828,8 +832,7 @@
                                 ($member['phone'] ?? '').' '.
                                 ($member['term'] ?? '').' '.
                                 $searchStatus
-                            ) }}"
-                        >
+                            ) }}">
 
                             <div class="w-16 h-16 rounded-2xl {{ $avatarStyle }} flex items-center justify-center font-black text-xl border-4 border-white shadow-sm">
                                 {{ strtoupper(substr($member['name'] ?? 'U',0,2)) }}
@@ -914,12 +917,26 @@
 
                                             <form method="POST"
                                                 action="{{ route('sk_chairman.leadership.secretary.resend',$member['user_id']) }}"
-                                                onsubmit="return confirm('Send a new setup link to {{ $member['email'] }}?');">
+                                                onsubmit="return confirm('Send a new setup link to this Secretary?');">
                                                 @csrf
 
                                                 <button type="submit"
                                                     class="block w-full text-left px-4 py-2 text-xs font-semibold text-blue-600 hover:bg-blue-50">
                                                     Resend Setup Link
+                                                </button>
+                                            </form>
+
+                                            <div class="border-t my-1"></div>
+
+                                            <form method="POST"
+                                                action="{{ route('sk_chairman.leadership.secretary.destroy',$member['user_id']) }}"
+                                                onsubmit="return confirm('Delete this pending Secretary account permanently?');">
+                                                @csrf
+                                                @method('DELETE')
+
+                                                <button type="submit"
+                                                    class="block w-full text-left px-4 py-2 text-xs font-semibold text-red-600 hover:bg-red-50">
+                                                    Delete Pending Account
                                                 </button>
                                             </form>
 
@@ -937,20 +954,6 @@
                                             </form>
 
                                         @endif
-
-                                        <div class="border-t my-1"></div>
-
-                                        <form method="POST"
-                                            action="{{ route('sk_chairman.leadership.secretary.destroy',$member['user_id']) }}"
-                                            onsubmit="return confirm('Delete this secretary account?');">
-                                            @csrf
-                                            @method('DELETE')
-
-                                            <button type="submit"
-                                                class="block w-full text-left px-4 py-2 text-xs font-semibold text-red-600 hover:bg-red-50">
-                                                Delete Account
-                                            </button>
-                                        </form>
                                     </div>
                                 </div>
                             @endif
@@ -1017,8 +1020,7 @@
                                 ($member['email'] ?? '').' '.
                                 ($member['phone'] ?? '').' '.
                                 ($member['term'] ?? '')
-                            ) }}"
-                        >
+                            ) }}">
 
                             <div class="w-12 h-12 rounded-full bg-yellow-400 flex items-center justify-center text-white font-black shadow-sm border-2 border-white">
                                 {{ strtoupper(substr($member['name'] ?? 'U',0,2)) }}
@@ -1063,8 +1065,7 @@
                                             data-id="{{ $member['council_id'] }}"
                                             data-name="{{ $member['name'] }}"
                                             data-email="{{ $member['email'] ?? '' }}"
-                                            data-phone="{{ $member['phone'] ?? '' }}"
-                                            data-term="{{ $member['term'] ?? '' }}">
+                                            data-phone="{{ $member['phone'] ?? '' }}">
                                             Edit Details
                                         </button>
 
@@ -1128,7 +1129,6 @@ document.addEventListener('DOMContentLoaded',()=>{
     | MODAL HELPER
     |--------------------------------------------------------------------------
     */
-
     window.toggleModal=(id)=>{
         const modal=document.getElementById(id);
 
@@ -1142,7 +1142,6 @@ document.addEventListener('DOMContentLoaded',()=>{
     | NOTIFICATION DROPDOWN
     |--------------------------------------------------------------------------
     */
-
     if(notifBtn && notifDropdown){
         notifBtn.addEventListener('click',(e)=>{
             e.stopPropagation();
@@ -1160,7 +1159,6 @@ document.addEventListener('DOMContentLoaded',()=>{
     | USER DROPDOWN
     |--------------------------------------------------------------------------
     */
-
     if(userMenuBtn && userDropdown){
         userMenuBtn.addEventListener('click',(e)=>{
             e.stopPropagation();
@@ -1178,16 +1176,13 @@ document.addEventListener('DOMContentLoaded',()=>{
     | BULK COUNCILOR ROWS
     |--------------------------------------------------------------------------
     */
-
     const bulkRows=document.getElementById('bulkCouncilorRows');
     const addCouncilorRow=document.getElementById('addCouncilorRow');
 
     let bulkIndex={{ $bulkNextIndex }};
 
     if(bulkRows && addCouncilorRow){
-
         addCouncilorRow.addEventListener('click',()=>{
-
             const firstRow=bulkRows.querySelector('.bulk-councilor-row');
 
             if(!firstRow){
@@ -1197,7 +1192,6 @@ document.addEventListener('DOMContentLoaded',()=>{
             const newRow=firstRow.cloneNode(true);
 
             newRow.querySelectorAll('input').forEach((field)=>{
-
                 const name=field.getAttribute('name');
 
                 if(name){
@@ -1210,11 +1204,7 @@ document.addEventListener('DOMContentLoaded',()=>{
                     );
                 }
 
-                if(field.getAttribute('name')?.includes('[term]')){
-                    field.value='2023-2026';
-                }else{
-                    field.value='';
-                }
+                field.value='';
             });
 
             const removeBtn=newRow.querySelector('.removeCouncilorRow');
@@ -1224,17 +1214,13 @@ document.addEventListener('DOMContentLoaded',()=>{
             }
 
             bulkRows.appendChild(newRow);
-
             bulkIndex++;
-
             updateCouncilorTitles();
         });
     }
 
     document.addEventListener('click',(e)=>{
-
         if(e.target.classList.contains('removeCouncilorRow')){
-
             const row=e.target.closest('.bulk-councilor-row');
 
             if(row){
@@ -1245,9 +1231,7 @@ document.addEventListener('DOMContentLoaded',()=>{
     });
 
     function updateCouncilorTitles(){
-
         document.querySelectorAll('.bulk-councilor-row').forEach((row,index)=>{
-
             const title=row.querySelector('.bulk-councilor-title');
             const removeBtn=row.querySelector('.removeCouncilorRow');
 
@@ -1266,11 +1250,8 @@ document.addEventListener('DOMContentLoaded',()=>{
     | ACTION MENUS
     |--------------------------------------------------------------------------
     */
-
     document.querySelectorAll('.action-menu-btn,.secretary-menu-btn').forEach((btn)=>{
-
         btn.addEventListener('click',(e)=>{
-
             e.stopPropagation();
 
             const menu=btn.nextElementSibling;
@@ -1290,7 +1271,6 @@ document.addEventListener('DOMContentLoaded',()=>{
     | EDIT COUNCILOR
     |--------------------------------------------------------------------------
     */
-
     const editCouncilorModal=document.getElementById('editCouncilorModal');
     const editCouncilorForm=document.getElementById('editCouncilorForm');
 
@@ -1301,9 +1281,7 @@ document.addEventListener('DOMContentLoaded',()=>{
     );
 
     document.querySelectorAll('.edit-councilor-btn').forEach((btn)=>{
-
         btn.addEventListener('click',()=>{
-
             const id=btn.dataset.id;
 
             if(!id || !editCouncilorForm){
@@ -1316,7 +1294,6 @@ document.addEventListener('DOMContentLoaded',()=>{
             document.getElementById('edit_councilor_name').value=btn.dataset.name || '';
             document.getElementById('edit_councilor_email').value=btn.dataset.email || '';
             document.getElementById('edit_councilor_phone').value=btn.dataset.phone || '';
-            document.getElementById('edit_councilor_term').value=btn.dataset.term || '';
 
             editCouncilorModal?.classList.remove('hidden');
         });
@@ -1327,24 +1304,18 @@ document.addEventListener('DOMContentLoaded',()=>{
     | REAL-TIME SEARCH
     |--------------------------------------------------------------------------
     */
-
     const leadershipSearch=document.getElementById('leadershipSearch');
     const leadershipNoResults=document.getElementById('leadershipNoResults');
 
     if(leadershipSearch){
-
         leadershipSearch.addEventListener('input',()=>{
-
             const search=leadershipSearch.value.trim().toLowerCase();
-
             const items=document.querySelectorAll('.leadership-search-item');
 
             let visibleCount=0;
 
             items.forEach((item)=>{
-
                 const content=(item.dataset.search || '').toLowerCase();
-
                 const matched=search==='' || content.includes(search);
 
                 item.classList.toggle('hidden',!matched);
@@ -1355,7 +1326,6 @@ document.addEventListener('DOMContentLoaded',()=>{
             });
 
             if(leadershipNoResults){
-
                 leadershipNoResults.classList.toggle(
                     'hidden',
                     search==='' || visibleCount>0
@@ -1369,9 +1339,7 @@ document.addEventListener('DOMContentLoaded',()=>{
     | CLOSE DROPDOWNS
     |--------------------------------------------------------------------------
     */
-
     document.addEventListener('click',(e)=>{
-
         if(
             notifBtn &&
             notifDropdown &&
@@ -1391,7 +1359,6 @@ document.addEventListener('DOMContentLoaded',()=>{
         }
 
         document.querySelectorAll('.action-menu,.secretary-menu').forEach((menu)=>{
-
             if(!menu.contains(e.target)){
                 menu.classList.add('hidden');
             }
@@ -1403,7 +1370,6 @@ document.addEventListener('DOMContentLoaded',()=>{
     | CLOSE MODALS BY CLICKING BACKDROP
     |--------------------------------------------------------------------------
     */
-
     [
         'addCouncilorModal',
         'bulkCouncilorModal',
@@ -1413,13 +1379,10 @@ document.addEventListener('DOMContentLoaded',()=>{
         'editTreasurerModal',
         'editCouncilorModal'
     ].forEach((id)=>{
-
         const modal=document.getElementById(id);
 
         if(modal){
-
             modal.addEventListener('click',(e)=>{
-
                 if(e.target===modal){
                     modal.classList.add('hidden');
                 }
@@ -1432,7 +1395,6 @@ document.addEventListener('DOMContentLoaded',()=>{
     | OPEN CORRECT MODAL AFTER VALIDATION ERROR
     |--------------------------------------------------------------------------
     */
-
     @if($errors->councilorAdd->any())
 
         document.getElementById('addCouncilorModal')
@@ -1472,7 +1434,6 @@ document.addEventListener('DOMContentLoaded',()=>{
         @if($failedCouncilorId)
 
             if(editCouncilorForm){
-
                 editCouncilorForm.action=
                     councilorUpdateUrlTemplate.replace(
                         '__ID__',
@@ -1482,7 +1443,6 @@ document.addEventListener('DOMContentLoaded',()=>{
 
             document.getElementById('editCouncilorModal')
                 ?.classList.remove('hidden');
-
         @endif
 
     @endif
@@ -1492,7 +1452,6 @@ document.addEventListener('DOMContentLoaded',()=>{
     | SUCCESS MESSAGE
     |--------------------------------------------------------------------------
     */
-
     @if(session('success'))
 
         Swal.fire({
