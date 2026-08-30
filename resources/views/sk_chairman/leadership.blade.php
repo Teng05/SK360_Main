@@ -587,35 +587,330 @@
     </div>
 </div>
 
+<!-- REAPPOINT FORMER OFFICIALS MODAL -->
+<div id="reappointLeadershipModal" class="hidden fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl w-full max-w-5xl max-h-[90vh] overflow-y-auto shadow-2xl">
+
+        <div class="bg-gray-800 p-6 text-white flex justify-between items-center">
+            <div>
+                <h2 class="text-xl font-black uppercase tracking-tighter">Reappoint Former Officials</h2>
+                <p class="text-[10px] opacity-80 uppercase font-bold">
+                    Search and filter officials from any completed administration.
+                </p>
+            </div>
+
+            <button type="button"
+                onclick="toggleModal('reappointLeadershipModal')"
+                class="text-2xl">
+                &times;
+            </button>
+        </div>
+
+        <div class="p-6">
+
+            @if($currentAdministration)
+                <div class="mb-4 rounded-xl bg-green-50 border border-green-100 px-4 py-3">
+                    <p class="text-[10px] font-black text-green-600 uppercase">Reappointing For</p>
+
+                    <p class="mt-1 text-sm font-black text-green-700">
+                        {{ $currentAdministration->start_year }} - {{ $currentAdministration->end_year }} Administration
+                    </p>
+                </div>
+            @endif
+
+            <div class="mb-5 rounded-xl bg-blue-50 border border-blue-100 px-4 py-3">
+                <p class="text-[10px] font-black uppercase text-blue-700">Account Security</p>
+
+                <p class="mt-1 text-[10px] text-blue-600">
+                    Reappointed Secretaries reuse their existing SK360 account, but their old password is invalidated. A new password setup link will be sent before the account becomes active.
+                </p>
+
+                <p class="mt-1 text-[10px] text-gray-500">
+                    Treasurers and Councilors do not have SK360 accounts, so no password setup email is required for those positions.
+                </p>
+            </div>
+
+            <!-- FILTERS -->
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-3 mb-5">
+
+                <div class="md:col-span-2">
+                    <label class="block mb-1 text-[9px] font-black text-gray-400 uppercase">
+                        Search Former Official
+                    </label>
+
+                    <input type="text"
+                        id="reappointSearch"
+                        placeholder="Search name, email, phone, position or term..."
+                        autocomplete="off"
+                        class="w-full rounded-xl border border-gray-200 px-4 py-3 text-xs font-semibold outline-none focus:border-red-400">
+                </div>
+
+                <div>
+                    <label class="block mb-1 text-[9px] font-black text-gray-400 uppercase">
+                        Position
+                    </label>
+
+                    <select id="reappointPosition"
+                        class="w-full rounded-xl border border-gray-200 px-3 py-3 text-xs font-bold outline-none focus:border-red-400">
+                        <option value="all">All Positions</option>
+                        <option value="secretary">SK Secretary</option>
+                        <option value="treasurer">SK Treasurer</option>
+                        <option value="councilor">SK Councilor</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block mb-1 text-[9px] font-black text-gray-400 uppercase">
+                        Previous Term
+                    </label>
+
+                    <select id="reappointTerm"
+                        class="w-full rounded-xl border border-gray-200 px-3 py-3 text-xs font-bold outline-none focus:border-red-400">
+                        <option value="all">All Previous Terms</option>
+
+                        @foreach($reappointmentTerms as $term)
+                            <option value="{{ $term }}">{{ $term }}</option>
+                        @endforeach
+                    </select>
+                </div>
+            </div>
+
+            <div class="flex items-center justify-between mb-4">
+                <p id="reappointResultCount"
+                    class="text-[10px] font-black uppercase tracking-widest text-gray-400">
+                    {{ $formerOfficials->count() }} Former Official{{ $formerOfficials->count() === 1 ? '' : 's' }}
+                </p>
+
+                <button type="button"
+                    id="clearReappointFilters"
+                    class="text-[10px] font-black uppercase text-red-600 hover:text-red-700">
+                    Clear Filters
+                </button>
+            </div>
+
+            <!-- FORMER OFFICIALS -->
+            <div id="reappointOfficialsList"
+                class="grid grid-cols-1 md:grid-cols-2 gap-3">
+
+                @forelse($formerOfficials as $former)
+
+                    @php
+                        $isSecretary=$former['type'] === 'secretary';
+                        $isTreasurer=$former['type'] === 'treasurer';
+
+                        $positionFilled=
+                            ($isSecretary && !$canAddSecretary) ||
+                            ($isTreasurer && !empty($treasurer));
+
+                        if($isSecretary){
+                            $cardBorder='border-blue-100';
+                            $positionBadge='bg-blue-100 text-blue-700';
+                        }elseif($isTreasurer){
+                            $cardBorder='border-yellow-200';
+                            $positionBadge='bg-yellow-100 text-yellow-700';
+                        }else{
+                            $cardBorder='border-red-100';
+                            $positionBadge='bg-red-100 text-red-700';
+                        }
+
+                        $searchText=strtolower(
+                            ($former['name'] ?? '').' '.
+                            ($former['email'] ?? '').' '.
+                            ($former['phone'] ?? '').' '.
+                            ($former['position'] ?? '').' '.
+                            implode(' ',$former['terms'] ?? [])
+                        );
+                    @endphp
+
+                    <div
+                        class="reappoint-official-card rounded-2xl border {{ $cardBorder }} bg-gray-50/50 p-4"
+                        data-position="{{ $former['type'] }}"
+                        data-terms="{{ implode('|',$former['terms']) }}"
+                        data-search="{{ $searchText }}">
+
+                        <div class="flex items-start justify-between gap-3">
+
+                            <div class="min-w-0">
+
+                                <div class="flex flex-wrap items-center gap-2">
+
+                                    <h3 class="text-sm font-black text-gray-800 uppercase">
+                                        {{ $former['name'] }}
+                                    </h3>
+
+                                    <span class="rounded-full px-2.5 py-1 text-[8px] font-black uppercase {{ $positionBadge }}">
+                                        {{ $former['position'] }}
+                                    </span>
+                                </div>
+
+                                <div class="mt-2 space-y-1 text-[10px] text-gray-500">
+                                    <p>
+                                        &#128231;
+                                        {{ $former['email'] ?: 'No email provided' }}
+                                    </p>
+
+                                    <p>
+                                        &#128222;
+                                        {{ $former['phone'] ?: 'No phone provided' }}
+                                    </p>
+                                </div>
+                            </div>
+
+                            @if($positionFilled)
+                                <span class="shrink-0 rounded-full bg-gray-200 px-2.5 py-1 text-[8px] font-black uppercase text-gray-500">
+                                    Position Filled
+                                </span>
+                            @endif
+                        </div>
+
+                        <div class="mt-4">
+
+                            <p class="mb-2 text-[8px] font-black uppercase tracking-widest text-gray-400">
+                                Previous Service
+                            </p>
+
+                            <div class="flex flex-wrap gap-1.5">
+
+                                @foreach($former['terms'] as $term)
+                                    <span class="rounded-lg bg-white border border-gray-200 px-2 py-1 text-[9px] font-black text-gray-600">
+                                        {{ $term }}
+                                    </span>
+                                @endforeach
+
+                            </div>
+                        </div>
+
+                        <div class="mt-4 flex justify-end">
+
+                            @if($positionFilled)
+
+                                <button type="button"
+                                    disabled
+                                    class="rounded-xl bg-gray-200 px-4 py-2.5 text-[9px] font-black uppercase text-gray-400 cursor-not-allowed">
+                                    Cannot Reappoint
+                                </button>
+
+                            @elseif($isSecretary)
+
+                                <form method="POST"
+                                    action="{{ route('sk_chairman.leadership.secretary.reappoint',$former['action_id']) }}"
+                                    onsubmit="return confirm(@js('Reappoint '.$former['name'].' as SK Secretary for the current administration? Their existing SK360 account will be reused, but their old password will be invalidated and a new password setup link will be sent.'));">
+
+                                    @csrf
+
+                                    <button type="submit"
+                                        class="rounded-xl bg-blue-600 hover:bg-blue-700 px-4 py-2.5 text-[9px] font-black uppercase text-white">
+                                        Reappoint Secretary
+                                    </button>
+                                </form>
+
+                            @else
+
+                                <form method="POST"
+                                    action="{{ route('sk_chairman.leadership.council.reappoint',$former['action_id']) }}"
+                                    onsubmit="return confirm(@js('Reappoint '.$former['name'].' as '.$former['position'].' for the current administration?'));">
+
+                                    @csrf
+
+                                    <button type="submit"
+                                        class="rounded-xl {{ $isTreasurer ? 'bg-yellow-500 hover:bg-yellow-600' : 'bg-red-600 hover:bg-red-700' }} px-4 py-2.5 text-[9px] font-black uppercase text-white">
+                                        Reappoint {{ $isTreasurer ? 'Treasurer' : 'Councilor' }}
+                                    </button>
+                                </form>
+
+                            @endif
+
+                        </div>
+                    </div>
+
+                @empty
+
+                    <div class="md:col-span-2 rounded-2xl bg-gray-50 p-8 text-center">
+
+                        <p class="text-sm font-bold text-gray-500">
+                            No former officials available for reappointment.
+                        </p>
+
+                        <p class="mt-1 text-xs text-gray-400">
+                            Completed leadership records will appear here in future administrations.
+                        </p>
+
+                    </div>
+
+                @endforelse
+
+            </div>
+
+            <div id="reappointNoResults"
+                class="hidden rounded-2xl bg-gray-50 p-8 text-center">
+
+                <div class="text-2xl mb-2">
+                    &#128269;
+                </div>
+
+                <p class="text-sm font-bold text-gray-500">
+                    No former officials match your filters.
+                </p>
+
+                <p class="mt-1 text-xs text-gray-400">
+                    Try another name, position, or previous administration term.
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- MAIN PAGE -->
 <div class="flex h-screen bg-gray-100 overflow-hidden">
 
     <!-- SIDEBAR -->
     <div class="w-64 bg-red-600 text-white flex flex-col p-3 overflow-y-auto">
+
         <div class="flex items-center gap-3 mb-4">
-            <img src="{{ asset('images/logo.png') }}" class="w-8 h-8 rounded-full object-cover" alt="logo">
+
+            <img src="{{ asset('images/logo.png') }}"
+                class="w-8 h-8 rounded-full object-cover"
+                alt="logo">
 
             <div class="leading-tight">
-                <h2 class="text-lg font-extrabold tracking-wide">SK 360°</h2>
-                <p class="text-[10px] opacity-80">Management System</p>
+                <h2 class="text-lg font-extrabold tracking-wide">
+                    SK 360°
+                </h2>
+
+                <p class="text-[10px] opacity-80">
+                    Management System
+                </p>
             </div>
         </div>
 
         <div class="bg-red-500 rounded-lg p-2 flex items-center gap-2 mb-3 shadow text-xs">
-            <div class="bg-yellow-400 text-red-600 p-1 rounded-full text-sm">👤</div>
+
+            <div class="bg-yellow-400 text-red-600 p-1 rounded-full text-sm">
+                👤
+            </div>
 
             <div>
-                <p class="font-semibold text-xs">SK Chairman</p>
-                <p class="text-xs opacity-80">Active Role</p>
+                <p class="font-semibold text-xs">
+                    SK Chairman
+                </p>
+
+                <p class="text-xs opacity-80">
+                    Active Role
+                </p>
             </div>
         </div>
 
         <nav class="space-y-1 text-xs">
+
             @foreach($menuItems as $item)
-                @php $isActive=$item['link'] === $currentUrl; @endphp
+
+                @php
+                    $isActive=$item['link'] === $currentUrl;
+                @endphp
 
                 <a href="{{ $item['link'] }}"
                     class="flex items-center gap-2 p-2 rounded-lg {{ $isActive ? 'bg-red-500' : 'hover:bg-red-500 transition' }}">
+
                     <span class="{{ $isActive ? 'bg-yellow-400 text-red-600' : 'bg-red-400' }} p-1 rounded text-sm">
                         {!! $item['icon'] !!}
                     </span>
@@ -624,7 +919,9 @@
                         {{ $item['label'] }}
                     </span>
                 </a>
+
             @endforeach
+
         </nav>
     </div>
 
@@ -633,6 +930,7 @@
 
         <!-- HEADER -->
         <div class="bg-red-600 text-white px-6 py-3 flex justify-between items-center shadow">
+
             <input type="text"
                 id="leadershipSearch"
                 placeholder="Search officials..."
@@ -643,7 +941,9 @@
 
                 <!-- NOTIFICATION -->
                 <div class="relative">
-                    <button id="notifBtn" type="button"
+
+                    <button id="notifBtn"
+                        type="button"
                         class="text-xl hover:bg-red-500 p-2 rounded-lg transition">
                         🔔
                     </button>
@@ -665,9 +965,14 @@
 
                 <!-- USER MENU -->
                 <div class="relative">
-                    <button id="userMenuBtn" type="button"
+
+                    <button id="userMenuBtn"
+                        type="button"
                         class="flex items-center gap-2 hover:bg-red-500 px-3 py-2 rounded-lg transition">
-                        <span class="font-semibold">{{ $fullName }}</span>
+
+                        <span class="font-semibold">
+                            {{ $fullName }}
+                        </span>
                     </button>
 
                     <div id="userDropdown"
@@ -679,8 +984,12 @@
 
                         <a href="{{ route('sk_chairman.profile') }}"
                             class="flex items-center gap-3 px-5 py-3 hover:bg-gray-100 transition">
+
                             <span>👤</span>
-                            <span class="text-gray-700">Profile Settings</span>
+
+                            <span class="text-gray-700">
+                                Profile Settings
+                            </span>
                         </a>
 
                         <form method="POST" action="{{ route('logout') }}">
@@ -688,8 +997,12 @@
 
                             <button type="submit"
                                 class="w-full text-left flex items-center gap-3 px-5 py-3 text-red-500 hover:bg-gray-100 transition">
+
                                 <span>↩️</span>
-                                <span>Log Out</span>
+
+                                <span>
+                                    Log Out
+                                </span>
                             </button>
                         </form>
                     </div>
@@ -707,6 +1020,7 @@
 
             <!-- PAGE TITLE -->
             <div class="flex justify-between items-end mb-8">
+
                 <div>
                     <h1 class="text-3xl font-black text-gray-800 uppercase tracking-tight">
                         Council Leadership
@@ -718,23 +1032,41 @@
                 </div>
 
                 <div class="flex items-center gap-2">
+
+                    @if($formerOfficials->isNotEmpty())
+                        <button type="button"
+                            onclick="toggleModal('reappointLeadershipModal')"
+                            class="bg-white hover:bg-gray-50 text-gray-600 border border-gray-200 px-5 py-3 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-sm transition-all">
+
+                            &#8635; Reappoint Former
+                        </button>
+                    @endif
+
                     <button type="button"
                         onclick="toggleModal('bulkCouncilorModal')"
                         class="bg-gray-800 hover:bg-gray-900 text-white px-5 py-3 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-lg transition-all">
+
                         &#128101; Bulk Add
                     </button>
 
                     <button type="button"
                         onclick="toggleModal('addCouncilorModal')"
                         class="bg-red-600 hover:bg-red-700 text-white px-5 py-3 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-lg transition-all">
-                        <span class="text-base">+</span> Single Add
+
+                        <span class="text-base">
+                            +
+                        </span>
+
+                        Single Add
                     </button>
                 </div>
             </div>
 
             <!-- BARANGAY CARD -->
             <div class="bg-red-600 rounded-2xl p-6 text-white mb-8 shadow-md flex justify-between items-center">
+
                 <div class="flex items-center gap-4">
+
                     <div class="bg-white/20 p-3 rounded-xl text-2xl">
                         &#128205;
                     </div>
@@ -757,6 +1089,7 @@
                 </div>
 
                 <div class="text-right">
+
                     <span class="bg-white/10 px-4 py-2 rounded-full text-[10px] font-bold border border-white/20 uppercase tracking-widest">
                         {{ $councilMembers->count() }} Total Members
                     </span>
@@ -765,10 +1098,14 @@
 
             <!-- EXECUTIVE OFFICERS -->
             <div class="bg-white rounded-3xl border border-gray-100 shadow-sm p-8 mb-8">
+
                 <div class="flex items-center justify-between gap-3 mb-8 border-b border-gray-50 pb-4">
 
                     <div class="flex items-center gap-2">
-                        <span class="text-red-500 font-bold">&#128737;</span>
+
+                        <span class="text-red-500 font-bold">
+                            &#128737;
+                        </span>
 
                         <h3 class="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">
                             Executive Officers
@@ -776,10 +1113,12 @@
                     </div>
 
                     <div class="flex items-center gap-2">
+
                         @if($canAddSecretary)
                             <button type="button"
                                 onclick="toggleModal('addSecretaryModal')"
                                 class="rounded-xl bg-blue-600 hover:bg-blue-700 px-4 py-2 text-[9px] font-black uppercase text-white">
+
                                 + Add Secretary
                             </button>
                         @endif
@@ -788,6 +1127,7 @@
                             <button type="button"
                                 onclick="toggleModal('addTreasurerModal')"
                                 class="rounded-xl bg-yellow-500 hover:bg-yellow-600 px-4 py-2 text-[9px] font-black uppercase text-white">
+
                                 + Add Treasurer
                             </button>
                         @endif
@@ -797,11 +1137,13 @@
                 <div class="grid grid-cols-1 gap-4">
 
                     @foreach($executives as $member)
+
                         @php
                             $isSecretary=($member['position'] ?? '') === 'SK Secretary';
                             $isChairman=($member['position'] ?? '') === 'SK Chairman';
                             $isTreasurer=($member['position'] ?? '') === 'SK Treasurer';
                             $pending=$isSecretary && (int)($member['is_verified'] ?? 1) === 0;
+                            $isSecretaryReappointment=$isSecretary && ($member['is_reappointment'] ?? false);
 
                             if($isChairman){
                                 $officerBorder='border-red-100 bg-red-50/30';
@@ -839,6 +1181,7 @@
                             </div>
 
                             <div class="flex-1">
+
                                 <div class="flex flex-wrap items-center gap-3">
 
                                     <h4 class="text-lg font-black text-gray-800 uppercase leading-none">
@@ -852,19 +1195,29 @@
                                     @if($isSecretary)
 
                                         @if($pending)
+
                                             <span class="px-3 py-1 rounded-full text-[9px] font-black uppercase bg-yellow-100 text-yellow-700">
-                                                Pending
+                                                Pending Setup
                                             </span>
 
+                                            @if($isSecretaryReappointment)
+                                                <span class="px-3 py-1 rounded-full text-[9px] font-black uppercase bg-blue-100 text-blue-700">
+                                                    Reappointment
+                                                </span>
+                                            @endif
+
                                         @elseif(($member['status'] ?? '') === 'active')
+
                                             <span class="px-3 py-1 rounded-full text-[9px] font-black uppercase bg-green-100 text-green-600">
                                                 Active
                                             </span>
 
                                         @else
+
                                             <span class="px-3 py-1 rounded-full text-[9px] font-black uppercase bg-gray-200 text-gray-600">
                                                 Inactive
                                             </span>
+
                                         @endif
 
                                     @elseif($isChairman)
@@ -879,25 +1232,34 @@
                                 <div class="grid grid-cols-1 md:grid-cols-3 mt-3 text-[11px] text-gray-500 font-medium gap-2">
 
                                     <div class="flex items-center gap-2">
-                                        <span>&#128231;</span>
+                                        <span>
+                                            &#128231;
+                                        </span>
+
                                         {{ $member['email'] ?: 'No email provided' }}
                                     </div>
 
                                     <div class="flex items-center gap-2">
-                                        <span>&#128222;</span>
+                                        <span>
+                                            &#128222;
+                                        </span>
+
                                         {{ $member['phone'] ?: 'No phone provided' }}
                                     </div>
 
                                     <div class="flex items-center gap-2 uppercase tracking-tighter">
-                                        <span>&#128197;</span>
+                                        <span>
+                                            &#128197;
+                                        </span>
+
                                         {{ $member['term'] ?: 'N/A' }}
                                     </div>
-
                                 </div>
                             </div>
 
                             <!-- SECRETARY ACTIONS -->
                             @if($isSecretary)
+
                                 <div class="relative">
 
                                     <button type="button"
@@ -905,11 +1267,12 @@
                                         &#8942;
                                     </button>
 
-                                    <div class="secretary-menu hidden absolute right-0 top-10 z-40 w-44 rounded-xl border bg-white shadow-xl py-1">
+                                    <div class="secretary-menu hidden absolute right-0 top-10 z-40 w-48 rounded-xl border bg-white shadow-xl py-1">
 
                                         <button type="button"
                                             onclick="toggleModal('editSecretaryModal')"
                                             class="block w-full text-left px-4 py-2 text-xs hover:bg-gray-50">
+
                                             Edit Details
                                         </button>
 
@@ -917,38 +1280,64 @@
 
                                             <form method="POST"
                                                 action="{{ route('sk_chairman.leadership.secretary.resend',$member['user_id']) }}"
-                                                onsubmit="return confirm('Send a new setup link to this Secretary?');">
+                                                onsubmit="return confirm('Send a new password setup link to this Secretary?');">
+
                                                 @csrf
 
                                                 <button type="submit"
                                                     class="block w-full text-left px-4 py-2 text-xs font-semibold text-blue-600 hover:bg-blue-50">
+
                                                     Resend Setup Link
                                                 </button>
                                             </form>
 
                                             <div class="border-t my-1"></div>
 
-                                            <form method="POST"
-                                                action="{{ route('sk_chairman.leadership.secretary.destroy',$member['user_id']) }}"
-                                                onsubmit="return confirm('Delete this pending Secretary account permanently?');">
-                                                @csrf
-                                                @method('DELETE')
+                                            @if($isSecretaryReappointment)
 
-                                                <button type="submit"
-                                                    class="block w-full text-left px-4 py-2 text-xs font-semibold text-red-600 hover:bg-red-50">
-                                                    Delete Pending Account
-                                                </button>
-                                            </form>
+                                                <form method="POST"
+                                                    action="{{ route('sk_chairman.leadership.secretary.destroy',$member['user_id']) }}"
+                                                    onsubmit="return confirm('Cancel this Secretary reappointment? Their historical service records will remain preserved.');">
+
+                                                    @csrf
+                                                    @method('DELETE')
+
+                                                    <button type="submit"
+                                                        class="block w-full text-left px-4 py-2 text-xs font-semibold text-red-600 hover:bg-red-50">
+
+                                                        Cancel Reappointment
+                                                    </button>
+                                                </form>
+
+                                            @else
+
+                                                <form method="POST"
+                                                    action="{{ route('sk_chairman.leadership.secretary.destroy',$member['user_id']) }}"
+                                                    onsubmit="return confirm('Delete this pending Secretary account permanently?');">
+
+                                                    @csrf
+                                                    @method('DELETE')
+
+                                                    <button type="submit"
+                                                        class="block w-full text-left px-4 py-2 text-xs font-semibold text-red-600 hover:bg-red-50">
+
+                                                        Delete Pending Account
+                                                    </button>
+                                                </form>
+
+                                            @endif
 
                                         @else
 
                                             <form method="POST"
                                                 action="{{ route('sk_chairman.leadership.secretary.toggle-status',$member['user_id']) }}">
+
                                                 @csrf
                                                 @method('PATCH')
 
                                                 <button type="submit"
                                                     class="block w-full text-left px-4 py-2 text-xs hover:bg-gray-50">
+
                                                     {{ ($member['status'] ?? '') === 'active' ? 'Deactivate' : 'Activate' }}
                                                 </button>
                                             </form>
@@ -956,10 +1345,12 @@
                                         @endif
                                     </div>
                                 </div>
+
                             @endif
 
                             <!-- TREASURER ACTIONS -->
                             @if($isTreasurer && !empty($member['council_id']))
+
                                 <div class="relative">
 
                                     <button type="button"
@@ -967,11 +1358,12 @@
                                         &#8942;
                                     </button>
 
-                                    <div class="action-menu hidden absolute right-0 top-10 z-40 w-44 rounded-xl border bg-white shadow-xl py-1">
+                                    <div class="action-menu hidden absolute right-0 top-10 z-40 w-48 rounded-xl border bg-white shadow-xl py-1">
 
                                         <button type="button"
                                             onclick="toggleModal('editTreasurerModal')"
                                             class="block w-full text-left px-4 py-2 text-xs hover:bg-gray-50">
+
                                             Edit Details
                                         </button>
 
@@ -979,19 +1371,22 @@
 
                                         <form method="POST"
                                             action="{{ route('sk_chairman.leadership.destroy',$member['council_id']) }}"
-                                            onsubmit="return confirm('Remove this treasurer?');">
+                                            onsubmit="return confirm('End this Treasurer\'s service for the current administration? Their historical record will be preserved.');">
+
                                             @csrf
 
                                             <button type="submit"
                                                 class="block w-full text-left px-4 py-2 text-xs font-semibold text-red-600 hover:bg-red-50">
-                                                Remove Treasurer
+
+                                                End Treasurer Service
                                             </button>
                                         </form>
                                     </div>
                                 </div>
-                            @endif
 
+                            @endif
                         </div>
+
                     @endforeach
                 </div>
             </div>
@@ -1000,7 +1395,10 @@
             <div class="bg-white rounded-3xl border border-gray-100 shadow-sm p-8">
 
                 <div class="flex items-center gap-2 mb-8 border-b border-gray-50 pb-4">
-                    <span class="text-yellow-500 font-bold">&#127775;</span>
+
+                    <span class="text-yellow-500 font-bold">
+                        &#127775;
+                    </span>
 
                     <h3 class="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">
                         SK Councilors
@@ -1047,10 +1445,10 @@
                                 <p class="text-[9px] text-gray-400 mt-1">
                                     &#128197; {{ $member['term'] ?: 'N/A' }}
                                 </p>
-
                             </div>
 
                             @if(!empty($member['council_id']))
+
                                 <div class="relative">
 
                                     <button type="button"
@@ -1058,7 +1456,7 @@
                                         &#8942;
                                     </button>
 
-                                    <div class="action-menu hidden absolute right-0 top-9 z-40 w-40 rounded-xl border bg-white shadow-xl py-1">
+                                    <div class="action-menu hidden absolute right-0 top-9 z-40 w-48 rounded-xl border bg-white shadow-xl py-1">
 
                                         <button type="button"
                                             class="edit-councilor-btn block w-full text-left px-4 py-2 text-xs hover:bg-gray-50"
@@ -1066,6 +1464,7 @@
                                             data-name="{{ $member['name'] }}"
                                             data-email="{{ $member['email'] ?? '' }}"
                                             data-phone="{{ $member['phone'] ?? '' }}">
+
                                             Edit Details
                                         </button>
 
@@ -1073,17 +1472,19 @@
 
                                         <form method="POST"
                                             action="{{ route('sk_chairman.leadership.destroy',$member['council_id']) }}"
-                                            onsubmit="return confirm('Remove this councilor?');">
+                                            onsubmit="return confirm('End this Councilor\'s service for the current administration? Their historical record will be preserved.');">
+
                                             @csrf
 
                                             <button type="submit"
                                                 class="block w-full text-left px-4 py-2 text-xs font-semibold text-red-600 hover:bg-red-50">
-                                                Remove Councilor
+
+                                                End Councilor Service
                                             </button>
                                         </form>
-
                                     </div>
                                 </div>
+
                             @endif
                         </div>
 
@@ -1098,8 +1499,12 @@
             </div>
 
             <!-- SEARCH NO RESULTS -->
-            <div id="leadershipNoResults" class="hidden py-10 text-center">
-                <div class="text-3xl mb-2">&#128269;</div>
+            <div id="leadershipNoResults"
+                class="hidden py-10 text-center">
+
+                <div class="text-3xl mb-2">
+                    &#128269;
+                </div>
 
                 <p class="text-sm font-bold text-gray-500">
                     No officials found.
@@ -1109,10 +1514,10 @@
                     Try a different name, position, email, phone number, term, or status.
                 </p>
             </div>
-
         </main>
     </div>
 </div>
+
 @endsection
 
 @push('scripts')
@@ -1336,6 +1741,76 @@ document.addEventListener('DOMContentLoaded',()=>{
 
     /*
     |--------------------------------------------------------------------------
+    | REAPPOINTMENT FILTERS
+    |--------------------------------------------------------------------------
+    */
+    const reappointSearch=document.getElementById('reappointSearch');
+    const reappointPosition=document.getElementById('reappointPosition');
+    const reappointTerm=document.getElementById('reappointTerm');
+    const clearReappointFilters=document.getElementById('clearReappointFilters');
+    const reappointResultCount=document.getElementById('reappointResultCount');
+    const reappointNoResults=document.getElementById('reappointNoResults');
+
+    function filterReappointmentOfficials(){
+        const search=(reappointSearch?.value || '').trim().toLowerCase();
+        const position=reappointPosition?.value || 'all';
+        const term=reappointTerm?.value || 'all';
+        const cards=document.querySelectorAll('.reappoint-official-card');
+
+        let visibleCount=0;
+
+        cards.forEach((card)=>{
+            const searchable=(card.dataset.search || '').toLowerCase();
+            const cardPosition=card.dataset.position || '';
+            const terms=(card.dataset.terms || '').split('|').filter(Boolean);
+
+            const matchesSearch=search==='' || searchable.includes(search);
+            const matchesPosition=position==='all' || cardPosition===position;
+            const matchesTerm=term==='all' || terms.includes(term);
+            const matched=matchesSearch && matchesPosition && matchesTerm;
+
+            card.classList.toggle('hidden',!matched);
+
+            if(matched){
+                visibleCount++;
+            }
+        });
+
+        if(reappointResultCount){
+            reappointResultCount.textContent=
+                `${visibleCount} Former Official${visibleCount===1 ? '' : 's'}`;
+        }
+
+        if(reappointNoResults){
+            reappointNoResults.classList.toggle(
+                'hidden',
+                visibleCount>0 || cards.length===0
+            );
+        }
+    }
+
+    reappointSearch?.addEventListener('input',filterReappointmentOfficials);
+    reappointPosition?.addEventListener('change',filterReappointmentOfficials);
+    reappointTerm?.addEventListener('change',filterReappointmentOfficials);
+
+    clearReappointFilters?.addEventListener('click',()=>{
+        if(reappointSearch){
+            reappointSearch.value='';
+        }
+
+        if(reappointPosition){
+            reappointPosition.value='all';
+        }
+
+        if(reappointTerm){
+            reappointTerm.value='all';
+        }
+
+        filterReappointmentOfficials();
+    });
+
+    /*
+    |--------------------------------------------------------------------------
     | CLOSE DROPDOWNS
     |--------------------------------------------------------------------------
     */
@@ -1377,7 +1852,8 @@ document.addEventListener('DOMContentLoaded',()=>{
         'editSecretaryModal',
         'addTreasurerModal',
         'editTreasurerModal',
-        'editCouncilorModal'
+        'editCouncilorModal',
+        'reappointLeadershipModal'
     ].forEach((id)=>{
         const modal=document.getElementById(id);
 
@@ -1443,6 +1919,7 @@ document.addEventListener('DOMContentLoaded',()=>{
 
             document.getElementById('editCouncilorModal')
                 ?.classList.remove('hidden');
+
         @endif
 
     @endif

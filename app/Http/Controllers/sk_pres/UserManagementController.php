@@ -36,7 +36,7 @@ class UserManagementController extends Controller
         $selectedHistoryBarangay=(int)request('history_barangay',0);
         $selectedHistoryRole=trim((string)request('history_role',''));
 
-        if(!in_array($selectedHistoryRole,['','sk_president','sk_chairman','sk_secretary'],true)){
+        if(!in_array($selectedHistoryRole,['','sk_president','sk_chairman','sk_secretary','sk_treasurer','sk_councilor'],true)){
             $selectedHistoryRole='';
         }
 
@@ -789,6 +789,7 @@ class UserManagementController extends Controller
                 });
             }catch(\Throwable $e){
                 \Log::error('Updated setup email failed for '.$user->email.': '.$e->getMessage());
+
                 return back()->with('warning','User details were updated, but the new setup email could not be sent. Use Resend Setup Link.');
             }
 
@@ -1132,13 +1133,13 @@ class UserManagementController extends Controller
         }
 
         if((int)$previousTerm->term_id === (int)$currentTerm->term_id){
-            return back()->with('warning','This record already belongs to the current administration.');
+            return back()->with('warning','A completed Chairman record from the current administration cannot be reappointed from history.');
         }
 
         $user=User::where('user_id',$previousTerm->user_id)->firstOrFail();
 
         if((int)$user->is_verified !== 1){
-            return back()->with('warning','This account must be verified before it can be reappointed.');
+            return back()->with('warning','This former Chairman account is already waiting for account setup or cannot be reappointed yet.');
         }
 
         $existingChairmanRecord=DB::table('official_terms')
@@ -1158,7 +1159,7 @@ class UserManagementController extends Controller
             ->exists();
 
         if($existingAssignment){
-            return back()->with('warning','This official already has another active assignment in the current administration.');
+            return back()->with('warning','This official already has another active or pending assignment in the current administration.');
         }
 
         $barangayOccupied=DB::table('official_terms')
@@ -1172,11 +1173,19 @@ class UserManagementController extends Controller
             return back()->with('warning','This barangay already has a current or pending SK Chairman.');
         }
 
-        DB::transaction(function() use($user,$previousTerm,$currentTerm){
+        $token=Str::random(64);
+
+        DB::transaction(function() use($user,$previousTerm,$currentTerm,$token){
+            DB::table('password_reset_tokens')
+                ->where('email',$user->email)
+                ->delete();
+
             $user->update([
                 'role'=>'sk_chairman',
                 'barangay_id'=>$previousTerm->barangay_id,
-                'status'=>'active',
+                'password'=>Hash::make(Str::random(64)),
+                'is_verified'=>0,
+                'status'=>'inactive',
                 'archived_at'=>null,
             ]);
 
@@ -1185,15 +1194,41 @@ class UserManagementController extends Controller
                 'term_id'=>$currentTerm->term_id,
                 'barangay_id'=>$previousTerm->barangay_id,
                 'role'=>'sk_chairman',
-                'status'=>'current',
-                'started_at'=>now(),
+                'status'=>'pending',
+                'started_at'=>null,
                 'completed_at'=>null,
             ]);
+
+            DB::table('password_reset_tokens')->updateOrInsert(
+                ['email'=>$user->email],
+                ['token'=>Hash::make($token),'created_at'=>now()]
+            );
         });
+
+        $setupLink=route('password.setup',[
+            'token'=>$token,
+            'email'=>$user->email,
+        ]);
+
+        try{
+            Mail::send('email.account-setup',[
+                'user'=>$user,
+                'setupLink'=>$setupLink,
+            ],function($message) use($user){
+                $message->to($user->email,trim($user->first_name.' '.$user->last_name))
+                    ->subject('Set Up Your Reappointed SK360 Chairman Account');
+            });
+        }catch(\Throwable $e){
+            \Log::error('Chairman reappointment setup email failed for '.$user->email.': '.$e->getMessage());
+
+            return redirect()
+                ->route('sk_pres.user-management',['tab'=>'current'])
+                ->with('warning',trim($user->first_name.' '.$user->last_name).' was selected for reappointment, but the password setup email could not be sent. Use Resend Setup Link.');
+        }
 
         return redirect()
             ->route('sk_pres.user-management',['tab'=>'current'])
-            ->with('success',trim($user->first_name.' '.$user->last_name).' was reappointed as SK Chairman for the '.$currentTerm->start_year.' - '.$currentTerm->end_year.' administration.');
+            ->with('success',trim($user->first_name.' '.$user->last_name).' was selected for reappointment as SK Chairman for the '.$currentTerm->start_year.' - '.$currentTerm->end_year.' administration. A new password setup link was sent to '.$user->email.'.');
     }
 
     /*
@@ -1265,7 +1300,7 @@ class UserManagementController extends Controller
 
     /*
     |--------------------------------------------------------------------------
-    | DELETE PENDING ACCOUNT
+    | DELETE PENDING ACCOUNT / CANCEL REAPPOINTMENT
     |--------------------------------------------------------------------------
     */
     public function destroy(int $userId): RedirectResponse
@@ -1327,13 +1362,55 @@ class UserManagementController extends Controller
             return back()->with('success','Pending President succession cancelled. Your current President account will continue for this administration.');
         }
 
+        if($user->role === 'sk_chairman'){
+            $pendingTerm=DB::table('official_terms')
+                ->where('user_id',$user->user_id)
+                ->where('role','sk_chairman')
+                ->where('status','pending')
+                ->orderByDesc('official_term_id')
+                ->first();
+
+            $hasCompletedHistory=DB::table('official_terms')
+                ->where('user_id',$user->user_id)
+                ->where('role','sk_chairman')
+                ->where('status','completed')
+                ->exists();
+
+            if($pendingTerm && $hasCompletedHistory){
+                DB::transaction(function() use($user,$pendingTerm){
+                    DB::table('password_reset_tokens')->where('email',$user->email)->delete();
+
+                    DB::table('official_terms')
+                        ->where('official_term_id',$pendingTerm->official_term_id)
+                        ->delete();
+
+                    $user->update([
+                        'is_verified'=>1,
+                        'status'=>'inactive',
+                        'archived_at'=>now(),
+                    ]);
+                });
+
+                return redirect()
+                    ->route('sk_pres.user-management',['tab'=>'history'])
+                    ->with('success','Chairman reappointment cancelled. The former official account and historical service records were preserved.');
+            }
+        }
+
         DB::transaction(function() use($user,$userId){
-            DB::table('email_verifications')->where('user_id',$userId)->delete();
-            DB::table('password_reset_tokens')->where('email',$user->email)->delete();
+            DB::table('email_verifications')
+                ->where('user_id',$userId)
+                ->delete();
+
+            DB::table('password_reset_tokens')
+                ->where('email',$user->email)
+                ->delete();
+
             DB::table('official_terms')
                 ->where('user_id',$userId)
                 ->whereIn('status',['pending','current'])
                 ->delete();
+
             $user->delete();
         });
 
@@ -1463,6 +1540,12 @@ class UserManagementController extends Controller
                 't.start_year as admin_start_year',
                 't.end_year as admin_end_year'
             )
+            ->selectSub(function($sub){
+                $sub->from('official_terms as hot')
+                    ->selectRaw('COUNT(*)')
+                    ->whereColumn('hot.user_id','u.user_id')
+                    ->where('hot.status','completed');
+            },'completed_terms_count')
             ->whereIn('u.role',$roles)
             ->whereNull('u.archived_at');
 
@@ -1491,10 +1574,20 @@ class UserManagementController extends Controller
     protected function historyTerms()
     {
         return DB::table('administration_terms as t')
-            ->join('official_terms as ot','t.term_id','=','ot.term_id')
-            ->where('ot.status','completed')
+            ->where(function($query){
+                $query->whereExists(function($sub){
+                    $sub->select(DB::raw(1))
+                        ->from('official_terms as ot')
+                        ->whereColumn('ot.term_id','t.term_id')
+                        ->where('ot.status','completed');
+                })->orWhereExists(function($sub){
+                    $sub->select(DB::raw(1))
+                        ->from('sk_council as sc')
+                        ->whereColumn('sc.term_id','t.term_id')
+                        ->where('sc.status','completed');
+                });
+            })
             ->select('t.term_id','t.start_year','t.end_year')
-            ->distinct()
             ->orderByDesc('t.start_year')
             ->orderByDesc('t.end_year')
             ->get()
@@ -1511,52 +1604,154 @@ class UserManagementController extends Controller
     */
     protected function officialHistory(string $term,int $barangayId=0,string $role='')
     {
-        $query=DB::table('official_terms as ot')
-            ->join('administration_terms as t','ot.term_id','=','t.term_id')
+        if(!preg_match('/^(\d{4})-(\d{4})$/',$term,$matches)){
+            return collect();
+        }
+
+        $administration=DB::table('administration_terms')
+            ->where('start_year',(int)$matches[1])
+            ->where('end_year',(int)$matches[2])
+            ->first();
+
+        if(!$administration){
+            return collect();
+        }
+
+        $officialQuery=DB::table('official_terms as ot')
             ->join('users as u','ot.user_id','=','u.user_id')
             ->leftJoin('barangays as b','ot.barangay_id','=','b.barangay_id')
+            ->where('ot.term_id',$administration->term_id)
+            ->where('ot.status','completed')
             ->select(
                 'ot.official_term_id',
+                DB::raw('NULL as council_id'),
                 'ot.user_id',
                 'ot.barangay_id',
                 'ot.role',
                 'ot.status as term_status',
                 'ot.started_at',
                 'ot.completed_at',
-                't.term_id',
-                't.start_year',
-                't.end_year',
+                DB::raw((int)$administration->term_id.' as term_id'),
+                DB::raw((int)$administration->start_year.' as start_year'),
+                DB::raw((int)$administration->end_year.' as end_year'),
                 'u.first_name',
                 'u.last_name',
                 'u.email',
                 'u.phone_number',
-                'b.barangay_name'
-            )
-            ->where('ot.status','completed');
+                'b.barangay_name',
+                DB::raw("'official_term' as source_type")
+            );
 
-        if(preg_match('/^(\d{4})-(\d{4})$/',$term,$matches)){
-            $query->where('t.start_year',(int)$matches[1])
-                ->where('t.end_year',(int)$matches[2]);
-        }else{
-            $query->whereRaw('1=0');
-        }
+        $councilQuery=DB::table('sk_council as sc')
+            ->leftJoin('barangays as b','sc.barangay_id','=','b.barangay_id')
+            ->where('sc.term_id',$administration->term_id)
+            ->where('sc.status','completed')
+            ->where(function($query){
+                $query->whereRaw('LOWER(TRIM(sc.position))=?',['sk treasurer'])
+                    ->orWhereRaw('LOWER(sc.position) LIKE ?',['%councilor%'])
+                    ->orWhereRaw('LOWER(sc.position) LIKE ?',['%kagawad%']);
+            })
+            ->select(
+                DB::raw('NULL as official_term_id'),
+                'sc.council_id',
+                DB::raw('NULL as user_id'),
+                'sc.barangay_id',
+                DB::raw("CASE WHEN LOWER(TRIM(sc.position))='sk treasurer' THEN 'sk_treasurer' ELSE 'sk_councilor' END as role"),
+                'sc.status as term_status',
+                'sc.created_at as started_at',
+                'sc.completed_at',
+                DB::raw((int)$administration->term_id.' as term_id'),
+                DB::raw((int)$administration->start_year.' as start_year'),
+                DB::raw((int)$administration->end_year.' as end_year'),
+                'sc.name as first_name',
+                DB::raw("'' as last_name"),
+                'sc.email',
+                'sc.phone as phone_number',
+                'b.barangay_name',
+                DB::raw("'sk_council' as source_type")
+            );
 
         if($barangayId > 0){
-            $query->where('ot.barangay_id',$barangayId);
+            $officialQuery->where('ot.barangay_id',$barangayId);
+            $councilQuery->where('sc.barangay_id',$barangayId);
         }
 
-        if(in_array($role,['sk_president','sk_chairman','sk_secretary'],true)){
-            $query->where('ot.role',$role);
+        $history=$officialQuery->get()->concat($councilQuery->get());
+
+        if(in_array($role,['sk_president','sk_chairman','sk_secretary','sk_treasurer','sk_councilor'],true)){
+            $history=$history->where('role',$role);
         }
 
-        return $query
-            ->orderByRaw("CASE WHEN ot.role='sk_president' THEN 0 ELSE 1 END")
-            ->orderByRaw('b.barangay_name IS NULL')
-            ->orderBy('b.barangay_name')
-            ->orderByRaw("CASE ot.role WHEN 'sk_chairman' THEN 1 WHEN 'sk_secretary' THEN 2 ELSE 3 END")
-            ->orderBy('u.first_name')
-            ->orderBy('u.last_name')
-            ->get();
+        $currentTerm=$this->currentAdministrationTerm();
+        $currentAssignments=collect();
+
+        if($currentTerm){
+            $currentAssignments=DB::table('official_terms')
+                ->where('term_id',$currentTerm->term_id)
+                ->whereIn('status',['pending','current'])
+                ->get();
+        }
+
+        $assignedUserIds=$currentAssignments
+            ->pluck('user_id')
+            ->filter()
+            ->map(fn($id)=>(int)$id)
+            ->unique()
+            ->all();
+
+        $occupiedChairmanBarangays=$currentAssignments
+            ->where('role','sk_chairman')
+            ->pluck('barangay_id')
+            ->filter()
+            ->map(fn($id)=>(int)$id)
+            ->unique()
+            ->all();
+
+        $history=$history->map(function($item) use($currentTerm,$assignedUserIds,$occupiedChairmanBarangays){
+            $item->can_reappoint=false;
+            $item->reappointment_status='';
+
+            if(($item->role ?? '') !== 'sk_chairman' || !$currentTerm){
+                return $item;
+            }
+
+            if((int)$item->term_id === (int)$currentTerm->term_id){
+                $item->reappointment_status='Same Administration';
+                return $item;
+            }
+
+            if(in_array((int)$item->user_id,$assignedUserIds,true)){
+                $item->reappointment_status='Already Reappointed';
+                return $item;
+            }
+
+            if(in_array((int)$item->barangay_id,$occupiedChairmanBarangays,true)){
+                $item->reappointment_status='Chairman Position Filled';
+                return $item;
+            }
+
+            $item->can_reappoint=true;
+            return $item;
+        });
+
+        $roleOrder=[
+            'sk_president'=>0,
+            'sk_chairman'=>1,
+            'sk_secretary'=>2,
+            'sk_treasurer'=>3,
+            'sk_councilor'=>4,
+        ];
+
+        return $history
+            ->sortBy(function($item) use($roleOrder){
+                $federation=($item->role ?? '') === 'sk_president' ? 0 : 1;
+                $barangay=strtolower((string)($item->barangay_name ?? ''));
+                $role=$roleOrder[$item->role ?? ''] ?? 9;
+                $name=strtolower(trim(($item->first_name ?? '').' '.($item->last_name ?? '')));
+
+                return sprintf('%d|%s|%02d|%s',$federation,$barangay,$role,$name);
+            })
+            ->values();
     }
 
     /*
@@ -1573,14 +1768,24 @@ class UserManagementController extends Controller
                 'icon'=>'&#128205;',
             ],
             [
-                'label'=>'SK Chairmen',
+                'label'=>'Chairmen',
                 'value'=>$users->where('role','sk_chairman')->count(),
                 'icon'=>'&#128737;',
             ],
             [
-                'label'=>'SK Secretaries',
+                'label'=>'Secretaries',
                 'value'=>$users->where('role','sk_secretary')->count(),
                 'icon'=>'&#128196;',
+            ],
+            [
+                'label'=>'Treasurers',
+                'value'=>$users->where('role','sk_treasurer')->count(),
+                'icon'=>'&#128176;',
+            ],
+            [
+                'label'=>'Councilors',
+                'value'=>$users->where('role','sk_councilor')->count(),
+                'icon'=>'&#127775;',
             ],
             [
                 'label'=>'Total Officials',
@@ -1605,7 +1810,9 @@ class UserManagementController extends Controller
             $groups[]=[
                 'key'=>'federation',
                 'label'=>'SK Federation / System Administration',
-                'users'=>$presidents,
+                'members'=>$presidents,
+                'executives'=>$presidents,
+                'councilors'=>collect(),
             ];
         }
 
@@ -1614,12 +1821,15 @@ class UserManagementController extends Controller
             ->groupBy(fn($user)=>$user->barangay_id ?: 'unassigned');
 
         foreach($barangayUsers as $barangayId=>$members){
+            $members=$members->values();
             $name=$members->first()->barangay_name ?? 'Unassigned';
 
             $groups[]=[
                 'key'=>'barangay_'.$barangayId,
                 'label'=>'Barangay '.$name,
-                'users'=>$members->values(),
+                'members'=>$members,
+                'executives'=>$members->whereIn('role',['sk_chairman','sk_secretary','sk_treasurer'])->values(),
+                'councilors'=>$members->where('role','sk_councilor')->values(),
             ];
         }
 
@@ -1637,7 +1847,14 @@ class UserManagementController extends Controller
             ->where('ot.term_id',$termId)
             ->where('ot.role','sk_president')
             ->where('ot.status','pending')
-            ->select('u.user_id','u.first_name','u.last_name','u.email','u.phone_number','ot.official_term_id')
+            ->select(
+                'u.user_id',
+                'u.first_name',
+                'u.last_name',
+                'u.email',
+                'u.phone_number',
+                'ot.official_term_id'
+            )
             ->first();
     }
 

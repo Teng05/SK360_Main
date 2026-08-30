@@ -227,7 +227,9 @@ Route::middleware('auth')->prefix('sk_chairman')->name('sk_chairman.')->group(fu
     Route::put('/leadership/treasurer/{councilId}', [SkChairmanLeadershipController::class, 'updateTreasurer'])->name('leadership.treasurer.update');
     Route::put('/leadership/councilor/{councilId}', [SkChairmanLeadershipController::class, 'updateCouncilor'])->name('leadership.councilor.update');
     Route::post('/leadership/{councilId}/delete', [SkChairmanLeadershipController::class, 'destroy'])->name('leadership.destroy');
-    
+    Route::post('/leadership/secretary/{officialTermId}/reappoint',[SkChairmanLeadershipController::class,'reappointSecretary'])->name('leadership.secretary.reappoint');
+    Route::post('/leadership/council/{councilId}/reappoint',[SkChairmanLeadershipController::class,'reappointCouncilMember'])->name('leadership.council.reappoint');
+
     Route::get('/archive', [App\Http\Controllers\sk_chairman\ArchiveController::class, 'index'])->name('archive');
     Route::get('/archive/download/bulk', [App\Http\Controllers\sk_chairman\ArchiveController::class, 'bulkDownload'])->name('archive.bulk-download');
     Route::get('/archive/download/{sourceType}/{sourceId}', [App\Http\Controllers\sk_chairman\ArchiveController::class, 'download'])->name('archive.download');
