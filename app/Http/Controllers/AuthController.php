@@ -18,27 +18,8 @@ use Illuminate\Support\Str;
 
 class AuthController extends Controller
 {
-    public function showLogin(Request $request)
+    public function showLogin()
     {
-        if(Auth::check()){
-            $user=Auth::user();
-
-            if(
-                $user->status === 'active' &&
-                (int)$user->is_verified === 1 &&
-                $user->archived_at === null
-            ){
-                return redirect(
-                    $this->redirectPathForRole($user->role)
-                );
-            }
-
-            Auth::logout();
-
-            $request->session()->invalidate();
-            $request->session()->regenerateToken();
-        }
-
         return view('auth.login');
     }
 
@@ -876,14 +857,6 @@ class AuthController extends Controller
             return back()
                 ->withErrors([
                     'email'=>'No account found with this email.',
-                ])
-                ->onlyInput('email');
-        }
-
-        if($user->archived_at !== null){
-            return back()
-                ->withErrors([
-                    'email'=>'This account is no longer active.',
                 ])
                 ->onlyInput('email');
         }

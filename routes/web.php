@@ -33,12 +33,11 @@ use App\Http\Controllers\sk_secretary\BudgetController as SkSecretaryBudgetContr
 use App\Http\Controllers\sk_secretary\LeadershipController as SkSecretaryLeadershipController;
 use App\Http\Controllers\sk_secretary\ChatController as SkSecretaryChatController;
 
-use App\Http\Controllers\Youth\AnnouncementController as YouthAnnouncementController;
-use App\Http\Controllers\Youth\CalendarController as YouthCalendarController;
-use App\Http\Controllers\Youth\HomeController as YouthHomeController;
-use App\Http\Controllers\Youth\LeadershipController as YouthLeadershipController;
-use App\Http\Controllers\Youth\ProfileController as YouthProfileController;
-use App\Http\Controllers\Youth\RankingController as YouthRankingController;
+use App\Http\Controllers\public_portal\HomeController as PublicHomeController;
+use App\Http\Controllers\public_portal\AnnouncementInteractionController as PublicAnnouncementInteractionController;
+use App\Http\Controllers\public_portal\AnnouncementController as PublicAnnouncementController;
+use App\Http\Controllers\public_portal\CalendarController as PublicCalendarController;
+use App\Http\Controllers\public_portal\LeadershipController as PublicLeadershipController;
 
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\NotificationController;
@@ -47,6 +46,7 @@ use App\Http\Controllers\WallPostController;
 use App\Http\Controllers\Api\MobileSyncController as MobileApiController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+
 
 /*
 |--------------------------------------------------------------------------
@@ -83,16 +83,13 @@ Route::controller(AuthController::class)->group(function () {
 
     Route::get('/set-password/{token}', [AuthController::class, 'showSetPassword'])->name('password.setup');
     Route::post('/set-password', [AuthController::class, 'setPassword'])->name('password.setup.store');
-    Route::get('/set-password/{token}', [AuthController::class, 'showSetPassword'])->name('password.setup');
-    Route::post('/set-password', [AuthController::class, 'setPassword'])->name('password.setup.store');
-
 });
 
-Route::middleware('auth')->group(function () {
-    Route::get('/notifications/feed', [NotificationController::class, 'feed'])->name('notifications.feed');
-    Route::post('/notifications/{notification}/read', [NotificationController::class, 'markRead'])->name('notifications.read');
-    Route::middleware('auth')->post('/wall/posts', [WallPostController::class, 'store'])->name('wall.posts.store');
-    Route::middleware('auth')->post('/wall/posts/{announcement}/like', [WallPostController::class, 'toggleLike'])->name('wall.posts.like');
+Route::middleware('auth')->group(function(){
+    Route::get('/notifications/feed',[NotificationController::class,'feed'])->name('notifications.feed');
+    Route::post('/notifications/{notification}/read',[NotificationController::class,'markRead'])->name('notifications.read');
+    Route::post('/wall/posts',[WallPostController::class,'store'])->name('wall.posts.store');
+    Route::post('/wall/posts/{announcement}/like',[WallPostController::class,'toggleLike'])->name('wall.posts.like');
 });
 
 
@@ -280,6 +277,29 @@ Route::middleware('auth')->prefix('sk_secretary')->name('sk_secretary.')->group(
     Route::post('/profile/password', fn (Request $r, ProfileSettingsController $c) => $c->updatePassword($r, 'sk_secretary'))->name('profile.password');
 });
 
+
+/*
+|--------------------------------------------------------------------------
+| PUBLIC PORTAL
+|--------------------------------------------------------------------------
+*/
+Route::prefix('public-portal')->name('public.')->group(function(){
+
+    Route::get('/',[PublicHomeController::class,'index'])->name('home');
+
+    Route::get('/announcements',[PublicAnnouncementController::class,'index'])->name('announcements');
+    Route::get('/calendar',[PublicCalendarController::class,'index'])->name('calendar');
+    Route::get('/leadership',[PublicLeadershipController::class,'index'])->name('leadership');
+
+    Route::post('/announcements/{announcementId}/like',[PublicAnnouncementInteractionController::class,'toggleLike'])->middleware('throttle:30,1')->name('announcements.like');
+    Route::post('/announcements/{announcementId}/view',[PublicAnnouncementInteractionController::class,'trackView'])->middleware('throttle:120,1')->name('announcements.view');
+    Route::get('/announcements/{announcementId}/feedback',[PublicAnnouncementInteractionController::class,'feedbackList'])->middleware('throttle:120,1')->name('announcements.feedback-list');
+    Route::post('/announcements/{announcementId}/feedback',[PublicAnnouncementInteractionController::class,'submitFeedback'])->middleware('throttle:public-feedback-submit')->name('announcements.feedback');
+
+    Route::post('/feedback/{feedbackId}/verify',[PublicAnnouncementInteractionController::class,'verifyFeedback'])->middleware('throttle:public-feedback-verify')->name('feedback.verify');
+    Route::post('/feedback/{feedbackId}/resend',[PublicAnnouncementInteractionController::class,'resendFeedback'])->middleware('throttle:public-feedback-resend')->name('feedback.resend');
+
+});
 
 
 /*
