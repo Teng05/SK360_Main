@@ -53,7 +53,18 @@ use Illuminate\Support\Facades\Route;
 | PUBLIC ROUTES
 |--------------------------------------------------------------------------
 */
-Route::get('/', fn () => view('welcome'));
+Route::get('/', function(){
+    if(auth()->check()){
+        return redirect()->to(match(auth()->user()->role){
+            'sk_president'=>route('sk_pres.home'),
+            'sk_chairman'=>route('sk_chairman.home'),
+            'sk_secretary'=>route('sk_secretary.home'),
+            default=>route('login'),
+        });
+    }
+
+    return view('welcome');
+});
 
 Route::get('/mobile/meetings/{meeting}/call', [MobileApiController::class, 'mobileMeetingCall'])
     ->middleware('signed')
@@ -66,14 +77,7 @@ Route::controller(AuthController::class)->group(function () {
     Route::get('/login', 'showLogin')->name('login');
     Route::post('/login', 'login')->name('login.submit');
     Route::post('/logout', 'logout')->name('logout');
-    Route::get('/register', 'showRegister')->name('register');
-    Route::post('/register', 'register')->name('register.submit');
 
-    Route::get('/verify', 'showVerify')->name('verify.notice');
-    Route::post('/verify', 'verifyCode')->name('verify.submit');
-    Route::post('/verify/resend', 'resendVerificationCode')->name('verify.resend');
-
-    
     Route::get('/password/request', [AuthController::class, 'showForgotPassword'])->name('password.request');
     Route::post('/password/email', [AuthController::class, 'sendPasswordReset'])->name('password.email');
     Route::get('/password/reset/{token}', [AuthController::class, 'showResetPassword'])->name('password.reset');
@@ -302,21 +306,3 @@ Route::prefix('public-portal')->name('public.')->group(function(){
 });
 
 
-/*
-|--------------------------------------------------------------------------
-| YOUTH
-|--------------------------------------------------------------------------
-*/
-Route::middleware('auth')->prefix('youth')->name('youth.')->group(function () {
-
-    Route::get('/home', [YouthHomeController::class, 'index'])->name('home');
-    Route::get('/announcements', [YouthAnnouncementController::class, 'index'])->name('announcements');
-    Route::get('/calendar', [YouthCalendarController::class, 'index'])->name('calendar');
-    Route::get('/rankings', [YouthRankingController::class, 'index'])->name('rankings');
-    Route::get('/rankings/live', [YouthRankingController::class, 'live'])->name('rankings.live');
-    Route::get('/leadership', [YouthLeadershipController::class, 'index'])->name('leadership');
-
-    Route::get('/profile', [YouthProfileController::class, 'show'])->name('profile');
-    Route::post('/profile', [YouthProfileController::class, 'update'])->name('profile.update');
-    Route::post('/profile/password', [YouthProfileController::class, 'updatePassword'])->name('profile.password');
-});

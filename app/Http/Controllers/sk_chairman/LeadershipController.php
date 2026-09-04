@@ -769,10 +769,6 @@ class LeadershipController extends Controller
         }
 
         DB::transaction(function() use($secretary,$pendingTerm,$userId){
-            DB::table('email_verifications')
-                ->where('user_id',$userId)
-                ->delete();
-
             DB::table('password_reset_tokens')
                 ->where('email',$secretary->email)
                 ->delete();

@@ -4,8 +4,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Barangay;
-use App\Models\EmailVerification;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -14,20 +12,24 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
-use Illuminate\Support\Str;
 
 class AuthController extends Controller
 {
+    private const OFFICIAL_ROLES=[
+        'sk_president',
+        'sk_chairman',
+        'sk_secretary',
+    ];
+
     public function showLogin()
     {
+        if(Auth::check()){
+            return redirect()->to(
+                $this->redirectPathForRole(Auth::user()->role)
+            );
+        }
+
         return view('auth.login');
-    }
-
-    public function showRegister()
-    {
-        $barangays=Barangay::orderBy('barangay_name')->get();
-
-        return view('auth.register',compact('barangays'));
     }
 
     public function showForgotPassword()
@@ -76,7 +78,18 @@ class AuthController extends Controller
                 ->withInput();
         }
 
-        User::where('email',$validated['email'])->update([
+        $user=User::where('email',$validated['email'])
+            ->whereIn('role',self::OFFICIAL_ROLES)
+            ->whereNull('archived_at')
+            ->first();
+
+        if(!$user){
+            return back()
+                ->withErrors(['email'=>'Official account not found.'])
+                ->withInput();
+        }
+
+        $user->update([
             'password'=>Hash::make($validated['password']),
         ]);
 
@@ -91,7 +104,7 @@ class AuthController extends Controller
 
     /*
     |--------------------------------------------------------------------------
-    | SHOW INITIAL PASSWORD SETUP
+    | INITIAL PASSWORD SETUP
     |--------------------------------------------------------------------------
     */
     public function showSetPassword(string $token)
@@ -104,7 +117,9 @@ class AuthController extends Controller
             ]);
         }
 
-        $user=User::where('email',$email)->first();
+        $user=User::where('email',$email)
+            ->whereIn('role',self::OFFICIAL_ROLES)
+            ->first();
 
         if(!$user){
             return redirect()->route('login')->withErrors([
@@ -112,12 +127,10 @@ class AuthController extends Controller
             ]);
         }
 
-        // Already finished setting up the account
         if((int)$user->is_verified === 1 && $user->status === 'active'){
-            return redirect()->route('login')->with(
-                'verified',
-                'Your account is already activated. You may log in.'
-            );
+            return redirect()
+                ->route('login')
+                ->with('verified','Your account is already activated. You may log in.');
         }
 
         $reset=DB::table('password_reset_tokens')
@@ -125,9 +138,7 @@ class AuthController extends Controller
             ->first();
 
         $invalid=!$reset || !Hash::check($token,$reset->token);
-
-        $expired=$reset &&
-            now()->subHours(24)->greaterThan($reset->created_at);
+        $expired=$reset && now()->subHours(24)->greaterThan($reset->created_at);
 
         if($invalid || $expired){
             if($expired){
@@ -152,24 +163,12 @@ class AuthController extends Controller
         ]);
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | SAVE INITIAL PASSWORD
-    |--------------------------------------------------------------------------
-    */
     public function setPassword(Request $request): RedirectResponse
     {
         $validated=$request->validate([
             'email'=>['required','email'],
             'token'=>['required','string'],
-            'password'=>[
-                'required',
-                'confirmed',
-                'min:8',
-                'regex:/[A-Z]/',
-                'regex:/[a-z]/',
-                'regex:/[0-9]/',
-            ],
+            'password'=>['required','confirmed','min:8','regex:/[A-Z]/','regex:/[a-z]/','regex:/[0-9]/'],
         ],[
             'password.confirmed'=>'Passwords do not match.',
             'password.min'=>'Password must be at least 8 characters.',
@@ -180,21 +179,19 @@ class AuthController extends Controller
             ->where('email',$validated['email'])
             ->first();
 
-        if(
-            !$reset ||
-            !Hash::check($validated['token'],$reset->token) ||
-            now()->subHours(24)->greaterThan($reset->created_at)
-        ){
+        if(!$reset || !Hash::check($validated['token'],$reset->token) || now()->subHours(24)->greaterThan($reset->created_at)){
             return back()->withErrors([
                 'email'=>'This password setup link is invalid or expired.',
             ]);
         }
 
-        $user=User::where('email',$validated['email'])->first();
+        $user=User::where('email',$validated['email'])
+            ->whereIn('role',self::OFFICIAL_ROLES)
+            ->first();
 
         if(!$user){
             return back()->withErrors([
-                'email'=>'Account not found.',
+                'email'=>'Official account not found.',
             ]);
         }
 
@@ -207,12 +204,6 @@ class AuthController extends Controller
         $endedPresidentUserIds=[];
 
         DB::transaction(function() use($user,$validated,$pendingAssignment,&$endedPresidentUserIds){
-
-            /*
-            |--------------------------------------------------------------------------
-            | ACTIVATE ACCOUNT
-            |--------------------------------------------------------------------------
-            */
             $user->update([
                 'password'=>Hash::make($validated['password']),
                 'is_verified'=>1,
@@ -225,16 +216,7 @@ class AuthController extends Controller
             | PRESIDENT SUCCESSION
             |--------------------------------------------------------------------------
             */
-            if(
-                $user->role === 'sk_president' &&
-                $pendingAssignment &&
-                $pendingAssignment->role === 'sk_president'
-            ){
-                /*
-                |--------------------------------------------------------------------------
-                | FIND CURRENT CARETAKER PRESIDENT
-                |--------------------------------------------------------------------------
-                */
+            if($user->role === 'sk_president' && $pendingAssignment && $pendingAssignment->role === 'sk_president'){
                 $caretakerTerms=DB::table('official_terms')
                     ->where('term_id',$pendingAssignment->term_id)
                     ->where('role','sk_president')
@@ -248,28 +230,15 @@ class AuthController extends Controller
                     ->values()
                     ->all();
 
-                /*
-                |--------------------------------------------------------------------------
-                | COMPLETE CARETAKER PRESIDENT TERM
-                |--------------------------------------------------------------------------
-                */
                 if($caretakerTerms->isNotEmpty()){
                     DB::table('official_terms')
-                        ->whereIn(
-                            'official_term_id',
-                            $caretakerTerms->pluck('official_term_id')->all()
-                        )
+                        ->whereIn('official_term_id',$caretakerTerms->pluck('official_term_id')->all())
                         ->update([
                             'status'=>'completed',
                             'completed_at'=>now(),
                         ]);
                 }
 
-                /*
-                |--------------------------------------------------------------------------
-                | ARCHIVE OUTGOING PRESIDENT ACCOUNT
-                |--------------------------------------------------------------------------
-                */
                 if(!empty($endedPresidentUserIds)){
                     DB::table('users')
                         ->whereIn('user_id',$endedPresidentUserIds)
@@ -280,11 +249,6 @@ class AuthController extends Controller
                         ]);
                 }
 
-                /*
-                |--------------------------------------------------------------------------
-                | ACTIVATE NEW PRESIDENT TERM
-                |--------------------------------------------------------------------------
-                */
                 DB::table('official_terms')
                     ->where('official_term_id',$pendingAssignment->official_term_id)
                     ->update([
@@ -293,11 +257,6 @@ class AuthController extends Controller
                         'completed_at'=>null,
                     ]);
             }else{
-                /*
-                |--------------------------------------------------------------------------
-                | ACTIVATE CHAIRMAN / SECRETARY TERM
-                |--------------------------------------------------------------------------
-                */
                 DB::table('official_terms')
                     ->where('user_id',$user->user_id)
                     ->where('status','pending')
@@ -307,21 +266,11 @@ class AuthController extends Controller
                     ]);
             }
 
-            /*
-            |--------------------------------------------------------------------------
-            | DELETE USED SETUP TOKEN
-            |--------------------------------------------------------------------------
-            */
             DB::table('password_reset_tokens')
                 ->where('email',$validated['email'])
                 ->delete();
         });
 
-        /*
-        |--------------------------------------------------------------------------
-        | LOG OUT OLD PRESIDENT DATABASE SESSIONS
-        |--------------------------------------------------------------------------
-        */
         if(!empty($endedPresidentUserIds)){
             $this->invalidateDatabaseSessions($endedPresidentUserIds);
         }
@@ -329,20 +278,19 @@ class AuthController extends Controller
         if($user->role === 'sk_president' && $pendingAssignment){
             return redirect()
                 ->route('login')
-                ->with(
-                    'verified',
-                    'Your SK President account has been activated successfully. The President handover is complete and you may now log in.'
-                );
+                ->with('verified','Your SK President account has been activated successfully. The President handover is complete and you may now log in.');
         }
 
         return redirect()
             ->route('login')
-            ->with(
-                'verified',
-                'Your password has been set successfully. You can now log in.'
-            );
+            ->with('verified','Your password has been set successfully. You can now log in.');
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | PHONE PASSWORD RESET
+    |--------------------------------------------------------------------------
+    */
     public function verifyPhoneReset(Request $request): RedirectResponse
     {
         $validated=$request->validate([
@@ -356,9 +304,7 @@ class AuthController extends Controller
         if(!$phone || !$userId){
             return redirect()
                 ->route('password.request')
-                ->withErrors([
-                    'phone'=>'Please request a reset code first.',
-                ]);
+                ->withErrors(['phone'=>'Please request a reset code first.']);
         }
 
         $response=$this->twilioRequest('VerificationCheck',[
@@ -368,26 +314,39 @@ class AuthController extends Controller
 
         if(!($response['ok'] ?? false) || ($response['json']['status'] ?? null) !== 'approved'){
             return back()
-                ->withErrors([
-                    'code'=>'Invalid or expired reset code.',
-                ])
+                ->withErrors(['code'=>'Invalid or expired reset code.'])
                 ->withInput();
         }
 
-        User::where('user_id',$userId)->update([
+        $user=User::where('user_id',$userId)
+            ->whereIn('role',self::OFFICIAL_ROLES)
+            ->whereNull('archived_at')
+            ->first();
+
+        if(!$user){
+            session()->forget(['reset_phone','reset_user_id']);
+
+            return redirect()
+                ->route('password.request')
+                ->withErrors(['phone'=>'Official account not found.']);
+        }
+
+        $user->update([
             'password'=>Hash::make($validated['password']),
         ]);
 
-        session()->forget([
-            'reset_phone',
-            'reset_user_id',
-        ]);
+        session()->forget(['reset_phone','reset_user_id']);
 
         return redirect()
             ->route('login')
             ->with('verified','Your password has been reset. You can now log in.');
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | EMAIL PASSWORD RESET
+    |--------------------------------------------------------------------------
+    */
     public function verifyEmailReset(Request $request): RedirectResponse
     {
         $validated=$request->validate([
@@ -401,28 +360,37 @@ class AuthController extends Controller
         if(!$email || !$userId){
             return redirect()
                 ->route('password.request')
-                ->withErrors([
-                    'email'=>'Please request a reset code first.',
-                ]);
+                ->withErrors(['email'=>'Please request a reset code first.']);
         }
 
         $reset=DB::table('password_reset_tokens')
             ->where('email',$email)
             ->first();
 
-        if(
-            !$reset ||
-            !Hash::check($validated['code'],$reset->token) ||
-            now()->subMinutes(15)->greaterThan($reset->created_at)
-        ){
+        if(!$reset || !Hash::check($validated['code'],$reset->token) || now()->subMinutes(15)->greaterThan($reset->created_at)){
             return back()
-                ->withErrors([
-                    'code'=>'Invalid or expired reset code.',
-                ])
+                ->withErrors(['code'=>'Invalid or expired reset code.'])
                 ->withInput();
         }
 
-        User::where('user_id',$userId)->update([
+        $user=User::where('user_id',$userId)
+            ->whereIn('role',self::OFFICIAL_ROLES)
+            ->whereNull('archived_at')
+            ->first();
+
+        if(!$user){
+            DB::table('password_reset_tokens')
+                ->where('email',$email)
+                ->delete();
+
+            session()->forget(['reset_email','reset_user_id']);
+
+            return redirect()
+                ->route('password.request')
+                ->withErrors(['email'=>'Official account not found.']);
+        }
+
+        $user->update([
             'password'=>Hash::make($validated['password']),
         ]);
 
@@ -430,223 +398,23 @@ class AuthController extends Controller
             ->where('email',$email)
             ->delete();
 
-        session()->forget([
-            'reset_email',
-            'reset_user_id',
-        ]);
+        session()->forget(['reset_email','reset_user_id']);
 
         return redirect()
             ->route('login')
             ->with('verified','Your password has been reset. You can now log in.');
     }
 
-    public function register(Request $request): RedirectResponse
-    {
-        $request->validate([
-            'first_name'=>['required','string','max:50'],
-            'last_name'=>['required','string','max:50'],
-            'email'=>['required','email','max:100','unique:users,email'],
-            'phone_number'=>['required','regex:/^\d{10,11}$/'],
-            'barangay_id'=>['required','exists:barangays,barangay_id'],
-            'password'=>[
-                'required',
-                'confirmed',
-                'min:8',
-                'regex:/[A-Z]/',
-                'regex:/[a-z]/',
-                'regex:/[0-9]/',
-            ],
-        ],[
-            'email.unique'=>'Email is already registered.',
-            'phone_number.regex'=>'Phone number must be 10–11 digits.',
-            'password.confirmed'=>'Passwords do not match.',
-            'barangay_id.exists'=>'Selected barangay is invalid.',
-        ]);
-
-        try{
-            DB::beginTransaction();
-
-            $user=User::create([
-                'first_name'=>trim($request->first_name),
-                'last_name'=>trim($request->last_name),
-                'email'=>trim($request->email),
-                'phone_number'=>trim($request->phone_number),
-                'password'=>$request->password,
-                'barangay_id'=>$request->barangay_id,
-                'role'=>'youth',
-                'is_verified'=>0,
-                'status'=>'inactive',
-            ]);
-
-            $verificationCode=(string)random_int(100000,999999);
-
-            EmailVerification::where('user_id',$user->user_id)->delete();
-
-            EmailVerification::create([
-                'user_id'=>$user->user_id,
-                'verification_code'=>$verificationCode,
-                'expires_at'=>now()->addHour(),
-                'created_at'=>now(),
-            ]);
-
-            DB::commit();
-
-            session([
-                'user_id'=>$user->user_id,
-                'verify_email'=>$user->email,
-            ]);
-
-            Mail::send('email.verification-code',[
-                'first_name'=>$user->first_name,
-                'verification_code'=>$verificationCode,
-            ],function($message) use($user){
-                $message->to(
-                    $user->email,
-                    $user->first_name.' '.$user->last_name
-                )->subject('SK360 Verification Code');
-            });
-
-            return redirect()->route('verify.notice');
-
-        }catch(\Exception $e){
-            DB::rollBack();
-
-            \Log::error('Registration error: '.$e->getMessage());
-
-            return back()
-                ->withInput(
-                    $request->except([
-                        'password',
-                        'password_confirmation',
-                    ])
-                )
-                ->withErrors([
-                    'email'=>'Registration failed. Please try again.',
-                ]);
-        }
-    }
-
-    public function showVerify()
-    {
-        if(!session()->has('user_id')){
-            return redirect()->route('register');
-        }
-
-        return view('auth.verify',[
-            'email'=>session('verify_email'),
-        ]);
-    }
-
-    public function verifyCode(Request $request): RedirectResponse
-    {
-        if(!session()->has('user_id')){
-            return redirect()->route('register');
-        }
-
-        $request->validate([
-            'code'=>['required','array','size:6'],
-            'code.*'=>['required','digits:1'],
-        ],[
-            'code.required'=>'Please enter the complete 6-digit code.',
-            'code.size'=>'Please enter the complete 6-digit code.',
-            'code.*.digits'=>'Each code field must contain exactly 1 digit.',
-        ]);
-
-        $code=implode('',$request->code);
-        $userId=session('user_id');
-
-        $verification=EmailVerification::where('user_id',$userId)
-            ->where('verification_code',$code)
-            ->where('expires_at','>',now())
-            ->latest('verification_id')
-            ->first();
-
-        if(!$verification){
-            return back()->withErrors([
-                'code'=>'Invalid or expired code.',
-            ]);
-        }
-
-        User::where('user_id',$userId)->update([
-            'is_verified'=>1,
-            'status'=>'active',
-        ]);
-
-        EmailVerification::where('user_id',$userId)->delete();
-
-        session()->forget([
-            'user_id',
-            'verify_email',
-        ]);
-
-        return redirect()
-            ->route('login')
-            ->with('verified','Your account has been verified. You can now log in.');
-    }
-
-    public function resendVerificationCode(): RedirectResponse
-    {
-        $userId=session('user_id');
-
-        if(!$userId){
-            return redirect()->route('register');
-        }
-
-        $user=User::where('user_id',$userId)->first();
-
-        if(!$user){
-            return redirect()
-                ->route('register')
-                ->withErrors([
-                    'email'=>'User not found.',
-                ]);
-        }
-
-        $newCode=(string)random_int(100000,999999);
-
-        try{
-            EmailVerification::updateOrCreate(
-                ['user_id'=>$user->user_id],
-                [
-                    'verification_code'=>$newCode,
-                    'expires_at'=>now()->addHour(),
-                    'created_at'=>now(),
-                ]
-            );
-
-            Mail::send('email.verification-code',[
-                'first_name'=>$user->first_name,
-                'verification_code'=>$newCode,
-            ],function($message) use($user){
-                $message->to(
-                    $user->email,
-                    $user->first_name.' '.$user->last_name
-                )->subject('SK360 Verification Code');
-            });
-
-            return back()->with(
-                'success',
-                'A new code has been sent to your email.'
-            );
-
-        }catch(\Exception $e){
-            \Log::error('Resend verification error: '.$e->getMessage());
-
-            return back()->withErrors([
-                'email'=>'Failed to send verification email.',
-            ]);
-        }
-    }
-
     protected function sendEmailPasswordReset(string $email): RedirectResponse
     {
-        $user=User::where('email',$email)->first();
+        $user=User::where('email',$email)
+            ->whereIn('role',self::OFFICIAL_ROLES)
+            ->whereNull('archived_at')
+            ->first();
 
         if(!$user){
             return back()
-                ->withErrors([
-                    'email'=>'No account found with this email.',
-                ])
+                ->withErrors(['email'=>'No official account found with this email.'])
                 ->withInput();
         }
 
@@ -688,9 +456,7 @@ class AuthController extends Controller
 
         if(!$user){
             return back()
-                ->withErrors([
-                    'phone'=>'No account found with this phone number.',
-                ])
+                ->withErrors(['phone'=>'No official account found with this phone number.'])
                 ->withInput();
         }
 
@@ -698,9 +464,7 @@ class AuthController extends Controller
 
         if(!$e164Phone){
             return back()
-                ->withErrors([
-                    'phone'=>'Use a valid Philippine phone number like +639123456789.',
-                ])
+                ->withErrors(['phone'=>'Use a valid Philippine phone number like +639123456789.'])
                 ->withInput();
         }
 
@@ -711,9 +475,7 @@ class AuthController extends Controller
 
         if(!($response['ok'] ?? false)){
             return back()
-                ->withErrors([
-                    'phone'=>$response['message'] ?? 'Failed to send SMS reset code.',
-                ])
+                ->withErrors(['phone'=>$response['message'] ?? 'Failed to send SMS reset code.'])
                 ->withInput();
         }
 
@@ -729,6 +491,11 @@ class AuthController extends Controller
             ->with('reset_target',$e164Phone);
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | TWILIO
+    |--------------------------------------------------------------------------
+    */
     protected function twilioRequest(string $type,array $payload): array
     {
         $sid=config('services.twilio.sid');
@@ -756,11 +523,8 @@ class AuthController extends Controller
                 'json'=>$response->json() ?: [],
                 'message'=>$response->json('message') ?: 'Twilio request failed.',
             ];
-
         }catch(\Throwable $exception){
-            \Log::error(
-                'Twilio reset error: '.$exception->getMessage()
-            );
+            \Log::error('Twilio reset error: '.$exception->getMessage());
 
             return [
                 'ok'=>false,
@@ -773,16 +537,15 @@ class AuthController extends Controller
     {
         $target=$this->phoneDigits($phone);
 
-        return User::whereNotNull('phone_number')
+        return User::whereIn('role',self::OFFICIAL_ROLES)
+            ->whereNull('archived_at')
+            ->whereNotNull('phone_number')
             ->get()
-            ->first(
-                fn(User $user)=>
-                    $this->phoneNumbersMatch(
-                        $target,
-                        $this->phoneDigits(
-                            (string)$user->phone_number
-                        )
-                    )
+            ->first(fn(User $user)=>
+                $this->phoneNumbersMatch(
+                    $target,
+                    $this->phoneDigits((string)$user->phone_number)
+                )
             );
     }
 
@@ -822,7 +585,7 @@ class AuthController extends Controller
 
     /*
     |--------------------------------------------------------------------------
-    | INVALIDATE OUTGOING PRESIDENT DATABASE SESSIONS
+    | INVALIDATE OUTGOING PRESIDENT SESSIONS
     |--------------------------------------------------------------------------
     */
     protected function invalidateDatabaseSessions(array $userIds): void
@@ -835,15 +598,18 @@ class AuthController extends Controller
             DB::table(config('session.table','sessions'))
                 ->whereIn('user_id',$userIds)
                 ->delete();
-
         }catch(\Throwable $e){
             \Log::warning(
-                'Unable to remove outgoing President database sessions: '.
-                $e->getMessage()
+                'Unable to remove outgoing President database sessions: '.$e->getMessage()
             );
         }
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | LOGIN / LOGOUT
+    |--------------------------------------------------------------------------
+    */
     public function login(Request $request): RedirectResponse
     {
         $credentials=$request->validate([
@@ -851,47 +617,40 @@ class AuthController extends Controller
             'password'=>['required'],
         ]);
 
-        $user=User::where('email',$credentials['email'])->first();
+        $user=User::where('email',$credentials['email'])
+            ->whereIn('role',self::OFFICIAL_ROLES)
+            ->first();
 
         if(!$user){
             return back()
-                ->withErrors([
-                    'email'=>'No account found with this email.',
-                ])
+                ->withErrors(['email'=>'No official account found with this email.'])
                 ->onlyInput('email');
         }
 
         if($user->status !== 'active'){
             return back()
-                ->withErrors([
-                    'email'=>'Your account is inactive. Contact admin.',
-                ])
+                ->withErrors(['email'=>'Your account is inactive. Contact admin.'])
                 ->onlyInput('email');
         }
 
         if(!$user->is_verified){
             return back()
-                ->withErrors([
-                    'email'=>'Email not verified. Please check your inbox.',
-                ])
+                ->withErrors(['email'=>'Email not verified. Please check your inbox.'])
                 ->onlyInput('email');
         }
 
         if(!Hash::check($credentials['password'],$user->password)){
             return back()
-                ->withErrors([
-                    'email'=>'Incorrect password.',
-                ])
+                ->withErrors(['email'=>'Incorrect password.'])
                 ->onlyInput('email');
         }
 
         Auth::login($user,false);
         $request->session()->regenerate();
 
-        return redirect()
-            ->intended(
-                $this->redirectPathForRole($user->role)
-            );
+        return redirect()->intended(
+            $this->redirectPathForRole($user->role)
+        );
     }
 
     public function logout(Request $request): RedirectResponse
@@ -907,7 +666,6 @@ class AuthController extends Controller
     protected function redirectPathForRole(?string $role): string
     {
         return match($role){
-            'youth'=>route('youth.home'),
             'sk_president'=>route('sk_pres.home'),
             'sk_chairman'=>route('sk_chairman.home'),
             'sk_secretary'=>route('sk_secretary.home'),

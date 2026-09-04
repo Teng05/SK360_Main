@@ -31,18 +31,20 @@ trait BuildsWallFeed
                 $post->likes_count = DB::table('wall_post_likes')
                     ->where('announcement_id', $post->announcement_id)
                     ->count();
+
                 $post->liked_by_current_user = auth()->check()
                     && DB::table('wall_post_likes')
                         ->where('announcement_id', $post->announcement_id)
                         ->where('user_id', auth()->user()->user_id)
                         ->exists();
-                $post->author_name = trim((string) $post->author_name) ?: 'SK 360 User';
+
+                $post->author_name = trim((string) $post->author_name) ?: 'SK 360 Official';
+
                 $post->role_label = match ($post->role) {
                     'sk_president' => 'SK President',
                     'sk_chairman' => 'SK Chairman',
                     'sk_secretary' => 'SK Secretary',
-                    'youth' => 'Youth Member',
-                    default => 'User',
+                    default => 'SK Official',
                 };
 
                 return $post;

@@ -1398,10 +1398,6 @@ class UserManagementController extends Controller
         }
 
         DB::transaction(function() use($user,$userId){
-            DB::table('email_verifications')
-                ->where('user_id',$userId)
-                ->delete();
-
             DB::table('password_reset_tokens')
                 ->where('email',$user->email)
                 ->delete();
@@ -1491,7 +1487,7 @@ class UserManagementController extends Controller
             ],
             [
                 'label'=>'SK Chairmen',
-                'description'=>'Current and pending barangay youth leaders',
+                'description'=>'Current and pending SK Chairmen',
                 'count'=>$this->currentRoleCount('sk_chairman'),
                 'badgeColor'=>'bg-green-500',
                 'iconColor'=>'text-green-400',
