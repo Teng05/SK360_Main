@@ -23,6 +23,7 @@
 
                 <h2 class="logo">SK 360&deg;</h2>
                 <h1>Welcome Back!</h1>
+
                 <p>
                     Access your dashboard to manage reports, coordinate with your team,
                     and drive youth governance forward.
@@ -57,9 +58,9 @@
 
             <div class="right-panel">
                 <h2>Sign In</h2>
-                <p class="subtitle">Enter your credentials to access your account</p>
+                <p class="subtitle">Enter your official account credentials</p>
 
-                <form method="POST" action="{{ url('/login') }}">
+                <form method="POST" action="{{ route('login.submit') }}">
                     @csrf
 
                     <label for="email">Email Address</label>
@@ -69,6 +70,7 @@
                         name="email"
                         placeholder="x.sk@gmail.com"
                         value="{{ old('email') }}"
+                        autocomplete="email"
                         required
                     >
 
@@ -78,12 +80,13 @@
                         type="password"
                         name="password"
                         placeholder="Enter your password"
+                        autocomplete="current-password"
                         required
                     >
 
                     <div class="options">
                         <label class="remember-me">
-                            <input type="checkbox" name="remember" {{ old('remember') ? 'checked' : '' }}>
+                            <input type="checkbox" name="remember" value="1" {{ old('remember') ? 'checked' : '' }}>
                             Remember me
                         </label>
 
@@ -91,11 +94,6 @@
                     </div>
 
                     <button class="login-btn" type="submit">Sign In</button>
-
-                    <p class="register">
-                        Don't have an account?
-                        <a href="{{ route('register') }}">Register here</a>
-                    </p>
                 </form>
             </div>
         </div>
@@ -103,25 +101,25 @@
 @endsection
 
 @push('scripts')
-    <script src="[cdn.jsdelivr.net](https://cdn.jsdelivr.net/npm/sweetalert2@11)"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
-    @if (session('verified'))
-        <script>
-            Swal.fire({
-                icon: 'success',
-                title: 'Account Verified',
-                text: @json(session('verified'))
-            });
-        </script>
-    @endif
+@if (session('verified'))
+<script>
+Swal.fire({
+    icon:'success',
+    title:'Success',
+    text:@json(session('verified'))
+});
+</script>
+@endif
 
-    @if ($errors->any())
-        <script>
-            Swal.fire({
-                icon: 'error',
-                title: 'Login Failed',
-                html: {!! json_encode(implode('<br>', $errors->all())) !!}
-            });
-        </script>
-    @endif
+@if ($errors->any())
+<script>
+Swal.fire({
+    icon:'error',
+    title:'Login Failed',
+    html:{!! json_encode(implode('<br>',$errors->all())) !!}
+});
+</script>
+@endif
 @endpush
