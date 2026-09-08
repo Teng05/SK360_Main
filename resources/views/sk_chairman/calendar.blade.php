@@ -20,7 +20,7 @@
 <div class="flex h-screen bg-gray-100 overflow-hidden">
     <div class="w-64 bg-red-600 text-white flex flex-col p-3 overflow-y-auto">
         <div class="flex items-center gap-3 mb-4">
-    <img src="{{ asset('images/logo.png') }}" class="w-8 h-8 rounded-full object-cover"  alt="logo">
+    <img src="{{ asset('images/sk logo.png') }}" class="w-8 h-8 rounded-full object-cover"  alt="logo">
     <div class="leading-tight">
         <h2 class="text-lg font-extrabold tracking-wide">SK 360°</h2>
         <p class="text-[10px] opacity-80">Management System</p>

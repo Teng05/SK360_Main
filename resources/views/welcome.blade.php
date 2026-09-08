@@ -14,7 +14,7 @@
         <nav class="navbar">
             <div class="footer-column brand-info">
                 <div class="footer-logo">
-                    <img src="{{ asset('images/logo.png') }}"
+                    <img src="{{ asset('images/sk logo.png') }}"
                         class="w-8 h-8 rounded-full object-cover"
                         alt="SK 360 Logo">
 
@@ -280,7 +280,7 @@
 
                 <div class="footer-logo">
 
-                    <img src="{{ asset('images/logo.png') }}"
+                    <img src="{{ asset('images/sk logo.png') }}"
                         alt="SK 360 Logo">
 
                     <span class="logo-text">

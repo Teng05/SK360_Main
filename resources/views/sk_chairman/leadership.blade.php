@@ -868,7 +868,7 @@
 
         <div class="flex items-center gap-3 mb-4">
 
-            <img src="{{ asset('images/logo.png') }}"
+            <img src="{{ asset('images/sk logo.png') }}"
                 class="w-8 h-8 rounded-full object-cover"
                 alt="logo">
 

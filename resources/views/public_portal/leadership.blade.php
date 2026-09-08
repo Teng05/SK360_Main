@@ -16,7 +16,7 @@
         <a href="{{ route('public.home') }}"
             class="flex items-center gap-3">
 
-            <img src="{{ asset('images/logo.png') }}"
+            <img src="{{ asset('images/sk logo.png') }}"
                 class="w-10 h-10 rounded-full object-cover"
                 alt="SK360 Logo">
 
