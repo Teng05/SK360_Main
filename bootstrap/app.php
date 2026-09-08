@@ -20,6 +20,7 @@ return Application::configure(basePath: dirname(__DIR__))
         */
         $middleware->appendToGroup('web',[
             \App\Http\Middleware\EnsureAccountIsActive::class,
+            \App\Http\Middleware\PreventBackHistory::class,
         ]);
 
         /*
