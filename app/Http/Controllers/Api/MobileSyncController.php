@@ -365,6 +365,59 @@ class MobileSyncController extends Controller
         return response()->json(['message' => 'Password updated successfully.']);
     }
 
+    public function requestPasswordChange(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'current_password' => ['required'],
+            'password' => ['required', 'confirmed', 'min:8', 'regex:/[A-Z]/', 'regex:/[a-z]/', 'regex:/[0-9]/'],
+        ], [
+            'password.confirmed' => 'Passwords do not match.',
+        ]);
+
+        $user = $request->user();
+        if (! Hash::check($validated['current_password'], $user->password)) {
+            return response()->json(['message' => 'Current password is incorrect.'], 422);
+        }
+
+        $code = (string) random_int(100000, 999999);
+        DB::table('mobile_password_changes')->updateOrInsert(
+            ['user_id' => $user->user_id],
+            [
+                'token' => Hash::make($code),
+                'password' => Hash::make($validated['password']),
+                'created_at' => now(),
+            ]
+        );
+
+        Mail::send('email.password-change', [
+            'first_name' => $user->first_name,
+            'verification_code' => $code,
+        ], function ($message) use ($user) {
+            $message->to($user->email, trim($user->first_name.' '.$user->last_name))
+                ->subject('SK360 Password Change Verification');
+        });
+
+        return response()->json(['message' => 'Verification code sent to your registered email.']);
+    }
+
+    public function verifyPasswordChange(Request $request): JsonResponse
+    {
+        $validated = $request->validate(['code' => ['required', 'digits:6']]);
+        $user = $request->user();
+        $change = DB::table('mobile_password_changes')
+            ->where('user_id', $user->user_id)
+            ->first();
+
+        if (! $change || ! Hash::check($validated['code'], $change->token) || now()->subMinutes(15)->greaterThan($change->created_at)) {
+            return response()->json(['message' => 'Invalid or expired verification code.'], 422);
+        }
+
+        $user->update(['password' => $change->password]);
+        DB::table('mobile_password_changes')->where('user_id', $user->user_id)->delete();
+
+        return response()->json(['message' => 'Password updated successfully.']);
+    }
+
     public function sync(Request $request): JsonResponse
     {
         $validated = $request->validate([

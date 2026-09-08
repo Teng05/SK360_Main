@@ -17,6 +17,8 @@ Route::prefix('mobile')->group(function () {
         Route::get('/me', [MobileSyncController::class, 'me'])->name('mobile.me');
         Route::post('/profile', [MobileSyncController::class, 'updateProfile'])->name('mobile.profile.update');
         Route::post('/profile/password', [MobileSyncController::class, 'updatePassword'])->name('mobile.profile.password');
+        Route::post('/profile/password/request', [MobileSyncController::class, 'requestPasswordChange'])->name('mobile.profile.password.request');
+        Route::post('/profile/password/verify', [MobileSyncController::class, 'verifyPasswordChange'])->name('mobile.profile.password.verify');
         Route::get('/sync', [MobileSyncController::class, 'sync'])->name('mobile.sync');
         Route::post('/wall/posts', [MobileSyncController::class, 'storeWallPost'])->name('mobile.wall.posts.store');
         Route::post('/wall/posts/{announcementId}/like', [MobileSyncController::class, 'toggleWallLike'])->name('mobile.wall.posts.like');
