@@ -1,0 +1,153 @@
+/* Shared mobile safeguards for dashboard and portal views. */
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+}
+
+html,
+body {
+    max-width: 100%;
+    overflow-x: hidden;
+}
+
+img,
+video,
+svg {
+    max-width: 100%;
+}
+
+[class~="flex-1"] {
+    min-width: 0;
+}
+
+.mobile-sidebar-toggle,
+.mobile-sidebar-backdrop {
+    display: none;
+}
+
+/* The topbar search is intentionally replaced by the mobile navigation control. */
+[class~="bg-red-600"][class~="px-6"][class~="py-3"][class~="justify-between"] input {
+    display: none !important;
+}
+
+[class~="bg-red-600"][class~="px-6"][class~="py-3"][class~="justify-between"] > div:last-child {
+    margin-left: auto !important;
+}
+
+@media (max-width: 767px) {
+    /* Keep the main page visible and turn the desktop sidebar into a drawer. */
+    [class~="w-64"][class~="bg-red-600"] {
+        display: none !important;
+        position: fixed;
+        inset: 0 auto 0 0;
+        z-index: 100;
+        width: min(86vw, 320px) !important;
+        max-height: 100vh !important;
+        overflow-y: auto !important;
+        box-shadow: 12px 0 28px rgba(0, 0, 0, 0.22);
+    }
+
+    [class~="w-64"][class~="bg-red-600"].mobile-sidebar-open {
+        display: flex !important;
+    }
+
+    [class~="w-64"][class~="bg-red-600"] nav {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.25rem;
+    }
+
+    .mobile-sidebar-toggle {
+        position: static;
+        display: inline-flex;
+        width: 2.75rem;
+        height: 2.75rem;
+        flex: 0 0 auto;
+        align-items: center;
+        justify-content: center;
+        border-radius: 0.75rem;
+        background: #dc2626;
+        color: #ffffff;
+        font-size: 1.5rem;
+        line-height: 1;
+        box-shadow: 0 5px 16px rgba(0, 0, 0, 0.2);
+    }
+
+    .mobile-sidebar-backdrop {
+        position: fixed;
+        inset: 0;
+        z-index: 90;
+        display: none;
+        background: rgba(15, 23, 42, 0.45);
+    }
+
+    .mobile-sidebar-backdrop.is-visible {
+        display: block;
+    }
+
+    /* Keep dashboards scrollable vertically instead of clipping their content. */
+    [class~="h-screen"] {
+        height: auto !important;
+        min-height: 100vh;
+    }
+
+    [class~="overflow-hidden"][class~="h-screen"] {
+        overflow: visible !important;
+    }
+
+    [class~="flex-1"][class~="flex"][class~="flex-col"][class~="overflow-hidden"] {
+        overflow: visible !important;
+    }
+
+    /* Stack the search and account controls in the shared dashboard topbars. */
+    [class~="bg-red-600"][class~="px-6"][class~="py-3"][class~="justify-between"] {
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        padding: 0.75rem 1rem;
+    }
+
+    [class~="bg-red-600"][class~="px-6"][class~="py-3"][class~="justify-between"] input {
+        width: 100%;
+        order: 1;
+    }
+
+    [class~="bg-red-600"][class~="px-6"][class~="py-3"][class~="justify-between"] > div {
+        margin-left: auto;
+        order: 2;
+    }
+
+    [class~="bg-red-600"][class~="px-6"][class~="py-3"][class~="justify-between"] .mobile-sidebar-toggle {
+        width: 2.25rem;
+        height: 2.25rem;
+        border-radius: 0.625rem;
+        font-size: 1.25rem;
+    }
+
+    /* Reduce desktop page padding while keeping cards breathable. */
+    [class~="overflow-y-auto"][class~="p-6"] {
+        padding: 1rem !important;
+    }
+
+    [class~="overflow-x-auto"] {
+        max-width: 100%;
+    }
+
+    table {
+        min-width: 620px;
+    }
+
+    /* Prevent long names and headings from forcing horizontal overflow. */
+    h1,
+    h2,
+    h3,
+    h4,
+    p,
+    a,
+    button,
+    label,
+    span {
+        overflow-wrap: anywhere;
+    }
+}

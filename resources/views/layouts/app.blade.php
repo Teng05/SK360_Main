@@ -11,6 +11,10 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
 
+    <style>
+        {!! file_get_contents(resource_path('css/responsive.css')) !!}
+    </style>
+
     @hasSection('page_css')
         @yield('page_css')
     @else
@@ -27,6 +31,60 @@
     @yield('content')
 
     @stack('scripts')
+    <script>
+        (function () {
+            const sidebar = document.querySelector('[class~="w-64"][class~="bg-red-600"]');
+
+            if (!sidebar) {
+                return;
+            }
+
+            const toggle = document.createElement('button');
+            toggle.type = 'button';
+            toggle.className = 'mobile-sidebar-toggle';
+            toggle.setAttribute('aria-label', 'Open navigation menu');
+            toggle.setAttribute('aria-expanded', 'false');
+            toggle.textContent = '\u2630';
+
+            const backdrop = document.createElement('div');
+            backdrop.className = 'mobile-sidebar-backdrop';
+
+            const topbar = document.querySelector('[class~="bg-red-600"][class~="px-6"][class~="py-3"][class~="justify-between"]');
+
+            function closeSidebar() {
+                sidebar.classList.remove('mobile-sidebar-open');
+                backdrop.classList.remove('is-visible');
+                toggle.setAttribute('aria-expanded', 'false');
+                toggle.setAttribute('aria-label', 'Open navigation menu');
+                toggle.textContent = '\u2630';
+            }
+
+            function openSidebar() {
+                sidebar.classList.add('mobile-sidebar-open');
+                backdrop.classList.add('is-visible');
+                toggle.setAttribute('aria-expanded', 'true');
+                toggle.setAttribute('aria-label', 'Close navigation menu');
+                toggle.textContent = '\u00d7';
+            }
+
+            toggle.addEventListener('click', function () {
+                sidebar.classList.contains('mobile-sidebar-open') ? closeSidebar() : openSidebar();
+            });
+
+            backdrop.addEventListener('click', closeSidebar);
+            sidebar.querySelectorAll('a').forEach(function (link) {
+                link.addEventListener('click', closeSidebar);
+            });
+
+            if (topbar) {
+                topbar.prepend(toggle);
+            } else {
+                document.body.append(toggle);
+            }
+
+            document.body.append(backdrop);
+        })();
+    </script>
     @auth
     <script>
         (function () {

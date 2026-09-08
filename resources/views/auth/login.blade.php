@@ -4,13 +4,9 @@
 @section('title', 'SK 360 | Login')
 
 @section('page_css')
-    @if (file_exists(public_path('build/manifest.json')) || file_exists(public_path('hot')))
-        @vite(['resources/css/login.css'])
-    @elseif (file_exists(resource_path('css/login.css')))
-        <style>
-            {!! file_get_contents(resource_path('css/login.css')) !!}
-        </style>
-    @endif
+    <style>
+        {!! file_get_contents(resource_path('css/login.css')) !!}
+    </style>
 @endsection
 
 @section('content')
