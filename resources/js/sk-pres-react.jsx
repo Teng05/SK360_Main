@@ -68,17 +68,30 @@ function RankingsLive({ url }) {
     const { data, error, loading } = useLiveData(url);
     const leaderboard = data?.leaderboard || [];
     const pointSystem = data?.pointSystem || [];
+    const [query, setQuery] = useState('');
+    const filteredLeaderboard = leaderboard
+        .filter((row) => String(row.name || '').toLowerCase().includes(query.toLowerCase()))
+        .slice(0, 10);
 
     return (
         <section className="mb-8">
             <LiveStatus loading={loading} error={error} updatedAt={data?.updatedAt} />
             <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.5fr_1fr]">
                 <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-                    <h3 className="mb-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Live Leaderboard</h3>
-                    <div className="space-y-3">
-                        {leaderboard.length === 0 ? (
+                    <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <h3 className="text-[10px] font-black uppercase tracking-widest text-gray-400">Live Leaderboard</h3>
+                        <input
+                            type="search"
+                            value={query}
+                            onChange={(event) => setQuery(event.target.value)}
+                            placeholder="Search barangay..."
+                            className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-700 outline-none focus:border-red-400 sm:w-56"
+                        />
+                    </div>
+                    <div className="max-h-[720px] space-y-3 overflow-y-auto pr-2">
+                        {filteredLeaderboard.length === 0 ? (
                             <p className="text-sm text-gray-400">No rankings found.</p>
-                        ) : leaderboard.map((row) => (
+                        ) : filteredLeaderboard.map((row) => (
                             <div key={row.barangay_id} className="flex items-center gap-4 rounded-2xl border border-gray-100 bg-gray-50 px-4 py-3">
                                 <div className="flex h-9 w-9 items-center justify-center rounded-full bg-red-600 text-xs font-black text-white">#{row.rank}</div>
                                 <div className="min-w-0 flex-1">

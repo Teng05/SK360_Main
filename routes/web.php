@@ -131,6 +131,7 @@ Route::middleware('auth')->prefix('sk_pres')->name('sk_pres.')->group(function()
 
     Route::get('/meetings',[MeetingsController::class,'index'])->name('meetings');
     Route::post('/meetings',[MeetingsController::class,'store'])->name('meetings.store');
+    Route::patch('/meetings/{meeting}/end',[MeetingsController::class,'end'])->name('meetings.end');
     Route::get('/meetings/{meeting}/call',[MeetingsController::class,'call'])->name('meetings.call');
     Route::post('/meetings/{meeting}/agora-token',[MeetingsController::class,'token'])->name('meetings.agora.token');
     Route::get('/video',fn()=>redirect()->route('sk_pres.meetings'))->name('video');
@@ -304,5 +305,4 @@ Route::prefix('public-portal')->name('public.')->group(function(){
     Route::post('/feedback/{feedbackId}/resend',[PublicAnnouncementInteractionController::class,'resendFeedback'])->middleware('throttle:public-feedback-resend')->name('feedback.resend');
 
 });
-
 

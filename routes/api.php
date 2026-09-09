@@ -22,6 +22,7 @@ Route::prefix('mobile')->group(function(){
         Route::post('/events',[MobileSyncController::class,'storeEvent'])->name('mobile.events.store');
 
         Route::post('/meetings',[MobileSyncController::class,'storeMeeting'])->name('mobile.meetings.store');
+        Route::patch('/meetings/{meeting}/end',[MobileSyncController::class,'endMeeting'])->name('mobile.meetings.end');
         Route::get('/meetings/{meeting}/join-url',[MobileSyncController::class,'meetingJoinUrl'])->name('mobile.meetings.join-url');
         Route::post('/meetings/{meeting}/agora-token',[MobileSyncController::class,'meetingAgoraToken'])->name('mobile.meetings.agora-token');
 

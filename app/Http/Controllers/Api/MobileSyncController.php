@@ -354,6 +354,8 @@ class MobileSyncController extends Controller
             'meetings' => $this->meetings($user, $since),
             'notifications' => $this->notifications($user, $since),
             'rankings' => $this->mobileRankings(),
+            'ranking_periods' => $this->rankingPeriods()->values()->all(),
+            'ranking_history' => $this->mobileRankingHistory(),
             'ranking_point_system' => $this->rankingPointSystem(),
             'latest_ranking_period' => $this->latestRankingPeriod(),
             'submission_slots' => $this->tableRows('submission_slots', $since, 'slot_id'),
@@ -533,6 +535,25 @@ class MobileSyncController extends Controller
             'message' => 'Meeting scheduled successfully.',
             'meeting' => $meeting,
         ], 201);
+    }
+
+    public function endMeeting(Request $request, Meeting $meeting): JsonResponse
+    {
+        if (! $this->isPresident($request->user())) {
+            return response()->json(['message' => 'Only SK President can end meetings.'], 403);
+        }
+
+        if ($meeting->status !== 'completed') {
+            $meeting->status = 'completed';
+            $meeting->updated_at = now();
+            $meeting->save();
+        }
+
+        return response()->json([
+            'message' => 'Meeting ended successfully.',
+            'meeting_id' => $meeting->meeting_id,
+            'status' => $meeting->status,
+        ]);
     }
 
     public function meetingJoinUrl(Request $request, Meeting $meeting): JsonResponse
@@ -1758,7 +1779,27 @@ class MobileSyncController extends Controller
 
     protected function mobileRankings(): array
     {
-        return $this->rankingsLeaderboard()
+        return $this->mobileRankingRows($this->rankingsLeaderboard());
+    }
+
+    protected function mobileRankingHistory(): array
+    {
+        return $this->rankingPeriods()
+            ->map(fn (string $period) => [
+                'period' => $period,
+                'rankings' => array_slice(
+                    $this->mobileRankingRows($this->rankingsLeaderboard($period)),
+                    0,
+                    3
+                ),
+            ])
+            ->values()
+            ->all();
+    }
+
+    protected function mobileRankingRows($leaderboard): array
+    {
+        return $leaderboard
             ->map(function ($row) {
                 return [
                     'barangay_id' => $row->barangay_id,

@@ -9,6 +9,8 @@
     <style>
         html, body { height: 100%; margin: 0; overflow: hidden; background: #111111; }
         .video-pane { background: #0f172a; border: 1px solid rgba(255, 255, 255, 0.06); }
+        #remote-grid { grid-auto-rows: minmax(180px, 1fr); }
+        #local-player { order: 99; min-height: 180px; }
     </style>
 @endsection
 
@@ -32,15 +34,12 @@
     </div>
 
     <div class="grid h-full w-full grid-cols-1 gap-3 p-6 pt-28 lg:grid-cols-[1fr_320px]">
-        <div class="grid min-h-0 grid-rows-[1fr_152px_auto] gap-3">
+        <div class="grid min-h-0 grid-rows-[1fr_auto] gap-3">
             <div id="remote-grid" class="grid min-h-0 grid-cols-1 gap-3 md:grid-cols-2">
                 <div id="remote-empty" class="video-pane flex min-h-[320px] items-center justify-center rounded-[24px] text-sm text-slate-400">
                     Waiting for other participants to join...
                 </div>
-            </div>
-
-            <div class="grid grid-cols-2 gap-3 md:grid-cols-4">
-                <div id="local-player" class="video-pane flex h-[140px] items-center justify-center rounded-[20px] text-sm text-slate-400">
+                <div id="local-player" class="video-pane flex min-h-[180px] items-center justify-center rounded-[20px] text-sm text-slate-400">
                     Joining local preview...
                 </div>
             </div>
@@ -94,6 +93,7 @@
     let client;
     let localTracks = [];
     let remoteUsers = new Map();
+    let activeSpeakerUid = null;
 
     const showStatus = (message) => {
         statusText.textContent = message;
@@ -129,6 +129,30 @@
 
         remoteEmpty.classList.add('hidden');
         return player;
+    };
+
+    const reorderRemoteGrid = () => {
+        const users = [...remoteUsers.values()];
+        users.sort((a, b) => (String(a.uid) === String(activeSpeakerUid) ? -1 : String(b.uid) === String(activeSpeakerUid) ? 1 : 0));
+        const visibleUsers = users.slice(0, 9);
+
+        visibleUsers.forEach((user, index) => {
+            const player = document.getElementById(`remote-${user.uid}`);
+            if (player) {
+                player.style.order = String(index + 1);
+                player.classList.toggle('ring-2', String(user.uid) === String(activeSpeakerUid));
+                player.classList.toggle('ring-green-400', String(user.uid) === String(activeSpeakerUid));
+            }
+        });
+
+        users.slice(9).forEach((user) => {
+            const player = document.getElementById(`remote-${user.uid}`);
+            if (player) player.style.display = 'none';
+        });
+
+        const columns = visibleUsers.length + 1 <= 1 ? 1 : visibleUsers.length + 1 <= 4 ? 2 : 3;
+        remoteGrid.style.gridTemplateColumns = `repeat(${columns}, minmax(0, 1fr))`;
+        document.getElementById('local-player').style.order = '99';
     };
 
     const syncParticipantList = () => {
@@ -177,8 +201,22 @@
                 if (mediaType === 'video') {
                     const player = ensureRemoteCard(user);
                     user.videoTrack.play(player.id);
+                    reorderRemoteGrid();
                 }
                 if (mediaType === 'audio') user.audioTrack.play();
+            });
+
+            client.on('user-unpublished', (user) => {
+                const player = document.getElementById(`remote-${user.uid}`);
+                if (player) player.style.display = 'none';
+            });
+
+            client.on('volume-indicator', (volumes) => {
+                const loudest = volumes
+                    .filter((volume) => volume.level > 25)
+                    .sort((a, b) => b.level - a.level)[0];
+                activeSpeakerUid = loudest ? loudest.uid : null;
+                reorderRemoteGrid();
             });
 
             client.on('user-unpublished', (user) => {
@@ -187,6 +225,7 @@
                 if (player) player.remove();
                 if (remoteUsers.size === 0) remoteEmpty.classList.remove('hidden');
                 syncParticipantList();
+                reorderRemoteGrid();
             });
 
             await client.join(tokenPayload.appId, tokenPayload.channel, tokenPayload.token, tokenPayload.uid);
@@ -194,6 +233,8 @@
             localTracks = await AgoraRTC.createMicrophoneAndCameraTracks();
             localTracks[1].play('local-player');
             await client.publish(localTracks);
+            await client.enableAudioVolumeIndicator();
+            reorderRemoteGrid();
 
             setConnectionStatus('Connected', 'bg-green-500/20 text-green-300');
             syncParticipantList();
@@ -227,4 +268,3 @@
     joinMeeting();
 </script>
 @endpush
-

@@ -28,7 +28,7 @@ class MeetingsController extends Controller
             ->map(fn (Meeting $meeting) => $this->decorateMeeting($meeting));
 
         $upcomingMeetings = $meetings
-            ->filter(fn (Meeting $meeting) => in_array($meeting->status, ['scheduled'], true) && $meeting->scheduled_at->isFuture())
+            ->filter(fn (Meeting $meeting) => $meeting->status === 'scheduled' && $meeting->scheduled_at->copy()->addHour()->isFuture())
             ->sortBy(fn (Meeting $meeting) => $meeting->scheduled_at->timestamp)
             ->values();
 
@@ -38,7 +38,13 @@ class MeetingsController extends Controller
             ->values();
 
         $pastMeetings = $meetings
-            ->filter(fn (Meeting $meeting) => $meeting->status !== 'scheduled')
+            ->filter(function (Meeting $meeting) {
+                $cancelled = in_array($meeting->status, ['cancelled', 'canceled'], true);
+                $completed = $meeting->status === 'completed' && ! $meeting->scheduled_at->isFuture();
+                $elapsed = $meeting->scheduled_at->copy()->addHour()->isPast();
+
+                return $cancelled || $completed || $elapsed;
+            })
             ->sortByDesc(fn (Meeting $meeting) => $meeting->scheduled_at->timestamp)
             ->values();
 
@@ -77,6 +83,19 @@ class MeetingsController extends Controller
         ]);
 
         return redirect()->route('sk_pres.meetings')->with('status', 'Meeting scheduled successfully.');
+    }
+
+    public function end(Meeting $meeting): RedirectResponse
+    {
+        abort_unless(auth()->check() && auth()->user()->role === 'sk_president', 403);
+
+        if ($meeting->status !== 'completed') {
+            $meeting->status = 'completed';
+            $meeting->updated_at = now();
+            $meeting->save();
+        }
+
+        return redirect()->route('sk_pres.meetings')->with('status', 'Meeting ended successfully.');
     }
 
     public function call(Meeting $meeting): View
@@ -195,10 +214,11 @@ class MeetingsController extends Controller
         $meeting->display_datetime = $scheduledAt->format('Y-m-d h:i A');
         $meeting->preview_datetime = $scheduledAt->format('M d, Y h:i A');
         $meeting->is_today = $scheduledAt->isToday();
-        $meeting->status_label = match ($meeting->status) {
-            'completed' => 'Completed',
-            'cancelled' => 'Cancelled',
-            default => $meeting->scheduled_at->isFuture() ? 'Upcoming' : 'Ready',
+        $meeting->status_label = match (true) {
+            $meeting->status === 'completed' => 'Completed',
+            in_array($meeting->status, ['cancelled', 'canceled'], true) => 'Cancelled',
+            $meeting->ends_at->isFuture() => 'Upcoming',
+            default => 'Ready',
         };
 
         return $meeting;

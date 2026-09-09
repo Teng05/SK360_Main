@@ -75,9 +75,21 @@
                 <p class="text-gray-500">Encouraging timely submissions and active participation{{ $latestPeriod ? ' for ' . $latestPeriod : '' }}</p>
             </div>
 
-            @isset($rankingsLiveRoute)
-                <div id="react-rankings-live" data-url="{{ $rankingsLiveRoute }}"></div>
-            @endisset
+            <div class="bg-white rounded-2xl border border-gray-100 p-5 mb-8 shadow-sm flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <div>
+                    <h3 class="text-sm font-black text-gray-800 uppercase tracking-wide">Ranking History</h3>
+                    <p class="text-xs text-gray-400">View the top 3 barangays for any month.</p>
+                </div>
+                <form method="GET" action="{{ url()->current() }}">
+                    <label for="ranking-period" class="sr-only">Select ranking month</label>
+                    <select id="ranking-period" name="period" onchange="this.form.submit()"
+                            class="rounded-xl border border-gray-200 bg-gray-50 px-4 py-2 text-sm text-gray-700 focus:border-red-400 focus:outline-none">
+                        @foreach ($rankingPeriods ?? [] as $period)
+                            <option value="{{ $period }}" @selected($period === $latestPeriod)>{{ $period }}</option>
+                        @endforeach
+                    </select>
+                </form>
+            </div>
 
             @if ($topRankings->isNotEmpty())
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
@@ -96,14 +108,24 @@
                 </div>
             @endif
 
+            @isset($rankingsLiveRoute)
+                <div id="react-rankings-live" data-url="{{ $rankingsLiveRoute }}"></div>
+            @endisset
+
+            @if (false && ($latestPeriod ?? null) === ($currentPeriod ?? null))
             <div class="bg-white rounded-2xl border border-gray-100 p-6 mb-10 shadow-sm">
-                <div class="mb-6">
-                    <h3 class="text-[10px] font-black text-gray-400 uppercase tracking-widest">Complete Leaderboard</h3>
+                <div class="mb-6 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                    <h3 class="text-[10px] font-black text-gray-400 uppercase tracking-widest">Live Leaderboard</h3>
+                    <div class="relative w-full md:w-72">
+                        <input id="ranking-search" type="search" placeholder="Search barangay..."
+                               class="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2 pl-10 text-sm text-gray-700 outline-none focus:border-red-400">
+                        <span class="pointer-events-none absolute left-3 top-2 text-xs text-gray-400">Search</span>
+                    </div>
                 </div>
 
-                <div class="space-y-6">
+                <div id="live-leaderboard-list" class="max-h-[720px] space-y-6 overflow-y-auto pr-2">
                     @forelse ($leaderboard as $row)
-                        <div class="bg-gray-50/50 rounded-2xl p-5 border border-gray-100 flex flex-col md:flex-row items-center gap-6 group hover:border-red-200 transition">
+                        <div data-ranking-name="{{ strtolower($row->name) }}" class="ranking-row bg-gray-50/50 rounded-2xl p-5 border border-gray-100 flex flex-col md:flex-row items-center gap-6 group hover:border-red-200 transition">
                             <div class="flex items-center gap-4 min-w-[200px]">
                                 <div class="text-2xl">{{ $row->rank == 1 ? '🥇' : ($row->rank == 2 ? '🥈' : ($row->rank == 3 ? '🥉' : '🏅')) }}</div>
                                 <div class="text-left leading-tight">
@@ -138,8 +160,10 @@
                     @empty
                         <p class="text-gray-400 italic">No rankings found.</p>
                     @endforelse
+                    <p id="ranking-no-results" class="hidden text-gray-400 italic">No barangay found.</p>
                 </div>
             </div>
+            @endif
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6 pb-10">
                 <div class="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
@@ -211,6 +235,21 @@
             userDropdown.classList.add('hidden');
         }
     });
+
+    const rankingSearch = document.getElementById('ranking-search');
+    if (rankingSearch) {
+        rankingSearch.addEventListener('input', function () {
+            const query = this.value.trim().toLowerCase();
+            const rows = document.querySelectorAll('.ranking-row');
+            let visible = 0;
+            rows.forEach((row) => {
+                const matches = row.dataset.rankingName.includes(query);
+                row.classList.toggle('hidden', !matches);
+                if (matches) visible++;
+            });
+            const noResults = document.getElementById('ranking-no-results');
+            if (noResults) noResults.classList.toggle('hidden', visible !== 0);
+        });
+    }
 </script>
 @endpush
-

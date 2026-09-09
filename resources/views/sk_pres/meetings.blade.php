@@ -163,6 +163,17 @@
                                            class="inline-flex items-center rounded-xl bg-[#d90f1f] px-4 py-2 text-xs font-semibold text-white transition hover:bg-[#b90e1b]">
                                             Join Meeting
                                         </a>
+                                        @if ($meeting->status === 'scheduled')
+                                            <form method="POST" action="{{ route('sk_pres.meetings.end', $meeting->meeting_id) }}"
+                                                  onsubmit="return confirm('End this meeting and move it to Past Meetings?');">
+                                                @csrf
+                                                @method('PATCH')
+                                                <button type="submit"
+                                                        class="inline-flex items-center rounded-xl border border-[#d90f1f] px-4 py-2 text-xs font-semibold text-[#d90f1f] transition hover:bg-red-50">
+                                                    End Meeting
+                                                </button>
+                                            </form>
+                                        @endif
                                     </div>
                                 </div>
                             @empty
