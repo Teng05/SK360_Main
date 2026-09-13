@@ -6,6 +6,7 @@ namespace App\Http\Controllers\sk_pres;
 
 use App\Http\Controllers\Controller;
 use App\Services\NotificationService;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -65,6 +66,68 @@ class ModuleController extends Controller
         abort_unless(auth()->check() && auth()->user()->role === 'sk_president', 403);
 
         return response()->json($this->modulePayload());
+    }
+
+    public function toggle(int $slotId): RedirectResponse
+    {
+        abort_unless(auth()->check() && auth()->user()->role === 'sk_president', 403);
+
+        $slot = DB::table('submission_slots')->where('slot_id', $slotId)->first();
+        abort_unless($slot, 404);
+
+        DB::table('submission_slots')
+            ->where('slot_id', $slotId)
+            ->update(['status' => $slot->status === 'open' ? 'closed' : 'open']);
+
+        return redirect()->route('sk_pres.module')->with('status', 'Submission slot status updated.');
+    }
+
+    public function submissions(int $slotId): JsonResponse
+    {
+        abort_unless(auth()->check() && auth()->user()->role === 'sk_president', 403);
+
+        $slot = DB::table('submission_slots')->where('slot_id', $slotId)->first();
+        abort_unless($slot, 404);
+
+        return response()->json([
+            'slot' => $slot,
+            'submissions' => $this->slotSubmissions($slot),
+        ]);
+    }
+
+    public function submissionsPage(int $slotId): View
+    {
+        abort_unless(auth()->check() && auth()->user()->role === 'sk_president', 403);
+
+        $slot = DB::table('submission_slots')->where('slot_id', $slotId)->first();
+        abort_unless($slot, 404);
+
+        $slots = DB::table('submission_slots')->orderByDesc('created_at')->get();
+        $fullName = trim((auth()->user()->first_name ?? '').' '.(auth()->user()->last_name ?? '')) ?: 'User';
+
+        return view('sk_pres.module', [
+            'fullName' => $fullName,
+            'currentUrl' => url()->current(),
+            'slots' => $slots,
+            'summaryCards' => [],
+            'submissionPage' => true,
+            'submissionSlot' => $slot,
+            'submissions' => $this->slotSubmissions($slot),
+            'menuItems' => [
+                ['link' => route('sk_pres.home'), 'icon' => '&#127968;', 'label' => 'Home'],
+                ['link' => route('sk_pres.dashboard'), 'icon' => '&#128202;', 'label' => 'Dashboard'],
+                ['link' => route('sk_pres.consolidation'), 'icon' => '&#128193;', 'label' => 'Consolidation'],
+                ['link' => route('sk_pres.module'), 'icon' => '&#9881;', 'label' => 'Module Management'],
+                ['link' => route('sk_pres.announcements'), 'icon' => '&#128226;', 'label' => 'Announcements'],
+                ['link' => route('sk_pres.calendar'), 'icon' => '&#128197;', 'label' => 'Calendar'],
+                ['link' => route('sk_pres.chat'), 'icon' => '&#128172;', 'label' => 'Chat'],
+                ['link' => route('sk_pres.meetings'), 'icon' => '&#128222;', 'label' => 'Meetings'],
+                ['link' => route('sk_pres.rankings'), 'icon' => '&#127942;', 'label' => 'Rankings'],
+                ['link' => route('sk_pres.leadership'), 'icon' => '&#128101;', 'label' => 'Leadership'],
+                ['link' => route('sk_pres.archive'), 'icon' => '&#128450;', 'label' => 'Archive'],
+                ['link' => route('sk_pres.user-management'), 'icon' => '&#128100;', 'label' => 'User Management'],
+            ],
+        ]);
     }
 
     public function storeLive(Request $request, NotificationService $notifications): JsonResponse
@@ -168,5 +231,50 @@ class ModuleController extends Controller
             ],
             'updatedAt' => now()->format('M d, Y h:i A'),
         ];
+    }
+
+    protected function slotSubmissions(object $slot): array
+    {
+        $table = $slot->submission_type === 'budget_report'
+            ? 'budget_reports'
+            : 'accomplishment_reports';
+        $idColumn = $table === 'budget_reports' ? 'budget_report_id' : 'report_id';
+
+        return DB::table('barangays as b')
+            ->leftJoin($table.' as r', function ($join) use ($slot) {
+                $join->on('r.barangay_id', '=', 'b.barangay_id')
+                    ->where('r.slot_id', '=', $slot->slot_id);
+            })
+            ->select(
+                'b.barangay_id',
+                'b.barangay_name',
+                'r.'.$idColumn.' as submission_id',
+                'r.title',
+                'r.uploaded_file_name',
+                'r.uploaded_file_path',
+                'r.generated_pdf_path',
+                'r.template_data',
+                'r.created_at as submitted_at'
+            )
+            ->orderBy('b.barangay_name')
+            ->get()
+            ->map(function ($row) use ($table) {
+                $path = $row->uploaded_file_path ?: $row->generated_pdf_path;
+                $row->file_url = $row->submission_id && (
+                    ($path && !in_array($path, ['SYSTEM_GEN', 'TEMPLATE_GEN'], true))
+                    || ($table === 'budget_reports' && !empty($row->template_data))
+                )
+                    ? route('sk_pres.archive.view', [
+                        $table === 'budget_reports' ? 'budget_report' : 'accomplishment_report',
+                        $row->submission_id,
+                    ])
+                    : null;
+                $row->submitted = $row->submission_id !== null;
+                $row->submitted_at_label = $row->submitted_at
+                    ? Carbon::parse($row->submitted_at)->format('M d, Y h:i A')
+                    : null;
+                return $row;
+            })
+            ->all();
     }
 }

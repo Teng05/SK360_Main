@@ -48,6 +48,7 @@ class AnnouncementController extends Controller
                 'users.last_name'
             )
             ->orderByDesc('announcements.created_at')
+            ->orderByDesc('announcements.announcement_id')
             ->get()
             ->map(function ($announcement) {
                 $announcement->author_name = trim(($announcement->first_name ?? '').' '.($announcement->last_name ?? '')) ?: 'Unknown User';

@@ -112,6 +112,9 @@ Route::middleware('auth')->prefix('sk_pres')->name('sk_pres.')->group(function()
     Route::get('/consolidation/download',[ConsolidationController::class,'download'])->name('consolidation.download');
 
     Route::get('/module',[ModuleController::class,'index'])->name('module');
+    Route::get('/module/{slotId}/submissions-page',[ModuleController::class,'submissionsPage'])->name('module.submissions-page');
+    Route::get('/module/{slotId}/submissions',[ModuleController::class,'submissions'])->name('module.submissions');
+    Route::post('/module/{slotId}/toggle',[ModuleController::class,'toggle'])->name('module.toggle');
     Route::get('/module/live',[ModuleController::class,'live'])->name('module.live');
     Route::post('/module/live',[ModuleController::class,'storeLive'])->name('module.live.store');
     Route::delete('/module/live/{slotId}',[ModuleController::class,'destroyLive'])->name('module.live.destroy');
@@ -148,6 +151,7 @@ Route::middleware('auth')->prefix('sk_pres')->name('sk_pres.')->group(function()
     */
     Route::get('/archive',[SkPresidentArchiveController::class,'index'])->name('archive');
     Route::get('/archive/download/bulk',[SkPresidentArchiveController::class,'bulkDownload'])->name('archive.bulk-download');
+    Route::get('/archive/view/{sourceType}/{sourceId}',[SkPresidentArchiveController::class,'view'])->name('archive.view');
     Route::get('/archive/download/{sourceType}/{sourceId}',[SkPresidentArchiveController::class,'download'])->name('archive.download');
 
     /*
@@ -305,4 +309,3 @@ Route::prefix('public-portal')->name('public.')->group(function(){
     Route::post('/feedback/{feedbackId}/resend',[PublicAnnouncementInteractionController::class,'resendFeedback'])->middleware('throttle:public-feedback-resend')->name('feedback.resend');
 
 });
-

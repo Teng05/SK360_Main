@@ -46,9 +46,11 @@ class AnnouncementController extends Controller
         }
 
         if($sort==='oldest'){
-            $query->orderBy('a.created_at');
+            $query->orderBy('a.created_at')
+                ->orderBy('a.announcement_id');
         }else{
-            $query->orderByDesc('a.created_at');
+            $query->orderByDesc('a.created_at')
+                ->orderByDesc('a.announcement_id');
         }
 
         $announcements=$query

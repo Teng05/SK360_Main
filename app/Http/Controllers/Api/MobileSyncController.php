@@ -854,6 +854,51 @@ class MobileSyncController extends Controller
         ]);
     }
 
+    public function toggleSubmissionSlot(Request $request, int $slotId): JsonResponse
+    {
+        if (! $this->isPresident($request->user())) {
+            return response()->json(['message' => 'Only SK President can manage submission slots.'], 403);
+        }
+
+        $slot = DB::table('submission_slots')->where('slot_id', $slotId)->first();
+        if (! $slot) return response()->json(['message' => 'Submission slot not found.'], 404);
+
+        DB::table('submission_slots')
+            ->where('slot_id', $slotId)
+            ->update(['status' => $slot->status === 'open' ? 'closed' : 'open']);
+
+        return response()->json(['message' => 'Submission slot status updated.']);
+    }
+
+    public function submissionSlotSubmissions(Request $request, int $slotId): JsonResponse
+    {
+        if (! $this->isPresident($request->user())) {
+            return response()->json(['message' => 'Only SK President can view submissions.'], 403);
+        }
+
+        $slot = DB::table('submission_slots')->where('slot_id', $slotId)->first();
+        if (! $slot) return response()->json(['message' => 'Submission slot not found.'], 404);
+
+        $table = $slot->submission_type === 'budget_report' ? 'budget_reports' : 'accomplishment_reports';
+        $idColumn = $table === 'budget_reports' ? 'budget_report_id' : 'report_id';
+        $rows = DB::table('barangays as b')
+            ->leftJoin($table.' as r', function ($join) use ($slot) {
+                $join->on('r.barangay_id', '=', 'b.barangay_id')
+                    ->where('r.slot_id', '=', $slot->slot_id);
+            })
+            ->select('b.barangay_id', 'b.barangay_name', 'r.'.$idColumn.' as submission_id', 'r.title', 'r.uploaded_file_name', 'r.uploaded_file_path', 'r.generated_pdf_path', 'r.created_at as submitted_at')
+            ->orderBy('b.barangay_name')
+            ->get()
+            ->map(function ($row) {
+                $path = $row->uploaded_file_path ?: $row->generated_pdf_path;
+                $row->file_url = $path && !in_array($path, ['SYSTEM_GEN', 'TEMPLATE_GEN'], true) ? $this->publicUrl($path) : null;
+                $row->submitted = $row->submission_id !== null;
+                return $row;
+            });
+
+        return response()->json(['slot' => $slot, 'submissions' => $rows]);
+    }
+
     public function storeSubmissionSlot(Request $request, NotificationService $notifications): JsonResponse
     {
         if (! $this->isPresident($request->user())) {
@@ -1469,8 +1514,18 @@ class MobileSyncController extends Controller
     {
         $this->applySince($query, $table, $since);
 
+        if ($table === 'announcements') {
+            $createdColumn = str_contains($orderColumn, '.')
+                ? substr($orderColumn, 0, strrpos($orderColumn, '.')).'.created_at'
+                : 'created_at';
+
+            $query->orderByDesc($createdColumn)
+                ->orderByDesc($orderColumn);
+        } else {
+            $query->orderBy($orderColumn);
+        }
+
         return $query
-            ->orderBy($orderColumn)
             ->limit(500)
             ->get()
             ->all();

@@ -25,6 +25,7 @@ trait BuildsWallFeed
                 DB::raw("CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, '')) as author_name")
             )
             ->orderByDesc('a.created_at')
+            ->orderByDesc('a.announcement_id')
             ->limit($limit)
             ->get()
             ->map(function ($post) {
