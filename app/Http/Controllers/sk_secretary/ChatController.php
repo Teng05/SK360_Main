@@ -99,6 +99,7 @@ class ChatController extends Controller
         return DB::table('users')
             ->select('user_id', 'first_name', 'last_name', 'email', 'role')
             ->where('status', 'active')
+            ->whereNull('archived_at')
             ->whereIn('role', ['sk_president', 'sk_chairman', 'sk_secretary'])
             ->orderBy('first_name')
             ->orderBy('last_name')

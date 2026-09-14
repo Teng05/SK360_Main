@@ -26,6 +26,79 @@ svg {
     display: none;
 }
 
+.dashboard-topbar {
+    position: relative;
+    z-index: 30;
+    flex-shrink: 0;
+    min-height: 68px;
+    font-size: 16px;
+    line-height: 1.5;
+    font-family: ui-sans-serif, system-ui, sans-serif;
+}
+
+.dashboard-topbar.dashboard-topbar {
+    height: 68px;
+    padding: 12px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: nowrap;
+}
+
+.dashboard-topbar.dashboard-topbar > div:last-child {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: auto;
+    margin-left: auto;
+}
+
+.dashboard-topbar #notifBtn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    padding: 8px;
+    font-size: 20px;
+    line-height: 28px;
+}
+
+.dashboard-topbar [data-topbar-account] {
+    min-height: 40px;
+    padding: 8px 12px;
+    font-weight: 600;
+}
+
+@media (max-width: 767px) {
+    .dashboard-topbar.dashboard-topbar {
+        padding: 12px 16px;
+    }
+
+    .dashboard-topbar [data-topbar-account] > span {
+        max-width: calc(100vw - 152px);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+}
+
+.dashboard-topbar > div:last-child {
+    min-width: 0;
+}
+
+.dashboard-topbar [data-topbar-account] {
+    font-size: 16px;
+    line-height: 1.5;
+    text-align: left;
+    overflow-wrap: anywhere;
+}
+
+.dashboard-topbar #notifDropdown,
+.dashboard-topbar [data-topbar-menu] {
+    max-width: calc(100vw - 2rem);
+}
+
 /* The topbar search is intentionally replaced by the mobile navigation control. */
 [class~="bg-red-600"][class~="px-6"][class~="py-3"][class~="justify-between"] input {
     display: none !important;

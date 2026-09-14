@@ -10,13 +10,7 @@
     </div>
 
     {{-- Secretary user card --}}
-    <div class="bg-red-500 rounded-lg p-2 flex items-center gap-2 mb-3 shadow text-xs">
-        <div class="bg-yellow-400 text-red-600 p-1 rounded-full text-sm">&#128100;</div>
-        <div>
-            <p class="font-semibold text-xs">{{ $fullName }}</p>
-            <p class="text-xs opacity-80">SK Secretary</p>
-        </div>
-    </div>
+    @include('shared.sidebar-user-card')
 
     {{-- Secretary navigation links --}}
     <nav class="space-y-1 text-xs">
