@@ -199,7 +199,8 @@ class ArchiveController extends Controller
             return redirect()->route('sk_pres.archive')->with('archive_error', 'This archive document is not available for viewing.');
         }
 
-        $filePath = $this->publicFilePath($document->uploaded_file_path ?? null);
+        $filePath = $this->publicFilePath($document->uploaded_file_path ?? null)
+            ?: $this->publicFilePath($document->generated_pdf_path ?? null);
         if ($filePath) {
             return response()->file($filePath);
         }

@@ -10,6 +10,7 @@ use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
@@ -240,22 +241,27 @@ class ModuleController extends Controller
             : 'accomplishment_reports';
         $idColumn = $table === 'budget_reports' ? 'budget_report_id' : 'report_id';
 
+        $columns = [
+            'b.barangay_id',
+            'b.barangay_name',
+            'r.'.$idColumn.' as submission_id',
+            'r.title',
+            'r.uploaded_file_name',
+            'r.uploaded_file_path',
+            'r.generated_pdf_path',
+            'r.created_at as submitted_at',
+        ];
+
+        if (Schema::hasColumn($table, 'template_data')) {
+            $columns[] = 'r.template_data';
+        }
+
         return DB::table('barangays as b')
             ->leftJoin($table.' as r', function ($join) use ($slot) {
                 $join->on('r.barangay_id', '=', 'b.barangay_id')
                     ->where('r.slot_id', '=', $slot->slot_id);
             })
-            ->select(
-                'b.barangay_id',
-                'b.barangay_name',
-                'r.'.$idColumn.' as submission_id',
-                'r.title',
-                'r.uploaded_file_name',
-                'r.uploaded_file_path',
-                'r.generated_pdf_path',
-                'r.template_data',
-                'r.created_at as submitted_at'
-            )
+            ->select($columns)
             ->orderBy('b.barangay_name')
             ->get()
             ->map(function ($row) use ($table) {

@@ -1556,7 +1556,9 @@ class MobileSyncController extends Controller
             return $path;
         }
 
-        return url(ltrim($path, '/'));
+        // Build the link from the current API request so a phone does not
+        // receive a useless 127.0.0.1 URL from the server's APP_URL.
+        return rtrim(request()->getSchemeAndHttpHost(), '/').'/'.ltrim($path, '/');
     }
 
     protected function saveMobileAccomplishmentSubmission(User $user, object $slot, array $validated): int
