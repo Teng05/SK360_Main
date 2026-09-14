@@ -27,7 +27,7 @@ class MeetingsController extends Controller
             ->map(fn (Meeting $meeting) => $this->decorateMeeting($meeting));
 
         $upcomingMeetings = $meetings
-            ->filter(fn (Meeting $meeting) => in_array($meeting->status, ['scheduled'], true) && $meeting->scheduled_at->isFuture())
+            ->filter(fn (Meeting $meeting) => in_array($meeting->status, ['scheduled'], true) && $meeting->scheduled_at->copy()->addHour()->isFuture())
             ->sortBy(fn (Meeting $meeting) => $meeting->scheduled_at->timestamp)
             ->values();
 
@@ -170,7 +170,7 @@ class MeetingsController extends Controller
         $meeting->status_label = match ($meeting->status) {
             'completed' => 'Completed',
             'cancelled' => 'Cancelled',
-            default => $meeting->scheduled_at->isFuture() ? 'Upcoming' : 'Ready',
+            default => $meeting->ends_at->isFuture() ? 'Upcoming' : 'Ready',
         };
 
         return $meeting;

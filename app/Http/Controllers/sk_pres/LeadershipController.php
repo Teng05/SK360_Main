@@ -1,150 +1,433 @@
 <?php
 
-// File guide: Handles route logic and page data for app/Http/Controllers/sk_pres/LeadershipController.php.
-
 namespace App\Http\Controllers\sk_pres;
 
 use App\Http\Controllers\Controller;
 use App\Models\Barangay;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\View\View;
 
 class LeadershipController extends Controller
 {
     public function index(): View
     {
-        abort_unless(auth()->check() && auth()->user()->role === 'sk_president', 403);
+        abort_unless(auth()->check() && auth()->user()->role === 'sk_president',403);
 
-        $user = auth()->user();
-        $fullName = trim(($user->first_name ?? '') . ' ' . ($user->last_name ?? '')) ?: 'User';
-        $activeTab = request('tab') === 'transition' ? 'transition' : 'directory';
+        $user=auth()->user();
+        $fullName=trim(($user->first_name ?? '').' '.($user->last_name ?? '')) ?: 'User';
+        $currentAdministration=$this->currentAdministrationTerm();
 
-        $menuItems = [
-            ['link' => route('sk_pres.home'), 'icon' => '&#127968;', 'label' => 'Home'],
-            ['link' => route('sk_pres.dashboard'), 'icon' => '&#128202;', 'label' => 'Dashboard'],
-            ['link' => route('sk_pres.consolidation'), 'icon' => '&#128193;', 'label' => 'Consolidation'],
-            ['link' => route('sk_pres.module'), 'icon' => '&#9881;&#65039;', 'label' => 'Module Management'],
-            ['link' => route('sk_pres.announcements'), 'icon' => '&#128226;', 'label' => 'Announcements'],
-            ['link' => route('sk_pres.calendar'), 'icon' => '&#128197;', 'label' => 'Calendar'],
-            ['link' => route('sk_pres.chat'), 'icon' => '&#128172;', 'label' => 'Chat'],
-            ['link' => route('sk_pres.meetings'), 'icon' => '&#128222;', 'label' => 'Meetings'],
-            ['link' => route('sk_pres.rankings'), 'icon' => '&#127942;', 'label' => 'Rankings'],
-            
-            ['link' => route('sk_pres.leadership'), 'icon' => '&#128101;', 'label' => 'Leadership'],
-            ['link' => route('sk_pres.archive'), 'icon' => '&#128450;&#65039;', 'label' => 'Archive'],
-            ['link' => route('sk_pres.user-management'), 'icon' => '&#128100;', 'label' => 'User Management'],
-        ];
-
-        $barangays = Barangay::query()
+        $barangays=Barangay::query()
             ->orderBy('barangay_name')
-            ->get(['barangay_id', 'barangay_name']);
+            ->get(['barangay_id','barangay_name']);
 
-        $selectedBarangayId = (int) request('barangay_id');
+        $selectedBarangayId=(int)request('barangay_id',0);
 
-        if ($selectedBarangayId <= 0 || ! $barangays->contains('barangay_id', $selectedBarangayId)) {
-            $selectedBarangayId = (int) ($barangays->first()->barangay_id ?? 0);
+        if($selectedBarangayId > 0 && !$barangays->contains('barangay_id',$selectedBarangayId)){
+            $selectedBarangayId=0;
         }
 
-        $selectedBarangay = $barangays->firstWhere('barangay_id', $selectedBarangayId);
-        $barangayName = $selectedBarangay->barangay_name ?? 'Unknown Barangay';
+        $federationPresidents=$this->federationPresidents($currentAdministration?->term_id);
 
-        $councilMembers = $this->councilMembers($selectedBarangayId);
+        $leadershipGroups=$this->leadershipGroups(
+            $barangays,
+            $currentAdministration?->term_id,
+            $selectedBarangayId
+        );
 
-        $executives = $councilMembers->filter(function ($member) {
-            $position = strtolower((string) ($member['position'] ?? ''));
+        $stats=[
+            [
+                'label'=>'Barangays',
+                'value'=>$leadershipGroups->count(),
+                'icon'=>'&#128205;',
+            ],
+            [
+                'label'=>'Chairmen',
+                'value'=>$leadershipGroups
+                    ->filter(fn($group)=>!empty($group['chairman']))
+                    ->count(),
+                'icon'=>'&#128737;',
+            ],
+            [
+                'label'=>'Secretaries',
+                'value'=>$leadershipGroups
+                    ->filter(fn($group)=>!empty($group['secretary']))
+                    ->count(),
+                'icon'=>'&#128196;',
+            ],
+            [
+                'label'=>'Treasurers',
+                'value'=>$leadershipGroups
+                    ->filter(fn($group)=>!empty($group['treasurer']))
+                    ->count(),
+                'icon'=>'&#128176;',
+            ],
+            [
+                'label'=>'Councilors',
+                'value'=>$leadershipGroups
+                    ->sum(fn($group)=>$group['councilors']->count()),
+                'icon'=>'&#127775;',
+            ],
+        ];
 
-            return str_contains($position, 'chairman')
-                || str_contains($position, 'secretary')
-                || str_contains($position, 'treasurer')
-                || str_contains($position, 'president');
-        })->values();
-
-        $kagawads = $councilMembers->filter(function ($member) {
-            $position = strtolower((string) ($member['position'] ?? ''));
-
-            return str_contains($position, 'councilor') || str_contains($position, 'kagawad');
-        })->values();
-
-        return view('sk_pres.leadership', [
-            'fullName' => $fullName,
-            'menuItems' => $menuItems,
-            'currentUrl' => url()->current(),
-            'activeTab' => $activeTab,
-            'barangays' => $barangays,
-            'selectedBarangayId' => $selectedBarangayId,
-            'barangayName' => $barangayName,
-            'councilMembers' => $councilMembers,
-            'executives' => $executives,
-            'kagawads' => $kagawads,
+        return view('sk_pres.leadership',[
+            'fullName'=>$fullName,
+            'menuItems'=>$this->menuItems(),
+            'currentUrl'=>url()->current(),
+            'barangays'=>$barangays,
+            'selectedBarangayId'=>$selectedBarangayId,
+            'currentAdministration'=>$currentAdministration,
+            'federationPresidents'=>$federationPresidents,
+            'leadershipGroups'=>$leadershipGroups,
+            'stats'=>$stats,
         ]);
     }
 
-    protected function councilMembers(int $barangayId): Collection
+    /*
+    |--------------------------------------------------------------------------
+    | FEDERATION PRESIDENT
+    |--------------------------------------------------------------------------
+    */
+    protected function federationPresidents(?int $termId): Collection
     {
-        if ($barangayId <= 0) {
+        if(!$termId){
             return collect();
         }
 
-        $members = collect();
-
-        $userLeaders = DB::table('users')
-            ->where('barangay_id', $barangayId)
-            ->whereIn('role', ['sk_chairman', 'sk_secretary'])
+        return DB::table('official_terms as ot')
+            ->join('users as u','ot.user_id','=','u.user_id')
+            ->where('ot.term_id',$termId)
+            ->where('ot.role','sk_president')
+            ->whereIn('ot.status',['pending','current'])
+            ->whereNull('u.archived_at')
             ->select(
-                DB::raw("CONCAT(first_name, ' ', last_name) as name"),
-                DB::raw("
-                    CASE
-                        WHEN role = 'sk_chairman' THEN 'SK Chairman'
-                        WHEN role = 'sk_secretary' THEN 'SK Secretary'
-                        ELSE role
-                    END as position
-                "),
-                'email',
-                'phone_number as phone',
-                DB::raw("'2024-2026' as term")
+                'u.user_id',
+                'u.first_name',
+                'u.last_name',
+                'u.email',
+                'u.phone_number',
+                'u.status as account_status',
+                'u.is_verified',
+                'ot.status as assignment_status',
+                'ot.started_at'
             )
+            ->orderByRaw("CASE WHEN ot.status='current' THEN 0 ELSE 1 END")
+            ->orderByDesc('ot.official_term_id')
             ->get()
-            ->map(fn ($row) => (array) $row);
+            ->map(fn($row)=>[
+                'user_id'=>$row->user_id,
+                'name'=>trim(($row->first_name ?? '').' '.($row->last_name ?? '')),
+                'position'=>'SK Federation President',
+                'email'=>$row->email,
+                'phone'=>$row->phone_number,
+                'assignment_status'=>$row->assignment_status,
+                'account_status'=>$row->account_status,
+                'is_verified'=>(int)$row->is_verified,
+                'started_at'=>$row->started_at,
+            ]);
+    }
 
-        $members = $members->merge($userLeaders);
+    /*
+    |--------------------------------------------------------------------------
+    | BARANGAY LEADERSHIP GROUPS
+    |--------------------------------------------------------------------------
+    */
+    protected function leadershipGroups(
+        Collection $barangays,
+        ?int $termId,
+        int $selectedBarangayId=0
+    ): Collection
+    {
+        $visibleBarangays=$selectedBarangayId > 0
+            ? $barangays
+                ->where('barangay_id',$selectedBarangayId)
+                ->values()
+            : $barangays->values();
 
-        if (Schema::hasTable('sk_council')) {
-            $councilRows = DB::table('sk_council')
-                ->where('barangay_id', $barangayId)
-                ->select('name', 'position', 'email', 'phone', 'term')
-                ->get()
-                ->map(fn ($row) => (array) $row);
-
-            $members = $members->merge($councilRows);
-        } elseif (Schema::hasTable('leadership_profiles')) {
-            $leadershipRows = DB::table('leadership_profiles')
-                ->where('barangay_id', $barangayId)
-                ->where('status', 'current')
-                ->leftJoin('users', 'leadership_profiles.user_id', '=', 'users.user_id')
-                ->select(
-                    DB::raw("COALESCE(leadership_profiles.full_name, CONCAT(users.first_name, ' ', users.last_name)) as name"),
-                    DB::raw("
-                        CASE
-                            WHEN leadership_profiles.position = 'sk_president' THEN 'SK President'
-                            WHEN leadership_profiles.position = 'sk_chairman' THEN 'SK Chairman'
-                            WHEN leadership_profiles.position = 'sk_secretary' THEN 'SK Secretary'
-                            ELSE leadership_profiles.position
-                        END as position
-                    "),
-                    'users.email',
-                    'users.phone_number as phone',
-                    DB::raw("CONCAT(YEAR(leadership_profiles.term_start), '-', COALESCE(YEAR(leadership_profiles.term_end), YEAR(CURDATE()))) as term")
-                )
-                ->get()
-                ->map(fn ($row) => (array) $row);
-
-            $members = $members->merge($leadershipRows);
+        if(!$termId){
+            return $visibleBarangays->map(fn($barangay)=>[
+                'barangay_id'=>(int)$barangay->barangay_id,
+                'barangay_name'=>$barangay->barangay_name,
+                'chairman'=>null,
+                'secretary'=>null,
+                'treasurer'=>null,
+                'councilors'=>collect(),
+                'member_count'=>0,
+            ]);
         }
 
-        return $members
-            ->unique(fn ($member) => strtolower(($member['name'] ?? '') . '|' . ($member['position'] ?? '')))
+        /*
+        |--------------------------------------------------------------------------
+        | CHAIRMAN / SECRETARY
+        |--------------------------------------------------------------------------
+        */
+        $officialRows=DB::table('official_terms as ot')
+            ->join('users as u','ot.user_id','=','u.user_id')
+            ->where('ot.term_id',$termId)
+            ->whereIn('ot.role',['sk_chairman','sk_secretary'])
+            ->whereIn('ot.status',['pending','current'])
+            ->whereNull('u.archived_at')
+            ->when(
+                $selectedBarangayId > 0,
+                fn($query)=>$query->where(
+                    'ot.barangay_id',
+                    $selectedBarangayId
+                )
+            )
+            ->select(
+                'ot.official_term_id',
+                'ot.barangay_id',
+                'ot.role',
+                'ot.status as assignment_status',
+                'ot.started_at',
+                'u.user_id',
+                'u.first_name',
+                'u.last_name',
+                'u.email',
+                'u.phone_number',
+                'u.status as account_status',
+                'u.is_verified'
+            )
+            ->orderByRaw("CASE WHEN ot.status='current' THEN 0 ELSE 1 END")
+            ->orderByDesc('ot.official_term_id')
+            ->get()
+            ->groupBy('barangay_id');
+
+        /*
+        |--------------------------------------------------------------------------
+        | TREASURER / COUNCILORS
+        |--------------------------------------------------------------------------
+        */
+        $councilRows=DB::table('sk_council')
+            ->where('term_id',$termId)
+            ->where('status','current')
+            ->when(
+                $selectedBarangayId > 0,
+                fn($query)=>$query->where(
+                    'barangay_id',
+                    $selectedBarangayId
+                )
+            )
+            ->select(
+                'council_id',
+                'barangay_id',
+                'name',
+                'position',
+                'email',
+                'phone',
+                'created_at'
+            )
+            ->orderBy('name')
+            ->get()
+            ->groupBy('barangay_id');
+
+        /*
+        |--------------------------------------------------------------------------
+        | BUILD DIRECTORY PER BARANGAY
+        |--------------------------------------------------------------------------
+        */
+        return $visibleBarangays
+            ->map(function($barangay) use($officialRows,$councilRows){
+
+                $barangayId=(int)$barangay->barangay_id;
+
+                $officials=$officialRows
+                    ->get($barangayId,collect());
+
+                $council=$councilRows
+                    ->get($barangayId,collect());
+
+                $chairmanRow=$officials
+                    ->firstWhere('role','sk_chairman');
+
+                $secretaryRow=$officials
+                    ->firstWhere('role','sk_secretary');
+
+                $treasurerRow=$council
+                    ->first(function($row){
+                        return strtolower(
+                            trim((string)$row->position)
+                        ) === 'sk treasurer';
+                    });
+
+                $councilors=$council
+                    ->filter(function($row){
+
+                        $position=strtolower(
+                            trim((string)$row->position)
+                        );
+
+                        return str_contains(
+                            $position,
+                            'councilor'
+                        ) || str_contains(
+                            $position,
+                            'kagawad'
+                        );
+                    })
+                    ->map(fn($row)=>[
+                        'council_id'=>$row->council_id,
+                        'name'=>$row->name,
+                        'position'=>'SK Councilor',
+                        'email'=>$row->email,
+                        'phone'=>$row->phone,
+                        'assignment_status'=>'current',
+                        'started_at'=>$row->created_at,
+                    ])
+                    ->values();
+
+                $chairman=$chairmanRow
+                    ? $this->mapOfficial(
+                        $chairmanRow,
+                        'SK Chairman'
+                    )
+                    : null;
+
+                $secretary=$secretaryRow
+                    ? $this->mapOfficial(
+                        $secretaryRow,
+                        'SK Secretary'
+                    )
+                    : null;
+
+                $treasurer=$treasurerRow
+                    ? [
+                        'council_id'=>$treasurerRow->council_id,
+                        'name'=>$treasurerRow->name,
+                        'position'=>'SK Treasurer',
+                        'email'=>$treasurerRow->email,
+                        'phone'=>$treasurerRow->phone,
+                        'assignment_status'=>'current',
+                        'started_at'=>$treasurerRow->created_at,
+                    ]
+                    : null;
+
+                return [
+                    'barangay_id'=>$barangayId,
+                    'barangay_name'=>$barangay->barangay_name,
+                    'chairman'=>$chairman,
+                    'secretary'=>$secretary,
+                    'treasurer'=>$treasurer,
+                    'councilors'=>$councilors,
+                    'member_count'=>
+                        ($chairman ? 1 : 0)
+                        +($secretary ? 1 : 0)
+                        +($treasurer ? 1 : 0)
+                        +$councilors->count(),
+                ];
+            })
             ->values();
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | MAP USER OFFICIAL
+    |--------------------------------------------------------------------------
+    */
+    protected function mapOfficial(
+        object $row,
+        string $position
+    ): array
+    {
+        return [
+            'user_id'=>$row->user_id,
+            'name'=>trim(
+                ($row->first_name ?? '').
+                ' '.
+                ($row->last_name ?? '')
+            ),
+            'position'=>$position,
+            'email'=>$row->email,
+            'phone'=>$row->phone_number,
+            'assignment_status'=>$row->assignment_status,
+            'account_status'=>$row->account_status,
+            'is_verified'=>(int)$row->is_verified,
+            'started_at'=>$row->started_at,
+        ];
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | CURRENT ADMINISTRATION
+    |--------------------------------------------------------------------------
+    */
+    protected function currentAdministrationTerm()
+    {
+        return DB::table('administration_terms')
+            ->where('status','current')
+            ->orderByDesc('term_id')
+            ->first();
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | MENU ITEMS
+    |--------------------------------------------------------------------------
+    */
+    protected function menuItems(): array
+    {
+        return [
+            [
+                'link'=>route('sk_pres.home'),
+                'icon'=>'&#127968;',
+                'label'=>'Home'
+            ],
+            [
+                'link'=>route('sk_pres.dashboard'),
+                'icon'=>'&#128202;',
+                'label'=>'Dashboard'
+            ],
+            [
+                'link'=>route('sk_pres.consolidation'),
+                'icon'=>'&#128193;',
+                'label'=>'Consolidation'
+            ],
+            [
+                'link'=>route('sk_pres.module'),
+                'icon'=>'&#9881;&#65039;',
+                'label'=>'Module Management'
+            ],
+            [
+                'link'=>route('sk_pres.announcements'),
+                'icon'=>'&#128226;',
+                'label'=>'Announcements'
+            ],
+            [
+                'link'=>route('sk_pres.calendar'),
+                'icon'=>'&#128197;',
+                'label'=>'Calendar'
+            ],
+            [
+                'link'=>route('sk_pres.chat'),
+                'icon'=>'&#128172;',
+                'label'=>'Chat'
+            ],
+            [
+                'link'=>route('sk_pres.meetings'),
+                'icon'=>'&#128222;',
+                'label'=>'Meetings'
+            ],
+            [
+                'link'=>route('sk_pres.rankings'),
+                'icon'=>'&#127942;',
+                'label'=>'Rankings'
+            ],
+            [
+                'link'=>route('sk_pres.leadership'),
+                'icon'=>'&#128101;',
+                'label'=>'Leadership'
+            ],
+            [
+                'link'=>route('sk_pres.archive'),
+                'icon'=>'&#128450;&#65039;',
+                'label'=>'Archive'
+            ],
+            [
+                'link'=>route('sk_pres.user-management'),
+                'icon'=>'&#128100;',
+                'label'=>'User Management'
+            ],
+        ];
     }
 }

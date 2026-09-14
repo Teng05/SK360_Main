@@ -10,13 +10,14 @@
     <style>
         [x-cloak] { display: none !important; }
         .tab-active { border-bottom: 2px solid #ef4444; color: #ef4444; }
+        {!! file_get_contents(resource_path('css/responsive.css')) !!}
     </style>
 </head>
 <body class="bg-gray-50 font-sans" x-data="{ activeTab: 'personal', isEditing: false, showPassModal: false }">
 <div class="flex h-screen overflow-hidden">
     <div class="w-64 bg-red-600 text-white flex flex-col p-3 shadow-xl z-20">
         <div class="flex items-center gap-3 mb-4">
-    <img src="{{ asset('images/logo.png') }}" class="w-8 h-8 rounded-full object-cover"  alt="logo">
+    <img src="{{ asset('images/sk logo.png') }}" class="w-8 h-8 rounded-full object-cover"  alt="logo">
     <div class="leading-tight">
         <h2 class="text-lg font-extrabold tracking-wide">SK 360°</h2>
         <p class="text-[10px] opacity-80">Management System</p>
@@ -42,10 +43,6 @@
 
     <div class="flex-1 flex flex-col min-w-0 overflow-hidden">
         <div class="bg-red-600 text-white px-6 py-3 flex justify-between items-center shadow relative z-10">
-            <div class="w-1/4"></div>
-            <div class="w-1/3">
-                <input type="text" placeholder="Search settings..." class="w-full px-4 py-2 rounded-full text-black text-sm outline-none">
-            </div>
             <div class="w-1/4 flex justify-end items-center gap-5 text-sm">
                 <button class="hover:opacity-80">&#128276;</button>
                 <div class="relative">
@@ -215,6 +212,53 @@
 </div>
 
 <script>
+const profileSidebar = document.querySelector('[class~="w-64"][class~="bg-red-600"]');
+
+if (profileSidebar) {
+    const mobileToggle = document.createElement('button');
+    mobileToggle.type = 'button';
+    mobileToggle.className = 'mobile-sidebar-toggle';
+    mobileToggle.setAttribute('aria-label', 'Open navigation menu');
+    mobileToggle.setAttribute('aria-expanded', 'false');
+    mobileToggle.textContent = '\u2630';
+
+    const mobileBackdrop = document.createElement('div');
+    mobileBackdrop.className = 'mobile-sidebar-backdrop';
+
+    const profileTopbar = document.querySelector('[class~="bg-red-600"][class~="px-6"][class~="py-3"][class~="justify-between"]');
+
+    function closeProfileSidebar() {
+        profileSidebar.classList.remove('mobile-sidebar-open');
+        mobileBackdrop.classList.remove('is-visible');
+        mobileToggle.setAttribute('aria-expanded', 'false');
+        mobileToggle.setAttribute('aria-label', 'Open navigation menu');
+        mobileToggle.textContent = '\u2630';
+    }
+
+    function openProfileSidebar() {
+        profileSidebar.classList.add('mobile-sidebar-open');
+        mobileBackdrop.classList.add('is-visible');
+        mobileToggle.setAttribute('aria-expanded', 'true');
+        mobileToggle.setAttribute('aria-label', 'Close navigation menu');
+        mobileToggle.textContent = '\u00d7';
+    }
+
+    mobileToggle.addEventListener('click', () => {
+        profileSidebar.classList.contains('mobile-sidebar-open')
+            ? closeProfileSidebar()
+            : openProfileSidebar();
+    });
+    mobileBackdrop.addEventListener('click', closeProfileSidebar);
+    profileSidebar.querySelectorAll('a').forEach((link) => link.addEventListener('click', closeProfileSidebar));
+
+    if (profileTopbar) {
+        profileTopbar.prepend(mobileToggle);
+    } else {
+        document.body.append(mobileToggle);
+    }
+    document.body.append(mobileBackdrop);
+}
+
 const dropdownBtn = document.getElementById('profileDropdownBtn');
 const profileMenu = document.getElementById('profileMenu');
 

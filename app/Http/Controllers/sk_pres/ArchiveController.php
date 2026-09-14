@@ -189,6 +189,35 @@ class ArchiveController extends Controller
         return $this->downloadDocument($document);
     }
 
+    public function view(string $sourceType, int $sourceId)
+    {
+        abort_unless(auth()->check() && auth()->user()->role === 'sk_president', 403);
+
+        $document = $this->downloadableDocument($sourceType, $sourceId);
+
+        if (! $document) {
+            return redirect()->route('sk_pres.archive')->with('archive_error', 'This archive document is not available for viewing.');
+        }
+
+        $filePath = $this->publicFilePath($document->uploaded_file_path ?? null)
+            ?: $this->publicFilePath($document->generated_pdf_path ?? null);
+        if ($filePath) {
+            return response()->file($filePath);
+        }
+
+        if (isset($document->template_data) && ! empty($document->template_data)) {
+            $data = json_decode($document->template_data, true) ?: [];
+            $paper = ($data['report_type'] ?? 'quarterly') === 'monthly' ? 'portrait' : 'landscape';
+
+            return Pdf::loadView('shared.budget-template-download', [
+                'data' => $data,
+                'barangayName' => $document->barangay_name ?? 'Barangay',
+            ])->setPaper('a4', $paper)->stream('budget-template-'.($document->budget_report_id ?? time()).'.pdf');
+        }
+
+        return redirect()->route('sk_pres.archive')->with('archive_error', 'This archive document is not available for viewing.');
+    }
+
     public function bulkDownload(Request $request)
     {
         abort_unless(auth()->check() && auth()->user()->role === 'sk_president', 403);

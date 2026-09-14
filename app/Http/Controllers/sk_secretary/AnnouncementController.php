@@ -30,6 +30,7 @@ class AnnouncementController extends Controller
             )
             ->where('a.visibility', 'public')
             ->orderByDesc('a.created_at')
+            ->orderByDesc('a.announcement_id')
             ->get()
             ->map(function ($announcement) {
                 $announcement->priority = 'Low';

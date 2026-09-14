@@ -25,24 +25,27 @@ trait BuildsWallFeed
                 DB::raw("CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, '')) as author_name")
             )
             ->orderByDesc('a.created_at')
+            ->orderByDesc('a.announcement_id')
             ->limit($limit)
             ->get()
             ->map(function ($post) {
                 $post->likes_count = DB::table('wall_post_likes')
                     ->where('announcement_id', $post->announcement_id)
                     ->count();
+
                 $post->liked_by_current_user = auth()->check()
                     && DB::table('wall_post_likes')
                         ->where('announcement_id', $post->announcement_id)
                         ->where('user_id', auth()->user()->user_id)
                         ->exists();
-                $post->author_name = trim((string) $post->author_name) ?: 'SK 360 User';
+
+                $post->author_name = trim((string) $post->author_name) ?: 'SK 360 Official';
+
                 $post->role_label = match ($post->role) {
                     'sk_president' => 'SK President',
                     'sk_chairman' => 'SK Chairman',
                     'sk_secretary' => 'SK Secretary',
-                    'youth' => 'Youth Member',
-                    default => 'User',
+                    default => 'SK Official',
                 };
 
                 return $post;

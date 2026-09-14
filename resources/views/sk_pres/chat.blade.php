@@ -10,7 +10,7 @@
 <div class="flex h-screen bg-gray-100">
     <div class="w-64 bg-red-600 text-white flex flex-col p-3 overflow-y-auto">
         <div class="flex items-center gap-2 mb-3">
-            <img src="{{ asset('logo.png') }}" class="w-7 h-7" alt="logo">
+            <img src="{{ asset('images/sk logo.png') }}" class="w-7 h-7" alt="logo">
             <h2 class="text-base font-bold">SK 360&deg;</h2>
         </div>
 
@@ -692,4 +692,3 @@
     loadRooms();
 </script>
 @endpush
-

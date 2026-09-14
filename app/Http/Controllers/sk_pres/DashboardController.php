@@ -29,44 +29,46 @@ class DashboardController extends Controller
             ['link' => route('sk_pres.chat'), 'icon' => '💬', 'label' => 'Chat'],
             ['link' => route('sk_pres.meetings'), 'icon' => '📞', 'label' => 'Meetings'],
             ['link' => route('sk_pres.rankings'), 'icon' => '🏆', 'label' => 'Rankings'],
-            
             ['link' => route('sk_pres.leadership'), 'icon' => '👥', 'label' => 'Leadership'],
             ['link' => route('sk_pres.archive'), 'icon' => '🗂️', 'label' => 'Archive'],
             ['link' => route('sk_pres.user-management'), 'icon' => '👤', 'label' => 'User Management'],
         ];
 
+        $officialRoles = ['sk_president','sk_chairman','sk_secretary'];
+
         $userStats = DB::table('users')
-            ->selectRaw('COUNT(*) as total_users')
-            ->selectRaw("SUM(role IN ('sk_president','sk_chairman','sk_secretary')) as officials")
-            ->selectRaw("SUM(role = 'youth') as youth")
-            ->selectRaw("SUM(status = 'active') as active_users")
+            ->whereIn('role',$officialRoles)
+            ->whereNull('archived_at')
+            ->selectRaw('COUNT(*) as total_officials')
+            ->selectRaw("SUM(status = 'active') as active_officials")
+            ->selectRaw("SUM(status = 'inactive') as inactive_officials")
+            ->selectRaw("SUM(role = 'sk_president') as presidents")
             ->selectRaw("SUM(role = 'sk_chairman') as chairmen")
             ->selectRaw("SUM(role = 'sk_secretary') as secretaries")
             ->selectRaw('SUM(MONTH(created_at) = MONTH(CURRENT_DATE()) AND YEAR(created_at) = YEAR(CURRENT_DATE())) as new_this_month')
-            ->selectRaw("SUM(role = 'youth' AND MONTH(created_at) = MONTH(CURRENT_DATE()) AND YEAR(created_at) = YEAR(CURRENT_DATE())) as youth_signups_this_month")
             ->first();
 
         $totalBarangays = DB::table('barangays')->count();
 
-        $totalUsers = (int) ($userStats->total_users ?? 0);
-        $officials = (int) ($userStats->officials ?? 0);
-        $youth = (int) ($userStats->youth ?? 0);
-        $activeUsers = (int) ($userStats->active_users ?? 0);
+        $totalOfficials = (int) ($userStats->total_officials ?? 0);
+        $activeOfficials = (int) ($userStats->active_officials ?? 0);
+        $inactiveOfficials = (int) ($userStats->inactive_officials ?? 0);
+        $presidents = (int) ($userStats->presidents ?? 0);
         $chairmen = (int) ($userStats->chairmen ?? 0);
         $secretaries = (int) ($userStats->secretaries ?? 0);
         $newThisMonth = (int) ($userStats->new_this_month ?? 0);
-        $youthSignupsThisMonth = (int) ($userStats->youth_signups_this_month ?? 0);
 
         $chairmanCoverage = $totalBarangays > 0 ? round(($chairmen / $totalBarangays) * 100) : 0;
         $secretaryCoverage = $totalBarangays > 0 ? round(($secretaries / $totalBarangays) * 100) : 0;
+        $remainingChairmen = max($totalBarangays - $chairmen, 0);
         $remainingSecretaries = max($totalBarangays - $secretaries, 0);
 
         $cards = [
             [
-                'label' => 'Total Users',
-                'value' => $totalUsers,
-                'subline1' => "{$officials} officials,",
-                'subline2' => "{$youth} youth",
+                'label' => 'Total Officials',
+                'value' => $totalOfficials,
+                'subline1' => "{$activeOfficials} active",
+                'subline2' => "{$inactiveOfficials} inactive / pending",
                 'footer' => "↗ +{$newThisMonth} this month",
                 'footerClass' => 'text-green-500',
                 'iconWrap' => 'bg-red-100',
@@ -74,21 +76,21 @@ class DashboardController extends Controller
                 'icon' => '👥',
             ],
             [
-                'label' => 'Lipa Youth',
-                'value' => $youth,
-                'subline1' => "{$activeUsers} active",
-                'subline2' => 'members',
-                'footer' => "↗ +{$youthSignupsThisMonth} new signups",
-                'footerClass' => 'text-green-500',
+                'label' => 'Active Accounts',
+                'value' => $activeOfficials,
+                'subline1' => "{$inactiveOfficials} inactive",
+                'subline2' => 'or pending setup',
+                'footer' => 'Official accounts only',
+                'footerClass' => 'text-gray-500',
                 'iconWrap' => 'bg-yellow-100',
                 'iconClass' => 'text-yellow-500',
-                'icon' => '👤',
+                'icon' => '✅',
             ],
             [
                 'label' => 'SK Chairmen',
                 'value' => $chairmen,
-                'subline1' => "Across {$totalBarangays}",
-                'subline2' => 'barangays',
+                'subline1' => "{$remainingChairmen}",
+                'subline2' => 'remaining barangays',
                 'footer' => "↗ {$chairmanCoverage}% coverage",
                 'footerClass' => 'text-green-500',
                 'iconWrap' => 'bg-green-100',
@@ -99,7 +101,7 @@ class DashboardController extends Controller
                 'label' => 'SK Secretaries',
                 'value' => $secretaries,
                 'subline1' => "{$remainingSecretaries}",
-                'subline2' => 'remaining',
+                'subline2' => 'remaining barangays',
                 'footer' => "↗ {$secretaryCoverage}% staffed",
                 'footerClass' => 'text-green-500',
                 'iconWrap' => 'bg-blue-100',
@@ -112,13 +114,9 @@ class DashboardController extends Controller
             ->map(fn (int $monthsAgo) => now()->subMonths($monthsAgo)->format('M'))
             ->values();
 
-        $reportCounts = [
-            'Accomplishment' => $this->tableCount('accomplishment_reports'),
-            'Budget' => $this->tableCount('budget_reports'),
-        ];
-
         $budgetTemplateChart = $this->budgetTemplateChartData();
         $barangaySubmissions = $this->barangaySubmissionChartData();
+
         $recentReportSeries = collect(range(5, 0))
             ->map(fn (int $monthsAgo) => $this->reportCountForMonth(now()->subMonths($monthsAgo)))
             ->values();
@@ -136,13 +134,8 @@ class DashboardController extends Controller
 
         $chartData = [
             'roleMix' => [
-                'labels' => ['Youth', 'Chairmen', 'Secretaries', 'President'],
-                'values' => [
-                    $youth,
-                    $chairmen,
-                    $secretaries,
-                    (int) DB::table('users')->where('role', 'sk_president')->count(),
-                ],
+                'labels' => ['President','Chairmen','Secretaries'],
+                'values' => [$presidents,$chairmen,$secretaries],
             ],
             'barangaySubmissions' => [
                 'labels' => $barangaySubmissions['labels'],
@@ -169,11 +162,6 @@ class DashboardController extends Controller
             'chartData' => $chartData,
             'overviewDate' => now()->format('n/j/Y'),
         ]);
-    }
-
-    protected function tableCount(string $table): int
-    {
-        return Schema::hasTable($table) ? DB::table($table)->count() : 0;
     }
 
     protected function budgetTemplateChartData(): array
@@ -316,7 +304,9 @@ class DashboardController extends Controller
             $dateColumn = $this->dateColumnFor('accomplishment_reports');
 
             if ($dateColumn) {
-                $total += DB::table('accomplishment_reports')->whereBetween($dateColumn, [$start, $end])->count();
+                $total += DB::table('accomplishment_reports')
+                    ->whereBetween($dateColumn, [$start, $end])
+                    ->count();
             }
         }
 
@@ -324,7 +314,9 @@ class DashboardController extends Controller
             $dateColumn = $this->dateColumnFor('budget_reports');
 
             if ($dateColumn) {
-                $total += DB::table('budget_reports')->whereBetween($dateColumn, [$start, $end])->count();
+                $total += DB::table('budget_reports')
+                    ->whereBetween($dateColumn, [$start, $end])
+                    ->count();
             }
         }
 
@@ -366,7 +358,10 @@ class DashboardController extends Controller
 
             if ($dateColumn) {
                 $total += DB::table('meetings')
-                    ->whereBetween($dateColumn, [$month->copy()->startOfMonth()->toDateString(), $month->copy()->endOfMonth()->toDateString()])
+                    ->whereBetween($dateColumn, [
+                        $month->copy()->startOfMonth()->toDateString(),
+                        $month->copy()->endOfMonth()->toDateString(),
+                    ])
                     ->count();
             }
         }
@@ -379,7 +374,10 @@ class DashboardController extends Controller
             if ($dateColumn) {
                 $total += DB::table('events')
                     ->where('event_type', 'meeting')
-                    ->whereBetween($dateColumn, [$month->copy()->startOfMonth(), $month->copy()->endOfMonth()])
+                    ->whereBetween($dateColumn, [
+                        $month->copy()->startOfMonth(),
+                        $month->copy()->endOfMonth(),
+                    ])
                     ->count();
             }
         }

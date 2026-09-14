@@ -10,20 +10,61 @@ use Illuminate\Support\Facades\DB;
 
 trait BuildsRankingsData
 {
-    protected function latestRankingPeriod(): ?string
+    protected function currentRankingPeriod(): string
     {
-        return DB::table('rankings')
-            ->orderByDesc('created_at')
-            ->value('reporting_period');
+        return now()->format('F Y');
     }
 
-    protected function rankingsLeaderboard(): Collection
+    protected function ensureCurrentRankingPeriod(): void
+    {
+        $period = $this->currentRankingPeriod();
+
+        DB::table('barangays')->pluck('barangay_id')->each(function ($barangayId) use ($period) {
+            $exists = DB::table('rankings')
+                ->where('barangay_id', $barangayId)
+                ->where('reporting_period', $period)
+                ->exists();
+
+            if (! $exists) {
+                DB::table('rankings')->insert([
+                    'barangay_id' => $barangayId,
+                    'reporting_period' => $period,
+                    'total_points' => 0,
+                    'timely_submission_points' => 0,
+                    'completeness_points' => 0,
+                    'participation_points' => 0,
+                    'created_at' => now(),
+                ]);
+            }
+        });
+    }
+
+    protected function rankingPeriods(): Collection
+    {
+        $this->ensureCurrentRankingPeriod();
+
+        return DB::table('rankings')
+            ->select('reporting_period')
+            ->selectRaw('MAX(created_at) as latest_created_at')
+            ->groupBy('reporting_period')
+            ->orderByDesc('latest_created_at')
+            ->pluck('reporting_period')
+            ->values();
+    }
+
+    protected function latestRankingPeriod(): ?string
+    {
+        return $this->rankingPeriods()->first();
+    }
+
+    protected function rankingsLeaderboard(?string $period = null): Collection
     {
         app(RankingPointsService::class)->recordMissedMeetings();
+        $periods = $this->rankingPeriods();
 
-        $latestPeriod = $this->latestRankingPeriod();
+        $latestPeriod = $period ?: $periods->first();
 
-        if (! $latestPeriod) {
+        if (! $latestPeriod || ! $periods->contains($latestPeriod)) {
             return collect();
         }
 

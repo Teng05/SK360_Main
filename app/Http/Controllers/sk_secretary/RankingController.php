@@ -7,19 +7,22 @@ namespace App\Http\Controllers\sk_secretary;
 use App\Http\Controllers\Concerns\BuildsRankingsData;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 class RankingController extends Controller
 {
     use BuildsRankingsData;
 
-    public function index(): View
+    public function index(Request $request): View
     {
         abort_unless(auth()->check() && auth()->user()->role === 'sk_secretary', 403);
 
         $user = auth()->user();
         $fullName = trim(($user->first_name ?? '') . ' ' . ($user->last_name ?? '')) ?: 'User';
-        $leaderboard = $this->rankingsLeaderboard();
+        $periods = $this->rankingPeriods();
+        $selectedPeriod = $periods->contains($request->query('period')) ? $request->query('period') : $periods->first();
+        $leaderboard = $this->rankingsLeaderboard($selectedPeriod);
 
         return view('sk_secretary.rankings', [
             'fullName' => $fullName,
@@ -28,23 +31,26 @@ class RankingController extends Controller
             'currentUrl' => url()->current(),
             'topRankings' => $this->topRankings($leaderboard),
             'leaderboard' => $leaderboard,
-            'latestPeriod' => $this->latestRankingPeriod(),
+            'latestPeriod' => $selectedPeriod,
+            'rankingPeriods' => $periods,
+            'currentPeriod' => $periods->first(),
             'pointSystem' => $this->rankingPointSystem(),
             'profileRoute' => route('sk_secretary.profile'),
             'rankingsLiveRoute' => route('sk_secretary.rankings.live'),
         ]);
     }
 
-    public function live(): JsonResponse
+    public function live(Request $request): JsonResponse
     {
         abort_unless(auth()->check() && auth()->user()->role === 'sk_secretary', 403);
 
-        $leaderboard = $this->rankingsLeaderboard();
+        $period = $request->query('period');
+        $leaderboard = $this->rankingsLeaderboard($period);
 
         return response()->json([
             'topRankings' => $this->topRankings($leaderboard)->values(),
             'leaderboard' => $leaderboard->values(),
-            'latestPeriod' => $this->latestRankingPeriod(),
+            'latestPeriod' => $period ?: $this->latestRankingPeriod(),
             'pointSystem' => $this->rankingPointSystem(),
             'updatedAt' => now()->format('M d, Y h:i A'),
         ]);

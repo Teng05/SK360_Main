@@ -1,7 +1,7 @@
 {{-- File guide: Blade view template for resources/views/sk_pres/meetings.blade.php. --}}
 @extends('layouts.app')
 
-@section('title', 'Meetings & Video Conference')
+@section('title', 'Meetings')
 
 @section('page_css')
     <script src="https://cdn.tailwindcss.com"></script>
@@ -21,7 +21,7 @@
 <div class="flex h-screen bg-gray-100">
     <aside class="w-64 bg-red-600 text-white flex flex-col p-3 overflow-y-auto">
         <div class="flex items-center gap-3 mb-4">
-    <img src="{{ asset('images/logo.png') }}" class="w-8 h-8 rounded-full object-cover"  alt="logo">
+    <img src="{{ asset('images/sk logo.png') }}" class="w-8 h-8 rounded-full object-cover"  alt="logo">
     <div class="leading-tight">
         <h2 class="text-lg font-extrabold tracking-wide">SK 360°</h2>
         <p class="text-[10px] opacity-80">Management System</p>
@@ -101,8 +101,8 @@
             <section class="bg-white rounded-[28px] shadow-sm border border-gray-100 p-6 xl:p-8">
                 <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                     <div>
-                        <h1 class="text-[32px] font-bold tracking-tight text-gray-900">Meetings & Video Conference</h1>
-                        <p class="mt-2 text-sm text-gray-500">Organize SK meetings and conduct virtual conferences</p>
+                        <h1 class="text-[32px] font-bold tracking-tight text-gray-900">Meetings</h1>
+                        <p class="mt-2 text-sm text-gray-500">Organize SK meetings and scheduled sessions</p>
                     </div>
 
                     <button id="openModalBtn" type="button" class="inline-flex items-center justify-center rounded-xl bg-[#d90f1f] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#b90e1b]">
@@ -122,13 +122,8 @@
                     </div>
                 @endif
 
-                <div class="mt-8 mx-auto flex w-full max-w-md items-center justify-between rounded-full bg-[#f6f7fb] p-1 text-xs font-semibold text-gray-500">
-                    <button id="scheduleTabBtn" type="button" class="tab-btn flex-1 rounded-full px-4 py-2 bg-white text-gray-900 shadow-sm">
-                        Meeting Schedule
-                    </button>
-                    <button id="conferenceTabBtn" type="button" class="tab-btn flex-1 rounded-full px-4 py-2">
-                        Video Conference
-                    </button>
+                <div class="mt-8 inline-flex rounded-full bg-[#f6f7fb] p-1 text-xs font-semibold text-gray-900">
+                    <span class="rounded-full bg-white px-5 py-2 shadow-sm">Meeting Schedule</span>
                 </div>
 
                 <div id="scheduleTab" class="mt-8 space-y-6">
@@ -163,6 +158,17 @@
                                            class="inline-flex items-center rounded-xl bg-[#d90f1f] px-4 py-2 text-xs font-semibold text-white transition hover:bg-[#b90e1b]">
                                             Join Meeting
                                         </a>
+                                        @if ($meeting->status === 'scheduled')
+                                            <form method="POST" action="{{ route('sk_pres.meetings.end', $meeting->meeting_id) }}"
+                                                  onsubmit="return confirm('End this meeting and move it to Past Meetings?');">
+                                                @csrf
+                                                @method('PATCH')
+                                                <button type="submit"
+                                                        class="inline-flex items-center rounded-xl border border-[#d90f1f] px-4 py-2 text-xs font-semibold text-[#d90f1f] transition hover:bg-red-50">
+                                                    End Meeting
+                                                </button>
+                                            </form>
+                                        @endif
                                     </div>
                                 </div>
                             @empty
@@ -349,10 +355,6 @@
     const openModalBtn = document.getElementById('openModalBtn');
     const closeModalBtn = document.getElementById('closeModalBtn');
     const scheduleModal = document.getElementById('scheduleModal');
-    const scheduleTabBtn = document.getElementById('scheduleTabBtn');
-    const conferenceTabBtn = document.getElementById('conferenceTabBtn');
-    const scheduleTab = document.getElementById('scheduleTab');
-    const conferenceTab = document.getElementById('conferenceTab');
 
     if (notifBtn && notifDropdown) {
         notifBtn.addEventListener('click', (e) => {
@@ -381,23 +383,6 @@
             }
         });
     }
-
-    const showScheduleTab = () => {
-        scheduleTab.classList.remove('hidden');
-        conferenceTab.classList.add('hidden');
-        scheduleTabBtn.classList.add('bg-white', 'text-gray-900', 'shadow-sm');
-        conferenceTabBtn.classList.remove('bg-white', 'text-gray-900', 'shadow-sm');
-    };
-
-    const showConferenceTab = () => {
-        conferenceTab.classList.remove('hidden');
-        scheduleTab.classList.add('hidden');
-        conferenceTabBtn.classList.add('bg-white', 'text-gray-900', 'shadow-sm');
-        scheduleTabBtn.classList.remove('bg-white', 'text-gray-900', 'shadow-sm');
-    };
-
-    scheduleTabBtn.addEventListener('click', showScheduleTab);
-    conferenceTabBtn.addEventListener('click', showConferenceTab);
 
     const openScheduleModal = () => {
         scheduleModal.classList.remove('hidden');
