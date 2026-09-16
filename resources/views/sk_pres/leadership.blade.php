@@ -242,9 +242,13 @@
                         <div class="federation-card flex items-center gap-4 rounded-2xl border border-red-100 bg-red-50/30 p-4"
                             data-search="{{ $searchText }}">
 
-                            <div class="w-12 h-12 rounded-xl bg-red-600 text-white flex items-center justify-center font-black">
-                                {{ strtoupper(substr($president['name'] ?: 'PR',0,2)) }}
-                            </div>
+                            @if(!empty($president['profile_pic_url']))
+                                <img src="{{ $president['profile_pic_url'] }}" alt="{{ $president['name'] }}" class="h-12 w-12 rounded-xl object-cover">
+                            @else
+                                <div class="w-12 h-12 rounded-xl bg-red-600 text-white flex items-center justify-center font-black">
+                                    {{ strtoupper(substr($president['name'] ?: 'PR',0,2)) }}
+                                </div>
+                            @endif
 
                             <div class="flex-1 min-w-0">
 
@@ -443,10 +447,13 @@
 
                                                 <div class="flex items-start gap-3">
 
-                                                    <div class="w-11 h-11 rounded-xl {{ $positionConfig['avatar'] }} text-white flex items-center justify-center font-black shrink-0">
-
-                                                        {{ strtoupper(substr($member['name'] ?: 'NA',0,2)) }}
-                                                    </div>
+                                                    @if(!empty($member['profile_pic_url']))
+                                                        <img src="{{ $member['profile_pic_url'] }}" alt="{{ $member['name'] }}" class="h-11 w-11 shrink-0 rounded-xl object-cover">
+                                                    @else
+                                                        <div class="w-11 h-11 rounded-xl {{ $positionConfig['avatar'] }} text-white flex items-center justify-center font-black shrink-0">
+                                                            {{ strtoupper(substr($member['name'] ?: 'NA',0,2)) }}
+                                                        </div>
+                                                    @endif
 
                                                     <div class="min-w-0 flex-1">
 

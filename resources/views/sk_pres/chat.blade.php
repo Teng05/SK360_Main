@@ -251,9 +251,9 @@
                     class="user-search-btn w-full rounded-2xl border border-gray-100 p-3 text-left transition hover:bg-gray-50"
                 >
                     <div class="flex items-start gap-3">
-                        <div class="flex h-10 w-10 items-center justify-center rounded-full bg-red-500 text-[10px] font-black text-white">
-                            ${initials}
-                        </div>
+                        ${user.profile_pic_url
+                            ? `<img src="${escapeRoomText(user.profile_pic_url)}" alt="${escapeRoomText(user.name)}" class="h-10 w-10 rounded-full object-cover">`
+                            : `<div class="flex h-10 w-10 items-center justify-center rounded-full bg-red-500 text-[10px] font-black text-white">${initials}</div>`}
                         <div class="min-w-0">
                             <div class="text-sm font-black text-gray-800">${user.name}</div>
                             <div class="text-[11px] text-gray-400">${roleLabel(user.role)}${user.barangay ? ' • ' + user.barangay : ''}</div>

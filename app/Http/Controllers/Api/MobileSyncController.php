@@ -245,14 +245,22 @@ class MobileSyncController extends Controller
         $validated = $request->validate([
             'first_name' => ['required', 'string', 'max:50'],
             'last_name' => ['required', 'string', 'max:50'],
+            'profile_pic' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
         ]);
 
         $user = $request->user();
-
         $user->update([
             'first_name' => trim($validated['first_name']),
             'last_name' => trim($validated['last_name']),
         ]);
+
+        if ($request->hasFile('profile_pic') && Schema::hasColumn('users', 'profile_pic')) {
+            $directory = public_path('uploads/profile_pics');
+            File::ensureDirectoryExists($directory);
+            $filename = $user->user_id.'-'.Str::random(20).'.'.$request->file('profile_pic')->extension();
+            $request->file('profile_pic')->move($directory, $filename);
+            $user->update(['profile_pic' => 'uploads/profile_pics/'.$filename]);
+        }
 
         return response()->json([
             'message' => 'Profile updated successfully.',
@@ -662,6 +670,7 @@ class MobileSyncController extends Controller
                 'u.last_name',
                 'u.email',
                 'u.role',
+                'u.profile_pic',
                 'b.barangay_name'
             )
             ->where('u.user_id', '!=', $user->user_id)
@@ -692,6 +701,11 @@ class MobileSyncController extends Controller
                     'email' => $row->email,
                     'role' => $row->role,
                     'barangay' => $row->barangay_name,
+                    'profile_pic_url' => $row->profile_pic
+                        ? $this->publicUrl(Str::startsWith($row->profile_pic, 'uploads/')
+                            ? $row->profile_pic
+                            : 'uploads/profile_pics/'.$row->profile_pic)
+                        : null,
                 ])
                 ->values(),
         ]);
@@ -1009,7 +1023,11 @@ class MobileSyncController extends Controller
             'is_verified' => (bool) $user->is_verified,
             'barangay_id' => $user->barangay_id,
             'barangay_name' => $user->barangay?->barangay_name,
-            'profile_pic_url' => $this->publicUrl($user->profile_pic ?? null),
+            'profile_pic_url' => $user->profile_pic
+                ? $this->publicUrl(Str::startsWith($user->profile_pic, 'uploads/')
+                    ? $user->profile_pic
+                    : 'uploads/profile_pics/'.$user->profile_pic)
+                : null,
         ];
     }
 
@@ -1415,6 +1433,7 @@ class MobileSyncController extends Controller
             ->select(
                 DB::raw('user_id as leadership_id'),
                 'user_id',
+                'profile_pic',
                 'barangay_id',
                 DB::raw("CONCAT(first_name, ' ', last_name) as full_name"),
                 DB::raw("
@@ -1458,23 +1477,25 @@ class MobileSyncController extends Controller
 
         if (Schema::hasTable('leadership_profiles')) {
             $profileRows = DB::table('leadership_profiles')
-                ->where('status', 'current')
+                ->leftJoin('users as u', 'leadership_profiles.user_id', '=', 'u.user_id')
+                ->where('leadership_profiles.status', 'current')
                 ->select(
-                    'leadership_id',
-                    'user_id',
-                    'barangay_id',
-                    'full_name',
-                    'position',
+                    'leadership_profiles.leadership_id',
+                    'leadership_profiles.user_id',
+                    'leadership_profiles.barangay_id',
+                    'leadership_profiles.full_name',
+                    'leadership_profiles.position',
+                    'u.profile_pic',
                     DB::raw("
                         CASE
-                            WHEN term_start IS NOT NULL AND term_end IS NOT NULL
-                                THEN CONCAT(YEAR(term_start), '-', YEAR(term_end))
-                            WHEN term_start IS NOT NULL
-                                THEN CONCAT(YEAR(term_start), '-present')
+                            WHEN leadership_profiles.term_start IS NOT NULL AND leadership_profiles.term_end IS NOT NULL
+                                THEN CONCAT(YEAR(leadership_profiles.term_start), '-', YEAR(leadership_profiles.term_end))
+                            WHEN leadership_profiles.term_start IS NOT NULL
+                                THEN CONCAT(YEAR(leadership_profiles.term_start), '-present')
                             ELSE '2024-2026'
                         END as term
                     "),
-                    'status'
+                    'leadership_profiles.status'
                 )
                 ->get();
 
@@ -1493,6 +1514,16 @@ class MobileSyncController extends Controller
                 ($leader->barangay_id ?? '')
             ))
             ->values()
+            ->map(function ($leader) {
+                $path = $leader->profile_pic ?? null;
+                $leader->profile_pic_url = $path
+                    ? $this->publicUrl(Str::startsWith($path, 'uploads/')
+                        ? $path
+                        : 'uploads/profile_pics/'.$path)
+                    : null;
+
+                return $leader;
+            })
             ->all();
     }
 

@@ -196,10 +196,13 @@
 
                                 <div class="flex items-start gap-4">
 
-                                    <div class="w-12 h-12 rounded-xl {{ $position['avatar'] }} text-white flex items-center justify-center font-black shrink-0">
-
-                                        {{ strtoupper(substr($member['name'] ?: 'NA',0,2)) }}
-                                    </div>
+                                    @if(!empty($member['profile_pic_url']))
+                                        <img src="{{ $member['profile_pic_url'] }}" alt="{{ $member['name'] }}" class="h-12 w-12 shrink-0 rounded-xl object-cover">
+                                    @else
+                                        <div class="w-12 h-12 rounded-xl {{ $position['avatar'] }} text-white flex items-center justify-center font-black shrink-0">
+                                            {{ strtoupper(substr($member['name'] ?: 'NA',0,2)) }}
+                                        </div>
+                                    @endif
 
                                     <div class="min-w-0 flex-1">
 

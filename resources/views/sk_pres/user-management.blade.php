@@ -386,9 +386,13 @@
 
                                             <div class="flex items-start gap-4">
 
-                                                <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full {{ $avatarBg }} text-xs font-black text-white shadow-sm">
-                                                    {{ $initials ?: 'U' }}
-                                                </div>
+                                                @if(!empty($groupUser->profile_pic))
+                                                    <img src="{{ asset(str_starts_with($groupUser->profile_pic, 'uploads/') ? $groupUser->profile_pic : 'uploads/profile_pics/'.$groupUser->profile_pic) }}" alt="{{ $displayName }}" class="h-10 w-10 shrink-0 rounded-full object-cover shadow-sm">
+                                                @else
+                                                    <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full {{ $avatarBg }} text-xs font-black text-white shadow-sm">
+                                                        {{ $initials ?: 'U' }}
+                                                    </div>
+                                                @endif
 
                                                 <div>
 

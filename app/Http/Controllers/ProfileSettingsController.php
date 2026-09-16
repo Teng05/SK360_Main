@@ -8,7 +8,9 @@ use App\Models\Barangay;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 use Illuminate\View\View;
 
 class ProfileSettingsController extends Controller
@@ -100,9 +102,20 @@ class ProfileSettingsController extends Controller
         $validated = $request->validate([
             'first_name' => ['required', 'string', 'max:50'],
             'last_name' => ['required', 'string', 'max:50'],
+            'profile_pic' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
         ]);
 
-        auth()->user()->update($validated);
+        $user = auth()->user();
+        unset($validated['profile_pic']);
+        $user->update($validated);
+
+        if ($request->hasFile('profile_pic') && Schema::hasColumn('users', 'profile_pic')) {
+            $directory = public_path('uploads/profile_pics');
+            File::ensureDirectoryExists($directory);
+            $filename = $user->user_id.'-'.Str::random(20).'.'.$request->file('profile_pic')->extension();
+            $request->file('profile_pic')->move($directory, $filename);
+            $user->update(['profile_pic' => 'uploads/profile_pics/'.$filename]);
+        }
 
         return redirect()->route($config['prefix'].'.profile')->with('status', 'Profile updated successfully.');
     }

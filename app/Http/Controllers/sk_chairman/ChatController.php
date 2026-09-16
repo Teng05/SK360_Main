@@ -50,6 +50,7 @@ class ChatController extends Controller
                 'u.last_name',
                 'u.email',
                 'u.role',
+                'u.profile_pic',
                 'b.barangay_name'
             )
             ->where('u.user_id', '!=', $currentUserId)
@@ -72,6 +73,9 @@ class ChatController extends Controller
                     'email' => $user->email,
                     'role' => $user->role,
                     'barangay' => $user->barangay_name,
+                    'profile_pic_url' => $user->profile_pic
+                        ? asset(str_starts_with($user->profile_pic, 'uploads/') ? $user->profile_pic : 'uploads/profile_pics/'.$user->profile_pic)
+                        : null,
                 ];
             })
             ->values();

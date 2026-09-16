@@ -105,6 +105,7 @@ class LeadershipController extends Controller
                 'u.user_id',
                 'u.first_name',
                 'u.last_name',
+                'u.profile_pic',
                 'u.email',
                 'u.phone_number',
                 'u.status as account_status',
@@ -124,6 +125,9 @@ class LeadershipController extends Controller
                 'assignment_status'=>$row->assignment_status,
                 'account_status'=>$row->account_status,
                 'is_verified'=>(int)$row->is_verified,
+                'profile_pic_url'=>$row->profile_pic
+                    ? asset(str_starts_with($row->profile_pic, 'uploads/') ? $row->profile_pic : 'uploads/profile_pics/'.$row->profile_pic)
+                    : null,
                 'started_at'=>$row->started_at,
             ]);
     }
@@ -184,6 +188,7 @@ class LeadershipController extends Controller
                 'u.user_id',
                 'u.first_name',
                 'u.last_name',
+                'u.profile_pic',
                 'u.email',
                 'u.phone_number',
                 'u.status as account_status',
@@ -343,6 +348,9 @@ class LeadershipController extends Controller
             'assignment_status'=>$row->assignment_status,
             'account_status'=>$row->account_status,
             'is_verified'=>(int)$row->is_verified,
+            'profile_pic_url'=>$row->profile_pic
+                ? asset(str_starts_with($row->profile_pic, 'uploads/') ? $row->profile_pic : 'uploads/profile_pics/'.$row->profile_pic)
+                : null,
             'started_at'=>$row->started_at,
         ];
     }
