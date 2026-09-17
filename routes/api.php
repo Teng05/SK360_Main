@@ -40,3 +40,5 @@ Route::prefix('mobile')->group(function(){
         Route::post('/notifications/{notificationId}/read',[MobileSyncController::class,'markNotificationRead'])->name('mobile.notifications.read');
     });
 });
+
+?>
