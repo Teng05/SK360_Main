@@ -68,8 +68,8 @@
                     A centralized digital platform for transparent reporting,
                     real-time communication, and coordinated engagement in
                     Sangguniang Kabataan operations. Stay informed through
-                    public announcements, activities, and current SK leadership
-                    across Lipa City.
+                    public announcements, activities, current SK leadership,
+                    and Annual Budget information across Lipa City.
                 </p>
 
                 <div class="hero-buttons">
@@ -173,8 +173,8 @@
                 </h3>
 
                 <p>
-                    Secure storage and archiving of budget documents
-                    for leadership transitions.
+                    Secure submission and archiving of budget and financial
+                    documents with Annual Budget transparency for the public.
                 </p>
             </div>
 
@@ -187,7 +187,8 @@
 
                 <p>
                     Access public announcements, event schedules,
-                    and current barangay SK leadership without an account.
+                    current barangay SK leadership, and Annual Budget
+                    information without an account.
                 </p>
             </div>
 
@@ -235,7 +236,8 @@
 
                 <p>
                     Provide the community with easy access to public
-                    announcements, activities, and current SK leadership.
+                    announcements, activities, current SK leadership,
+                    and barangay Annual Budget information.
                 </p>
             </div>
 
@@ -265,8 +267,8 @@
 
         <p>
             Explore public announcements, upcoming activities,
-            and the current Sangguniang Kabataan leadership
-            across Lipa City.
+            current Sangguniang Kabataan leadership, and Annual Budget
+            information across Lipa City.
         </p>
 
     </section>
@@ -332,6 +334,14 @@
                         <li>
                             <a href="{{ route('public.leadership') }}">
                                 Leadership
+                            </a>
+                        </li>
+                    @endif
+
+                    @if(Route::has('public.budgets'))
+                        <li>
+                            <a href="{{ route('public.budgets') }}">
+                                Annual Budget
                             </a>
                         </li>
                     @endif

@@ -10,6 +10,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 class ModuleController extends Controller
@@ -31,7 +32,6 @@ class ModuleController extends Controller
             ['link' => route('sk_pres.chat'), 'icon' => '💬', 'label' => 'Chat'],
             ['link' => route('sk_pres.meetings'), 'icon' => '📞', 'label' => 'Meetings'],
             ['link' => route('sk_pres.rankings'), 'icon' => '🏆', 'label' => 'Rankings'],
-            
             ['link' => route('sk_pres.leadership'), 'icon' => '👥', 'label' => 'Leadership'],
             ['link' => route('sk_pres.archive'), 'icon' => '🗂️', 'label' => 'Archive'],
             ['link' => route('sk_pres.user-management'), 'icon' => '👤', 'label' => 'User Management'],
@@ -73,16 +73,9 @@ class ModuleController extends Controller
 
         $validated = $this->validateSlot($request);
 
-        DB::table('submission_slots')->insert([
-            'submission_type' => $validated['submission_type'],
-            'title' => $validated['submission_title'],
-            'description' => $validated['description'] ?? null,
-            'role' => $validated['submission_role'],
-            'start_date' => $validated['start_date'],
-            'end_date' => $validated['end_date'],
-            'status' => 'open',
-            'created_at' => now(),
-        ]);
+        DB::table('submission_slots')->insert(
+            $this->slotData($validated)
+        );
 
         $notifications->notifySubmissionSlotCreated([
             'submission_type' => $validated['submission_type'],
@@ -99,7 +92,9 @@ class ModuleController extends Controller
     {
         abort_unless(auth()->check() && auth()->user()->role === 'sk_president', 403);
 
-        DB::table('submission_slots')->where('slot_id', $slotId)->delete();
+        DB::table('submission_slots')
+            ->where('slot_id', $slotId)
+            ->delete();
 
         return response()->json($this->modulePayload());
     }
@@ -110,15 +105,9 @@ class ModuleController extends Controller
 
         $validated = $this->validateSlot($request);
 
-        DB::table('submission_slots')->insert([
-            'submission_type' => $validated['submission_type'],
-            'title' => $validated['submission_title'],
-            'description' => $validated['description'] ?? null,
-            'role' => $validated['submission_role'],
-            'start_date' => $validated['start_date'],
-            'end_date' => $validated['end_date'],
-            'status' => 'open',
-        ]);
+        DB::table('submission_slots')->insert(
+            $this->slotData($validated)
+        );
 
         $notifications->notifySubmissionSlotCreated([
             'submission_type' => $validated['submission_type'],
@@ -128,28 +117,163 @@ class ModuleController extends Controller
             'end_date' => $validated['end_date'],
         ], auth()->user());
 
-        return redirect()->route('sk_pres.module')->with('status', 'Submission slot created successfully.');
+        return redirect()
+            ->route('sk_pres.module')
+            ->with('status', 'Submission slot created successfully.');
     }
 
     public function destroy(int $slotId): RedirectResponse
     {
         abort_unless(auth()->check() && auth()->user()->role === 'sk_president', 403);
 
-        DB::table('submission_slots')->where('slot_id', $slotId)->delete();
+        DB::table('submission_slots')
+            ->where('slot_id', $slotId)
+            ->delete();
 
-        return redirect()->route('sk_pres.module')->with('status', 'Submission slot deleted successfully.');
+        return redirect()
+            ->route('sk_pres.module')
+            ->with('status', 'Submission slot deleted successfully.');
     }
 
     protected function validateSlot(Request $request): array
     {
+        $isBudget = $request->input('submission_type') === 'budget_report';
+
+        $isCoaReport = $isBudget &&
+            $request->input('budget_category') === 'coa_report';
+
+        $period = $request->input('budget_period_type');
+
         return $request->validate([
-            'submission_type' => ['required', 'in:accomplishment_report,budget_report'],
-            'submission_title' => ['required', 'string', 'max:255'],
-            'description' => ['nullable', 'string'],
-            'submission_role' => ['required', 'in:SK Chairman,SK Secretary,Both'],
-            'start_date' => ['required', 'date'],
-            'end_date' => ['required', 'date', 'after_or_equal:start_date'],
+            'submission_type' => [
+                'required',
+                'in:accomplishment_report,budget_report',
+            ],
+
+            'budget_category' => [
+                Rule::requiredIf($isBudget),
+                'nullable',
+                Rule::in([
+                    'annual_budget',
+                    'supplemental_budget',
+                    'coa_report',
+                ]),
+            ],
+
+            'fiscal_year' => [
+                Rule::requiredIf($isBudget),
+                'nullable',
+                'integer',
+                'min:2000',
+                'max:2100',
+            ],
+
+            'budget_period_type' => [
+                Rule::requiredIf($isCoaReport),
+                'nullable',
+                Rule::in([
+                    'monthly',
+                    'quarterly',
+                    'semi_annual',
+                    'annual',
+                ]),
+            ],
+
+            'fiscal_month' => [
+                Rule::requiredIf($isCoaReport && $period === 'monthly'),
+                'nullable',
+                'integer',
+                'min:1',
+                'max:12',
+            ],
+
+            'fiscal_quarter' => [
+                Rule::requiredIf($isCoaReport && $period === 'quarterly'),
+                'nullable',
+                Rule::in(['Q1', 'Q2', 'Q3', 'Q4']),
+            ],
+
+            'fiscal_half' => [
+                Rule::requiredIf($isCoaReport && $period === 'semi_annual'),
+                'nullable',
+                Rule::in(['H1', 'H2']),
+            ],
+
+            'submission_title' => [
+                'required',
+                'string',
+                'max:255',
+            ],
+
+            'description' => [
+                'nullable',
+                'string',
+            ],
+
+            'submission_role' => [
+                'required',
+                'in:SK Chairman,SK Secretary,Both',
+            ],
+
+            'start_date' => [
+                'required',
+                'date',
+            ],
+
+            'end_date' => [
+                'required',
+                'date',
+                'after_or_equal:start_date',
+            ],
         ]);
+    }
+
+    protected function slotData(array $validated): array
+    {
+        $isBudget = $validated['submission_type'] === 'budget_report';
+
+        $isCoaReport = $isBudget &&
+            ($validated['budget_category'] ?? null) === 'coa_report';
+
+        $period = $isCoaReport
+            ? ($validated['budget_period_type'] ?? null)
+            : null;
+
+        return [
+            'submission_type' => $validated['submission_type'],
+
+            'budget_category' => $isBudget
+                ? ($validated['budget_category'] ?? null)
+                : null,
+
+            'fiscal_year' => $isBudget
+                ? ($validated['fiscal_year'] ?? null)
+                : null,
+
+            'budget_period_type' => $isCoaReport
+                ? $period
+                : null,
+
+            'fiscal_month' => $isCoaReport && $period === 'monthly'
+                ? ($validated['fiscal_month'] ?? null)
+                : null,
+
+            'fiscal_quarter' => $isCoaReport && $period === 'quarterly'
+                ? ($validated['fiscal_quarter'] ?? null)
+                : null,
+
+            'fiscal_half' => $isCoaReport && $period === 'semi_annual'
+                ? ($validated['fiscal_half'] ?? null)
+                : null,
+
+            'title' => $validated['submission_title'],
+            'description' => $validated['description'] ?? null,
+            'role' => $validated['submission_role'],
+            'start_date' => $validated['start_date'],
+            'end_date' => $validated['end_date'],
+            'status' => 'open',
+            'created_at' => now(),
+        ];
     }
 
     protected function modulePayload(): array
@@ -160,12 +284,14 @@ class ModuleController extends Controller
 
         return [
             'slots' => $slots,
+
             'summary' => [
                 'totalSlots' => $slots->count(),
                 'openSlots' => $slots->where('status', 'open')->count(),
                 'closedSlots' => $slots->where('status', 'closed')->count(),
                 'allTimeTotal' => $slots->count(),
             ],
+
             'updatedAt' => now()->format('M d, Y h:i A'),
         ];
     }

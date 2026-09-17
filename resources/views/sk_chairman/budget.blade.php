@@ -15,10 +15,73 @@
 <script>
     const budgetTemplateRoute = @json(route('sk_chairman.budget.template.create'));
 
-    function openSlotSubmission(slotId, title) {
+    let currentBudgetCategory = null;
+
+    function openSlotSubmission(
+        slotId,
+        title,
+        category = null,
+        fiscalYear = null,
+        reportType = null,
+        fiscalMonth = null,
+        fiscalQuarter = null,
+        fiscalHalf = null,
+        templateAvailable = false
+    ) {
+        currentBudgetCategory = category;
+
         document.getElementById('slotIdField').value = slotId;
         document.getElementById('slotSubmissionTitle').textContent = title;
+
+        updateBudgetSlotDetails(
+            category,
+            fiscalYear,
+            reportType,
+            fiscalMonth,
+            fiscalQuarter,
+            fiscalHalf
+        );
+
+        const annualBudgetAmountSection = document.getElementById('annualBudgetAmountSection');
+        const annualBudgetAmount = document.getElementById('annualBudgetAmount');
+
+        const isAnnualBudget = category === 'annual_budget';
+
+        if (annualBudgetAmountSection) {
+            annualBudgetAmountSection.classList.toggle('hidden', !isAnnualBudget);
+        }
+
+        if (annualBudgetAmount) {
+            annualBudgetAmount.required = isAnnualBudget;
+
+            if (!isAnnualBudget) {
+                annualBudgetAmount.value = '';
+            }
+        }
+
+        const templateLabel = document.getElementById('templateModeLabel');
+        const templateRadio = document.querySelector('input[name="sub_method"][value="template"]');
+        const pdfRadio = document.querySelector('input[name="sub_method"][value="pdf"]');
+        const unavailableNote = document.getElementById('templateUnavailableNote');
+
+        if (templateAvailable) {
+            templateLabel?.classList.remove('hidden');
+            unavailableNote?.classList.add('hidden');
+
+            if (templateRadio) {
+                templateRadio.checked = true;
+            }
+        } else {
+            templateLabel?.classList.add('hidden');
+            unavailableNote?.classList.remove('hidden');
+
+            if (pdfRadio) {
+                pdfRadio.checked = true;
+            }
+        }
+
         document.getElementById('slotSubmissionModal').classList.remove('hidden');
+
         syncBudgetSubmissionMode();
     }
 
@@ -26,18 +89,91 @@
         document.getElementById('slotSubmissionModal').classList.add('hidden');
     }
 
+    function updateBudgetSlotDetails(
+        category,
+        fiscalYear,
+        reportType,
+        fiscalMonth,
+        fiscalQuarter,
+        fiscalHalf
+    ) {
+        const categoryLabels = {
+            annual_budget: 'Annual Budget',
+            supplemental_budget: 'Supplemental Budget',
+            coa_report: 'Financial / COA Report'
+        };
+
+        const monthNames = [
+            '',
+            'January',
+            'February',
+            'March',
+            'April',
+            'May',
+            'June',
+            'July',
+            'August',
+            'September',
+            'October',
+            'November',
+            'December'
+        ];
+
+        let periodText = '';
+
+        if (category === 'coa_report') {
+            if (reportType === 'monthly') {
+                periodText = `Monthly - ${monthNames[Number(fiscalMonth)] || ''}`;
+            } else if (reportType === 'quarterly') {
+                periodText = `Quarterly - ${fiscalQuarter || ''}`;
+            } else if (reportType === 'semi_annual') {
+                periodText = fiscalHalf === 'H1'
+                    ? 'Semi-Annual - First Half'
+                    : 'Semi-Annual - Second Half';
+            } else if (reportType === 'annual') {
+                periodText = 'Annual';
+            }
+        }
+
+        const categoryField = document.getElementById('modalBudgetCategory');
+        const yearField = document.getElementById('modalFiscalYear');
+        const periodField = document.getElementById('modalReportingPeriod');
+        const periodRow = document.getElementById('modalPeriodRow');
+
+        if (categoryField) {
+            categoryField.textContent = categoryLabels[category] || 'Budget / Financial Report';
+        }
+
+        if (yearField) {
+            yearField.textContent = fiscalYear ? `FY ${fiscalYear}` : '--';
+        }
+
+        if (periodRow) {
+            periodRow.classList.toggle('hidden', category !== 'coa_report');
+        }
+
+        if (periodField) {
+            periodField.textContent = periodText || '--';
+        }
+    }
+
     function toggleSlotFile(show) {
         document.getElementById('slotFileSection').classList.toggle('hidden', !show);
     }
 
     function syncBudgetSubmissionMode() {
-        const selectedMethod = document.querySelector('input[name="sub_method"]:checked')?.value || 'template';
+        const selectedMethod = document.querySelector('input[name="sub_method"]:checked')?.value || 'pdf';
         const submitButton = document.getElementById('slotSubmitButton');
         const fileInput = document.querySelector('input[name="report_file"]');
         const fileName = document.getElementById('slotFileName');
 
         document.querySelectorAll('.slot-mode-label').forEach((label) => {
+            if (label.classList.contains('hidden')) {
+                return;
+            }
+
             const isActive = label.dataset.submissionMode === selectedMethod;
+
             label.classList.toggle('border-red-500', isActive);
             label.classList.toggle('bg-red-50', isActive);
             label.classList.toggle('text-red-600', isActive);
@@ -52,6 +188,7 @@
 
             if (selectedMethod !== 'pdf') {
                 fileInput.value = '';
+
                 if (fileName) {
                     fileName.textContent = '';
                 }
@@ -59,16 +196,25 @@
         }
 
         if (submitButton) {
-            submitButton.textContent = selectedMethod === 'template' ? 'Continue to Template' : 'Submit Slot';
+            if (selectedMethod === 'template') {
+                submitButton.textContent = 'Continue to Template';
+            } else if (currentBudgetCategory === 'annual_budget') {
+                submitButton.textContent = 'Submit Annual Budget';
+            } else {
+                submitButton.textContent = 'Submit Report';
+            }
         }
     }
 
     document.addEventListener('DOMContentLoaded', function () {
         const fileInput = document.querySelector('input[name="report_file"]');
         const fileName = document.getElementById('slotFileName');
+
         if (fileInput && fileName) {
             fileInput.addEventListener('change', function () {
-                fileName.textContent = this.files.length ? this.files[0].name : '';
+                fileName.textContent = this.files.length
+                    ? this.files[0].name
+                    : '';
             });
         }
 
@@ -78,43 +224,18 @@
 
         document.querySelectorAll('.slot-mode-label').forEach((label) => {
             label.addEventListener('click', function () {
+                if (this.classList.contains('hidden')) {
+                    return;
+                }
+
                 const input = this.querySelector('input[name="sub_method"]');
+
                 if (input) {
                     input.checked = true;
                     syncBudgetSubmissionMode();
                 }
             });
         });
-
-        const form = document.querySelector('#slotSubmissionModal form');
-        if (form) {
-            form.addEventListener('submit', function (event) {
-                const selectedMethod = document.querySelector('input[name="sub_method"]:checked')?.value;
-                if (selectedMethod === 'template') {
-                    event.preventDefault();
-                    const slotId = document.getElementById('slotIdField').value;
-                    const reportType = document.querySelector('select[name="report_type"]')?.value || 'quarterly';
-                    const reportingYear = document.querySelector('input[name="reporting_year"]')?.value || new Date().getFullYear();
-                    const reportingMonth = document.querySelector('select[name="reporting_month"]')?.value || '';
-                    const reportingQuarter = document.querySelector('select[name="reporting_quarter"]')?.value || '';
-                    const params = new URLSearchParams({
-                        slot_id: slotId,
-                        report_type: reportType,
-                        reporting_year: reportingYear,
-                        reporting_month: reportingMonth,
-                        reporting_quarter: reportingQuarter
-                    });
-                    window.location.href = `${budgetTemplateRoute}?${params.toString()}`;
-                    return;
-                }
-
-                const fileInput = document.querySelector('input[name="report_file"]');
-                if (selectedMethod === 'pdf' && (!fileInput || fileInput.files.length === 0)) {
-                    event.preventDefault();
-                    window.alert('Please select a PDF file before submitting.');
-                }
-            });
-        }
 
         syncBudgetSubmissionMode();
     });

@@ -10,7 +10,7 @@ use App\Http\Controllers\sk_pres\ModuleController;
 use App\Http\Controllers\sk_pres\PlaceholderController;
 use App\Http\Controllers\sk_pres\ChatController as SkPresidentChatController;
 use App\Http\Controllers\sk_pres\RankingController as SkPresidentRankingController;
-use App\Http\Controllers\sk_pres\LeadershipController as SkPresidentLeadershipController; 
+use App\Http\Controllers\sk_pres\LeadershipController as SkPresidentLeadershipController;
 use App\Http\Controllers\sk_pres\ArchiveController as SkPresidentArchiveController;
 use App\Http\Controllers\sk_pres\UserManagementController as SkPresidentUserManagementController;
 
@@ -23,6 +23,7 @@ use App\Http\Controllers\sk_chairman\MeetingsController as SkChairmanMeetingsCon
 use App\Http\Controllers\sk_chairman\ReportController as SkChairmanReportController;
 use App\Http\Controllers\sk_chairman\BudgetController as SkChairmanBudgetController;
 use App\Http\Controllers\sk_chairman\LeadershipController as SkChairmanLeadershipController;
+
 use App\Http\Controllers\sk_secretary\RankingController as SkSecretaryRankingController;
 use App\Http\Controllers\sk_secretary\HomeController as SkSecretaryHomeController;
 use App\Http\Controllers\sk_secretary\AnnouncementController as SkSecretaryAnnouncementController;
@@ -38,6 +39,7 @@ use App\Http\Controllers\public_portal\AnnouncementInteractionController as Publ
 use App\Http\Controllers\public_portal\AnnouncementController as PublicAnnouncementController;
 use App\Http\Controllers\public_portal\CalendarController as PublicCalendarController;
 use App\Http\Controllers\public_portal\LeadershipController as PublicLeadershipController;
+use App\Http\Controllers\public_portal\BudgetController as PublicBudgetController;
 
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\NotificationController;
@@ -69,6 +71,7 @@ Route::get('/', function(){
 Route::get('/mobile/meetings/{meeting}/call', [MobileApiController::class, 'mobileMeetingCall'])
     ->middleware('signed')
     ->name('mobile.meetings.call');
+
 Route::post('/mobile/meetings/{meeting}/agora-token', [MobileApiController::class, 'mobileMeetingToken'])
     ->middleware('signed')
     ->name('mobile.meetings.agora.token');
@@ -95,7 +98,6 @@ Route::middleware('auth')->group(function(){
     Route::post('/wall/posts',[WallPostController::class,'store'])->name('wall.posts.store');
     Route::post('/wall/posts/{announcement}/like',[WallPostController::class,'toggleLike'])->name('wall.posts.like');
 });
-
 
 
 /*
@@ -166,6 +168,7 @@ Route::middleware('auth')->prefix('sk_pres')->name('sk_pres.')->group(function()
     Route::delete('/user-management/{userId}',[SkPresidentUserManagementController::class,'destroy'])->name('user-management.destroy');
     Route::post('/user-management/start-new-term',[SkPresidentUserManagementController::class,'startNewTerm'])->name('user-management.start-new-term');
     Route::post('/user-management/history/{officialTermId}/reappoint',[SkPresidentUserManagementController::class,'reappoint'])->name('user-management.reappoint');
+
     /*
     |--------------------------------------------------------------------------
     | PROFILE
@@ -180,7 +183,6 @@ Route::middleware('auth')->prefix('sk_pres')->name('sk_pres.')->group(function()
     Route::post('/profile/password',fn(Request $r,ProfileSettingsController $c)=>$c->updatePassword($r,'sk_president'))
         ->name('profile.password');
 });
-
 
 
 /*
@@ -241,7 +243,6 @@ Route::middleware('auth')->prefix('sk_chairman')->name('sk_chairman.')->group(fu
 });
 
 
-
 /*
 |--------------------------------------------------------------------------
 | SK SECRETARY
@@ -274,6 +275,7 @@ Route::middleware('auth')->prefix('sk_secretary')->name('sk_secretary.')->group(
 
     Route::get('/rankings', [SkSecretaryRankingController::class, 'index'])->name('rankings');
     Route::get('/rankings/live', [SkSecretaryRankingController::class, 'live'])->name('rankings.live');
+
     Route::get('/leadership', [SkSecretaryLeadershipController::class, 'index'])->name('leadership');
 
     Route::get('/profile', fn (ProfileSettingsController $c) => $c->show('sk_secretary'))->name('profile');
@@ -292,17 +294,35 @@ Route::prefix('public-portal')->name('public.')->group(function(){
     Route::get('/',[PublicHomeController::class,'index'])->name('home');
 
     Route::get('/announcements',[PublicAnnouncementController::class,'index'])->name('announcements');
+
     Route::get('/calendar',[PublicCalendarController::class,'index'])->name('calendar');
+
     Route::get('/leadership',[PublicLeadershipController::class,'index'])->name('leadership');
 
-    Route::post('/announcements/{announcementId}/like',[PublicAnnouncementInteractionController::class,'toggleLike'])->middleware('throttle:30,1')->name('announcements.like');
-    Route::post('/announcements/{announcementId}/view',[PublicAnnouncementInteractionController::class,'trackView'])->middleware('throttle:120,1')->name('announcements.view');
-    Route::get('/announcements/{announcementId}/feedback',[PublicAnnouncementInteractionController::class,'feedbackList'])->middleware('throttle:120,1')->name('announcements.feedback-list');
-    Route::post('/announcements/{announcementId}/feedback',[PublicAnnouncementInteractionController::class,'submitFeedback'])->middleware('throttle:public-feedback-submit')->name('announcements.feedback');
+    Route::get('/annual-budgets',[PublicBudgetController::class,'index'])->name('budgets');
 
-    Route::post('/feedback/{feedbackId}/verify',[PublicAnnouncementInteractionController::class,'verifyFeedback'])->middleware('throttle:public-feedback-verify')->name('feedback.verify');
-    Route::post('/feedback/{feedbackId}/resend',[PublicAnnouncementInteractionController::class,'resendFeedback'])->middleware('throttle:public-feedback-resend')->name('feedback.resend');
+    Route::post('/announcements/{announcementId}/like',[PublicAnnouncementInteractionController::class,'toggleLike'])
+        ->middleware('throttle:30,1')
+        ->name('announcements.like');
+
+    Route::post('/announcements/{announcementId}/view',[PublicAnnouncementInteractionController::class,'trackView'])
+        ->middleware('throttle:120,1')
+        ->name('announcements.view');
+
+    Route::get('/announcements/{announcementId}/feedback',[PublicAnnouncementInteractionController::class,'feedbackList'])
+        ->middleware('throttle:120,1')
+        ->name('announcements.feedback-list');
+
+    Route::post('/announcements/{announcementId}/feedback',[PublicAnnouncementInteractionController::class,'submitFeedback'])
+        ->middleware('throttle:public-feedback-submit')
+        ->name('announcements.feedback');
+
+    Route::post('/feedback/{feedbackId}/verify',[PublicAnnouncementInteractionController::class,'verifyFeedback'])
+        ->middleware('throttle:public-feedback-verify')
+        ->name('feedback.verify');
+
+    Route::post('/feedback/{feedbackId}/resend',[PublicAnnouncementInteractionController::class,'resendFeedback'])
+        ->middleware('throttle:public-feedback-resend')
+        ->name('feedback.resend');
 
 });
-
-
