@@ -127,6 +127,7 @@ class BudgetController extends Controller
             'slot_id' => ['required', 'integer'],
             'sub_method' => ['required', 'in:template,pdf'],
             'annual_budget_amount' => ['nullable', 'numeric', 'min:0.01'],
+            'actual_expenditure' => ['nullable', 'numeric', 'min:0.01'],
             'report_file' => ['nullable', 'file', 'mimes:pdf', 'max:5120'],
         ]);
 
@@ -147,6 +148,10 @@ class BudgetController extends Controller
         $isAnnualBudget =
             ($slot->budget_category ?? null) === 'annual_budget';
 
+        $isAnnualCoa =
+            ($slot->budget_category ?? null) === 'coa_report' &&
+            ($slot->budget_period_type ?? null) === 'annual';
+
         if (
             $isAnnualBudget &&
             !$request->filled('annual_budget_amount')
@@ -159,6 +164,18 @@ class BudgetController extends Controller
                 ->withInput();
         }
 
+        if (
+            $isAnnualCoa &&
+            !$request->filled('actual_expenditure')
+        ) {
+            return back()
+                ->withErrors([
+                    'actual_expenditure' =>
+                        'Please enter the Actual Expenditure.',
+                ])
+                ->withInput();
+        }
+
         if ($validated['sub_method'] === 'template') {
             if (!$this->templateAvailableForSlot($slot)) {
                 return back()->with(
@@ -167,9 +184,18 @@ class BudgetController extends Controller
                 );
             }
 
+            $params = [
+                'slot_id' => $slot->slot_id,
+            ];
+
+            if ($isAnnualCoa) {
+                $params['actual_expenditure'] =
+                    $validated['actual_expenditure'];
+            }
+
             return redirect()->route(
                 'sk_chairman.budget.template.create',
-                ['slot_id' => $slot->slot_id]
+                $params
             );
         }
 
@@ -214,6 +240,10 @@ class BudgetController extends Controller
                 ? (float) $validated['annual_budget_amount']
                 : 0,
 
+            'actual_expenditure' => $isAnnualCoa
+                ? (float) $validated['actual_expenditure']
+                : null,
+
             'status' => 'recorded',
             'submitted_at' => now(),
             'created_at' => now(),
@@ -241,7 +271,9 @@ class BudgetController extends Controller
                 'report_success',
                 $isAnnualBudget
                     ? 'Annual Budget submitted successfully.'
-                    : 'Budget document submitted successfully.'
+                    : ($isAnnualCoa
+                        ? 'Annual COA Report submitted successfully.'
+                        : 'Budget document submitted successfully.')
             );
     }
 
@@ -276,6 +308,26 @@ class BudgetController extends Controller
                 );
         }
 
+        $isAnnualCoa =
+            ($slot->budget_category ?? null) === 'coa_report' &&
+            ($slot->budget_period_type ?? null) === 'annual';
+
+        $actualExpenditure = $isAnnualCoa
+            ? $request->query('actual_expenditure')
+            : null;
+
+        if (
+            $isAnnualCoa &&
+            (!is_numeric($actualExpenditure) || (float) $actualExpenditure <= 0)
+        ) {
+            return redirect()
+                ->route('sk_chairman.budget')
+                ->with(
+                    'report_error',
+                    'Please enter a valid Actual Expenditure.'
+                );
+        }
+
         $user = auth()->user();
 
         return view('shared.budget-template-form', [
@@ -295,6 +347,7 @@ class BudgetController extends Controller
             'reportingQuarter' =>
                 $slot->fiscal_quarter ?: 'Q1',
             'reportingHalf' => $slot->fiscal_half,
+            'actualExpenditure' => $actualExpenditure,
         ]);
     }
 
@@ -304,6 +357,7 @@ class BudgetController extends Controller
 
         $validated = $request->validate([
             'slot_id' => ['required', 'integer'],
+            'actual_expenditure' => ['nullable', 'numeric', 'min:0.01'],
 
             'monitoring_officer' => ['nullable', 'string', 'max:255'],
             'sheet_no' => ['nullable', 'string', 'max:255'],
@@ -389,6 +443,22 @@ class BudgetController extends Controller
                 );
         }
 
+        $isAnnualCoa =
+            ($slot->budget_category ?? null) === 'coa_report' &&
+            ($slot->budget_period_type ?? null) === 'annual';
+
+        if (
+            $isAnnualCoa &&
+            empty($validated['actual_expenditure'])
+        ) {
+            return redirect()
+                ->route('sk_chairman.budget')
+                ->with(
+                    'report_error',
+                    'Actual Expenditure is required for Annual COA.'
+                );
+        }
+
         $templateData = array_merge($validated, [
             'report_type' => $slot->budget_period_type,
             'reporting_year' => $slot->fiscal_year,
@@ -427,6 +497,10 @@ class BudgetController extends Controller
                             (float) ($row['shortage_value'] ?? 0)
                     ),
 
+            'actual_expenditure' => $isAnnualCoa
+                ? (float) $validated['actual_expenditure']
+                : null,
+
             'status' => 'recorded',
             'submitted_at' => now(),
             'created_at' => now(),
@@ -452,7 +526,9 @@ class BudgetController extends Controller
             ->route('sk_chairman.budget')
             ->with(
                 'report_success',
-                'Budget template submitted successfully.'
+                $isAnnualCoa
+                    ? 'Annual COA template submitted successfully.'
+                    : 'Budget template submitted successfully.'
             );
     }
 

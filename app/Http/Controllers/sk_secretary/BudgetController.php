@@ -127,6 +127,7 @@ class BudgetController extends Controller
             'slot_id' => ['required', 'integer'],
             'sub_method' => ['required', 'in:template,pdf'],
             'annual_budget_amount' => ['nullable', 'numeric', 'min:0.01'],
+            'actual_expenditure' => ['nullable', 'numeric', 'min:0.01'],
             'report_file' => ['nullable', 'file', 'mimes:pdf', 'max:5120'],
         ]);
 
@@ -147,6 +148,10 @@ class BudgetController extends Controller
         $isAnnualBudget =
             ($slot->budget_category ?? null) === 'annual_budget';
 
+        $isAnnualCoa =
+            ($slot->budget_category ?? null) === 'coa_report' &&
+            ($slot->budget_period_type ?? null) === 'annual';
+
         if (
             $isAnnualBudget &&
             !$request->filled('annual_budget_amount')
@@ -159,6 +164,18 @@ class BudgetController extends Controller
                 ->withInput();
         }
 
+        if (
+            $isAnnualCoa &&
+            !$request->filled('actual_expenditure')
+        ) {
+            return back()
+                ->withErrors([
+                    'actual_expenditure' =>
+                        'Please enter the Actual Expenditure.',
+                ])
+                ->withInput();
+        }
+
         if ($validated['sub_method'] === 'template') {
             if (!$this->templateAvailableForSlot($slot)) {
                 return back()->with(
@@ -167,9 +184,18 @@ class BudgetController extends Controller
                 );
             }
 
+            $params = [
+                'slot_id' => $slot->slot_id,
+            ];
+
+            if ($isAnnualCoa) {
+                $params['actual_expenditure'] =
+                    $validated['actual_expenditure'];
+            }
+
             return redirect()->route(
                 'sk_secretary.budget.template.create',
-                ['slot_id' => $slot->slot_id]
+                $params
             );
         }
 
@@ -204,17 +230,19 @@ class BudgetController extends Controller
             'fiscal_year' => $slot->fiscal_year ?? now()->year,
             'title' => $slot->title,
             'generated_pdf_path' => null,
-
             'uploaded_file_name' => $request
                 ->file('report_file')
                 ->getClientOriginalName(),
-
             'uploaded_file_path' =>
                 'uploads/budget_reports/'.$filename,
 
             'total_amount' => $isAnnualBudget
                 ? (float) $validated['annual_budget_amount']
                 : 0,
+
+            'actual_expenditure' => $isAnnualCoa
+                ? (float) $validated['actual_expenditure']
+                : null,
 
             'status' => 'recorded',
             'submitted_at' => now(),
@@ -243,7 +271,9 @@ class BudgetController extends Controller
                 'report_success',
                 $isAnnualBudget
                     ? 'Annual Budget submitted successfully.'
-                    : 'Budget document submitted successfully.'
+                    : ($isAnnualCoa
+                        ? 'Annual COA Report submitted successfully.'
+                        : 'Budget document submitted successfully.')
             );
     }
 
@@ -278,35 +308,42 @@ class BudgetController extends Controller
                 );
         }
 
+        $isAnnualCoa =
+            ($slot->budget_category ?? null) === 'coa_report' &&
+            ($slot->budget_period_type ?? null) === 'annual';
+
+        $actualExpenditure = $isAnnualCoa
+            ? $request->query('actual_expenditure')
+            : null;
+
+        if (
+            $isAnnualCoa &&
+            (!is_numeric($actualExpenditure) || (float) $actualExpenditure <= 0)
+        ) {
+            return redirect()
+                ->route('sk_secretary.budget')
+                ->with(
+                    'report_error',
+                    'Please enter a valid Actual Expenditure.'
+                );
+        }
+
         $user = auth()->user();
 
         return view('shared.budget-template-form', [
             'slot' => $slot,
             'submitRoute' => route('sk_secretary.budget.template.store'),
             'backRoute' => route('sk_secretary.budget'),
-
             'fullName' => trim(
                 ($user->first_name ?? '').' '.($user->last_name ?? '')
             ) ?: 'User',
-
-            'barangayName' =>
-                $user->barangay->barangay_name ?? 'Barangay',
-
+            'barangayName' => $user->barangay->barangay_name ?? 'Barangay',
             'reportType' => $slot->budget_period_type,
-
-            'reportingYear' =>
-                (int) $slot->fiscal_year,
-
-            'reportingMonth' =>
-                (int) (
-                    $slot->fiscal_month ?: now()->month
-                ),
-
-            'reportingQuarter' =>
-                $slot->fiscal_quarter ?: 'Q1',
-
-            'reportingHalf' =>
-                $slot->fiscal_half,
+            'reportingYear' => (int) $slot->fiscal_year,
+            'reportingMonth' => (int) ($slot->fiscal_month ?: now()->month),
+            'reportingQuarter' => $slot->fiscal_quarter ?: 'Q1',
+            'reportingHalf' => $slot->fiscal_half,
+            'actualExpenditure' => $actualExpenditure,
         ]);
     }
 
@@ -316,6 +353,7 @@ class BudgetController extends Controller
 
         $validated = $request->validate([
             'slot_id' => ['required', 'integer'],
+            'actual_expenditure' => ['nullable', 'numeric', 'min:0.01'],
 
             'monitoring_officer' => ['nullable', 'string', 'max:255'],
             'sheet_no' => ['nullable', 'string', 'max:255'],
@@ -401,99 +439,70 @@ class BudgetController extends Controller
                 );
         }
 
-        $templateData = array_merge(
-            $validated,
-            [
-                'report_type' =>
-                    $slot->budget_period_type,
+        $isAnnualCoa =
+            ($slot->budget_category ?? null) === 'coa_report' &&
+            ($slot->budget_period_type ?? null) === 'annual';
 
-                'reporting_year' =>
-                    $slot->fiscal_year,
+        if (
+            $isAnnualCoa &&
+            empty($validated['actual_expenditure'])
+        ) {
+            return redirect()
+                ->route('sk_secretary.budget')
+                ->with(
+                    'report_error',
+                    'Actual Expenditure is required for Annual COA.'
+                );
+        }
 
-                'reporting_month' =>
-                    $slot->fiscal_month,
-
-                'reporting_quarter' =>
-                    $slot->fiscal_quarter,
-
-                'reporting_half' =>
-                    $slot->fiscal_half,
-
-                'budget_category' =>
-                    $slot->budget_category,
-            ]
-        );
+        $templateData = array_merge($validated, [
+            'report_type' => $slot->budget_period_type,
+            'reporting_year' => $slot->fiscal_year,
+            'reporting_month' => $slot->fiscal_month,
+            'reporting_quarter' => $slot->fiscal_quarter,
+            'reporting_half' => $slot->fiscal_half,
+            'budget_category' => $slot->budget_category,
+        ]);
 
         $data = [
-            'user_id' =>
-                auth()->user()->user_id,
-
-            'barangay_id' =>
-                auth()->user()->barangay_id,
-
-            'slot_id' =>
-                $slot->slot_id,
-
-            'submission_method' =>
-                'direct_input',
-
-            'document_type' =>
-                'financial_record',
-
-            'fiscal_year' =>
-                $slot->fiscal_year ?? now()->year,
-
-            'title' =>
-                $slot->title,
-
-            'generated_pdf_path' =>
-                'TEMPLATE_GEN',
-
-            'template_data' =>
-                json_encode(
-                    $templateData,
-                    JSON_UNESCAPED_UNICODE
-                ),
-
-            'uploaded_file_name' =>
-                null,
-
-            'uploaded_file_path' =>
-                null,
+            'user_id' => auth()->user()->user_id,
+            'barangay_id' => auth()->user()->barangay_id,
+            'slot_id' => $slot->slot_id,
+            'submission_method' => 'direct_input',
+            'document_type' => 'financial_record',
+            'fiscal_year' => $slot->fiscal_year ?? now()->year,
+            'title' => $slot->title,
+            'generated_pdf_path' => 'TEMPLATE_GEN',
+            'template_data' => json_encode(
+                $templateData,
+                JSON_UNESCAPED_UNICODE
+            ),
+            'uploaded_file_name' => null,
+            'uploaded_file_path' => null,
 
             'total_amount' =>
                 collect($validated['rows'] ?? [])
                     ->sum(
                         fn ($row) =>
-                            (float) (
-                                $row['total_amount'] ?? 0
-                            )
+                            (float) ($row['total_amount'] ?? 0)
                     )
                 +
-                collect(
-                    $validated['inventory_rows'] ?? []
-                )
+                collect($validated['inventory_rows'] ?? [])
                     ->sum(
                         fn ($row) =>
-                            (float) (
-                                $row['shortage_value'] ?? 0
-                            )
+                            (float) ($row['shortage_value'] ?? 0)
                     ),
 
-            'status' =>
-                'recorded',
+            'actual_expenditure' => $isAnnualCoa
+                ? (float) $validated['actual_expenditure']
+                : null,
 
-            'submitted_at' =>
-                now(),
-
-            'created_at' =>
-                now(),
+            'status' => 'recorded',
+            'submitted_at' => now(),
+            'created_at' => now(),
         ];
 
-        $data = $this->applySlotMetadata(
-            $data,
-            $slot
-        );
+        $data = $this->applySlotMetadata($data, $slot);
 
         $budgetReportId = $this->saveBudgetSubmission(
             $data,
@@ -510,30 +519,22 @@ class BudgetController extends Controller
             ->route('sk_secretary.budget')
             ->with(
                 'report_success',
-                'Budget template submitted successfully.'
+                $isAnnualCoa
+                    ? 'Annual COA template submitted successfully.'
+                    : 'Budget template submitted successfully.'
             );
     }
 
-    public function downloadTemplate(
-        int $budgetReportId
-    ): Response|RedirectResponse {
+    public function downloadTemplate(int $budgetReportId): Response|RedirectResponse
+    {
         abort_unless(auth()->check() && auth()->user()->role === 'sk_secretary', 403);
 
         $submission = DB::table('budget_reports')
-            ->where(
-                'budget_report_id',
-                $budgetReportId
-            )
-            ->where(
-                'barangay_id',
-                auth()->user()->barangay_id
-            )
+            ->where('budget_report_id', $budgetReportId)
+            ->where('barangay_id', auth()->user()->barangay_id)
             ->first();
 
-        if (
-            !$submission ||
-            empty($submission->template_data)
-        ) {
+        if (!$submission || empty($submission->template_data)) {
             return redirect()
                 ->route('sk_secretary.budget')
                 ->with(
@@ -547,53 +548,33 @@ class BudgetController extends Controller
             true
         ) ?: [];
 
-        $paper =
-            ($data['report_type'] ?? 'quarterly')
-            === 'monthly'
-                ? 'portrait'
-                : 'landscape';
+        $paper = ($data['report_type'] ?? 'quarterly') === 'monthly'
+            ? 'portrait'
+            : 'landscape';
 
         $pdf = Pdf::loadView(
             'shared.budget-template-download',
             [
                 'data' => $data,
-
-                'barangayName' =>
-                    auth()->user()
-                        ->barangay
-                        ->barangay_name
-                    ?? 'Barangay',
+                'barangayName' => auth()->user()->barangay->barangay_name ?? 'Barangay',
             ]
-        )->setPaper(
-            'a4',
-            $paper
-        );
+        )->setPaper('a4', $paper);
 
         return $pdf->download(
             'budget-template-'.$budgetReportId.'.pdf'
         );
     }
 
-    public function viewTemplate(
-        int $budgetReportId
-    ): Response|RedirectResponse {
+    public function viewTemplate(int $budgetReportId): Response|RedirectResponse
+    {
         abort_unless(auth()->check() && auth()->user()->role === 'sk_secretary', 403);
 
         $submission = DB::table('budget_reports')
-            ->where(
-                'budget_report_id',
-                $budgetReportId
-            )
-            ->where(
-                'barangay_id',
-                auth()->user()->barangay_id
-            )
+            ->where('budget_report_id', $budgetReportId)
+            ->where('barangay_id', auth()->user()->barangay_id)
             ->first();
 
-        if (
-            !$submission ||
-            empty($submission->template_data)
-        ) {
+        if (!$submission || empty($submission->template_data)) {
             return redirect()
                 ->route('sk_secretary.budget')
                 ->with(
@@ -607,113 +588,65 @@ class BudgetController extends Controller
             true
         ) ?: [];
 
-        $paper =
-            ($data['report_type'] ?? 'quarterly')
-            === 'monthly'
-                ? 'portrait'
-                : 'landscape';
+        $paper = ($data['report_type'] ?? 'quarterly') === 'monthly'
+            ? 'portrait'
+            : 'landscape';
 
         $pdf = Pdf::loadView(
             'shared.budget-template-download',
             [
                 'data' => $data,
-
-                'barangayName' =>
-                    auth()->user()
-                        ->barangay
-                        ->barangay_name
-                    ?? 'Barangay',
+                'barangayName' => auth()->user()->barangay->barangay_name ?? 'Barangay',
             ]
-        )->setPaper(
-            'a4',
-            $paper
-        );
+        )->setPaper('a4', $paper);
 
         return $pdf->stream(
             'budget-template-'.$budgetReportId.'.pdf'
         );
     }
 
-    protected function templateAvailableForSlot(
-        object $slot
-    ): bool {
-        return ($slot->budget_category ?? null)
-            === 'coa_report'
+    protected function templateAvailableForSlot(object $slot): bool
+    {
+        return ($slot->budget_category ?? null) === 'coa_report'
             && in_array(
                 $slot->budget_period_type ?? null,
-                [
-                    'monthly',
-                    'quarterly',
-                    'annual',
-                ],
+                ['monthly', 'quarterly', 'annual'],
                 true
             );
     }
 
-    protected function applySlotMetadata(
-        array $data,
-        object $slot
-    ): array {
-        if (
-            Schema::hasColumn(
-                'budget_reports',
-                'budget_category'
-            )
-        ) {
-            $data['budget_category'] =
-                $slot->budget_category;
+    protected function applySlotMetadata(array $data, object $slot): array
+    {
+        if (Schema::hasColumn('budget_reports', 'budget_category')) {
+            $data['budget_category'] = $slot->budget_category;
         }
 
-        if (
-            Schema::hasColumn(
-                'budget_reports',
-                'budget_period_type'
-            )
-        ) {
+        if (Schema::hasColumn('budget_reports', 'budget_period_type')) {
             $data['budget_period_type'] =
-                ($slot->budget_category ?? null)
-                    === 'coa_report'
-                        ? $slot->budget_period_type
-                        : null;
+                ($slot->budget_category ?? null) === 'coa_report'
+                    ? $slot->budget_period_type
+                    : null;
         }
 
-        if (
-            Schema::hasColumn(
-                'budget_reports',
-                'fiscal_month'
-            )
-        ) {
+        if (Schema::hasColumn('budget_reports', 'fiscal_month')) {
             $data['fiscal_month'] =
-                ($slot->budget_period_type ?? null)
-                    === 'monthly'
-                        ? $slot->fiscal_month
-                        : null;
+                ($slot->budget_period_type ?? null) === 'monthly'
+                    ? $slot->fiscal_month
+                    : null;
         }
 
-        if (
-            Schema::hasColumn(
-                'budget_reports',
-                'fiscal_quarter'
-            )
-        ) {
+        if (Schema::hasColumn('budget_reports', 'fiscal_quarter')) {
             $data['fiscal_quarter'] =
-                ($slot->budget_period_type ?? null)
-                    === 'quarterly'
-                        ? $slot->fiscal_quarter
-                        : null;
+                ($slot->budget_period_type ?? null) === 'quarterly'
+                    ? $slot->fiscal_quarter
+                    : null;
         }
 
-        if (
-            Schema::hasColumn(
-                'budget_reports',
-                'fiscal_half'
-            )
-        ) {
+        if (Schema::hasColumn('budget_reports', 'fiscal_half')) {
             $data['fiscal_half'] =
-                ($slot->budget_period_type ?? null)
-                    === 'semi_annual'
-                        ? $slot->fiscal_half
-                        : null;
+                ($slot->budget_period_type ?? null) === 'semi_annual'
+                    ? $slot->fiscal_half
+                    : null;
         }
 
         return $data;
@@ -722,61 +655,15 @@ class BudgetController extends Controller
     protected function menuItems(): array
     {
         return [
-            [
-                'link' => route('sk_secretary.home'),
-                'icon' => '&#127968;',
-                'label' => 'Home',
-            ],
-            [
-                'link' => route('sk_secretary.reports'),
-                'icon' => '&#128196;',
-                'label' => 'Reports',
-            ],
-            [
-                'link' => route('sk_secretary.budget'),
-                'icon' => '&#128229;',
-                'label' => 'Budget',
-            ],
-            [
-                'link' => route(
-                    'sk_secretary.announcements'
-                ),
-                'icon' => '&#128226;',
-                'label' => 'Announcements',
-            ],
-            [
-                'link' => route(
-                    'sk_secretary.calendar'
-                ),
-                'icon' => '&#128197;',
-                'label' => 'Calendar',
-            ],
-            [
-                'link' => route('sk_secretary.chat'),
-                'icon' => '&#128172;',
-                'label' => 'Chat',
-            ],
-            [
-                'link' => route(
-                    'sk_secretary.meetings'
-                ),
-                'icon' => '&#128222;',
-                'label' => 'Meetings',
-            ],
-            [
-                'link' => route(
-                    'sk_secretary.rankings'
-                ),
-                'icon' => '&#127942;',
-                'label' => 'Rankings',
-            ],
-            [
-                'link' => route(
-                    'sk_secretary.leadership'
-                ),
-                'icon' => '&#128101;',
-                'label' => 'Leadership',
-            ],
+            ['link' => route('sk_secretary.home'), 'icon' => '&#127968;', 'label' => 'Home'],
+            ['link' => route('sk_secretary.reports'), 'icon' => '&#128196;', 'label' => 'Reports'],
+            ['link' => route('sk_secretary.budget'), 'icon' => '&#128229;', 'label' => 'Budget'],
+            ['link' => route('sk_secretary.announcements'), 'icon' => '&#128226;', 'label' => 'Announcements'],
+            ['link' => route('sk_secretary.calendar'), 'icon' => '&#128197;', 'label' => 'Calendar'],
+            ['link' => route('sk_secretary.chat'), 'icon' => '&#128172;', 'label' => 'Chat'],
+            ['link' => route('sk_secretary.meetings'), 'icon' => '&#128222;', 'label' => 'Meetings'],
+            ['link' => route('sk_secretary.rankings'), 'icon' => '&#127942;', 'label' => 'Rankings'],
+            ['link' => route('sk_secretary.leadership'), 'icon' => '&#128101;', 'label' => 'Leadership'],
         ];
     }
 
@@ -787,14 +674,10 @@ class BudgetController extends Controller
     ): void {
         $user = auth()->user();
 
-        $points = app(
-            RankingPointsService::class
-        );
+        $points = app(RankingPointsService::class);
 
         $isOnTime = now()->lessThanOrEqualTo(
-            Carbon::parse(
-                $slot->end_date
-            )->endOfDay()
+            Carbon::parse($slot->end_date)->endOfDay()
         );
 
         $submissionAction = $isOnTime
@@ -827,10 +710,7 @@ class BudgetController extends Controller
                 'barangay_id',
                 auth()->user()->barangay_id
             )
-            ->where(
-                'slot_id',
-                $slotId
-            )
+            ->where('slot_id', $slotId)
             ->first();
 
         if ($existing) {
@@ -841,27 +721,21 @@ class BudgetController extends Controller
                 )
                 ->update($data);
 
-            return (int)
-                $existing->budget_report_id;
+            return (int) $existing->budget_report_id;
         }
 
-        return (int)
-            DB::table('budget_reports')
-                ->insertGetId(
-                    $data,
-                    'budget_report_id'
-                );
+        return (int) DB::table('budget_reports')
+            ->insertGetId(
+                $data,
+                'budget_report_id'
+            );
     }
 
-    protected function periodLabel(
-        object $submission
-    ): string {
-        $category =
-            $submission->slot_budget_category
-            ?? null;
+    protected function periodLabel(object $submission): string
+    {
+        $category = $submission->slot_budget_category ?? null;
 
-        $year =
-            $submission->slot_fiscal_year
+        $year = $submission->slot_fiscal_year
             ?? $submission->fiscal_year
             ?? '';
 
@@ -869,14 +743,11 @@ class BudgetController extends Controller
             return 'Annual Budget FY '.$year;
         }
 
-        if (
-            $category === 'supplemental_budget'
-        ) {
+        if ($category === 'supplemental_budget') {
             return 'Supplemental Budget FY '.$year;
         }
 
-        $periodType =
-            $submission->slot_budget_period_type
+        $periodType = $submission->slot_budget_period_type
             ?? $submission->budget_period_type
             ?? 'annual';
 
@@ -898,10 +769,7 @@ class BudgetController extends Controller
             ).' '.$year,
 
             'semi_annual' => (
-                (
-                    $submission->slot_fiscal_half
-                    ?? null
-                ) === 'H1'
+                ($submission->slot_fiscal_half ?? null) === 'H1'
                     ? 'First Half '
                     : 'Second Half '
             ).$year,

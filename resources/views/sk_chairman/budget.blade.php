@@ -13,9 +13,8 @@
 
 @push('scripts')
 <script>
-    const budgetTemplateRoute = @json(route('sk_chairman.budget.template.create'));
-
     let currentBudgetCategory = null;
+    let currentBudgetReportType = null;
 
     function openSlotSubmission(
         slotId,
@@ -29,6 +28,7 @@
         templateAvailable = false
     ) {
         currentBudgetCategory = category;
+        currentBudgetReportType = reportType;
 
         document.getElementById('slotIdField').value = slotId;
         document.getElementById('slotSubmissionTitle').textContent = title;
@@ -42,13 +42,77 @@
             fiscalHalf
         );
 
-        const annualBudgetAmountSection = document.getElementById('annualBudgetAmountSection');
-        const annualBudgetAmount = document.getElementById('annualBudgetAmount');
+        /*
+        |--------------------------------------------------------------------------
+        | ANNUAL BUDGET AMOUNT
+        |--------------------------------------------------------------------------
+        */
+        const annualBudgetAmountSection =
+            document.getElementById('annualBudgetAmountSection');
 
-        const isAnnualBudget = category === 'annual_budget';
+        const annualBudgetAmount =
+            document.getElementById('annualBudgetAmount');
 
+        /*
+        |--------------------------------------------------------------------------
+        | ANNUAL COA ACTUAL EXPENDITURE
+        |--------------------------------------------------------------------------
+        */
+        const actualExpenditureSection =
+            document.getElementById('actualExpenditureSection');
+
+        const actualExpenditure =
+            document.getElementById('actualExpenditure');
+
+        /*
+        |--------------------------------------------------------------------------
+        | SUBMISSION METHOD ELEMENTS
+        |--------------------------------------------------------------------------
+        */
+        const templateLabel =
+            document.getElementById('templateModeLabel');
+
+        const templateRadio =
+            document.querySelector(
+                'input[name="sub_method"][value="template"]'
+            );
+
+        const pdfRadio =
+            document.querySelector(
+                'input[name="sub_method"][value="pdf"]'
+            );
+
+        const unavailableNote =
+            document.getElementById('templateUnavailableNote');
+
+        const fileInput =
+            document.querySelector('input[name="report_file"]');
+
+        const fileName =
+            document.getElementById('slotFileName');
+
+        /*
+        |--------------------------------------------------------------------------
+        | CHECK SLOT TYPE
+        |--------------------------------------------------------------------------
+        */
+        const isAnnualBudget =
+            category === 'annual_budget';
+
+        const isAnnualCoa =
+            category === 'coa_report'
+            && reportType === 'annual';
+
+        /*
+        |--------------------------------------------------------------------------
+        | SHOW / HIDE ANNUAL BUDGET AMOUNT
+        |--------------------------------------------------------------------------
+        */
         if (annualBudgetAmountSection) {
-            annualBudgetAmountSection.classList.toggle('hidden', !isAnnualBudget);
+            annualBudgetAmountSection.classList.toggle(
+                'hidden',
+                !isAnnualBudget
+            );
         }
 
         if (annualBudgetAmount) {
@@ -59,19 +123,55 @@
             }
         }
 
-        const templateLabel = document.getElementById('templateModeLabel');
-        const templateRadio = document.querySelector('input[name="sub_method"][value="template"]');
-        const pdfRadio = document.querySelector('input[name="sub_method"][value="pdf"]');
-        const unavailableNote = document.getElementById('templateUnavailableNote');
+        /*
+        |--------------------------------------------------------------------------
+        | SHOW / HIDE ACTUAL EXPENDITURE
+        |--------------------------------------------------------------------------
+        */
+        if (actualExpenditureSection) {
+            actualExpenditureSection.classList.toggle(
+                'hidden',
+                !isAnnualCoa
+            );
+        }
 
+        if (actualExpenditure) {
+            actualExpenditure.required = isAnnualCoa;
+
+            if (!isAnnualCoa) {
+                actualExpenditure.value = '';
+            }
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | RESET FILE
+        |--------------------------------------------------------------------------
+        */
+        if (fileInput) {
+            fileInput.value = '';
+        }
+
+        if (fileName) {
+            fileName.textContent = '';
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | TEMPLATE / PDF AVAILABILITY
+        |--------------------------------------------------------------------------
+        */
         if (templateAvailable) {
+
             templateLabel?.classList.remove('hidden');
             unavailableNote?.classList.add('hidden');
 
             if (templateRadio) {
                 templateRadio.checked = true;
             }
+
         } else {
+
             templateLabel?.classList.add('hidden');
             unavailableNote?.classList.remove('hidden');
 
@@ -80,13 +180,19 @@
             }
         }
 
-        document.getElementById('slotSubmissionModal').classList.remove('hidden');
+        document
+            .getElementById('slotSubmissionModal')
+            .classList
+            .remove('hidden');
 
         syncBudgetSubmissionMode();
     }
 
     function closeSlotSubmission() {
-        document.getElementById('slotSubmissionModal').classList.add('hidden');
+        document
+            .getElementById('slotSubmissionModal')
+            .classList
+            .add('hidden');
     }
 
     function updateBudgetSlotDetails(
@@ -122,71 +228,148 @@
         let periodText = '';
 
         if (category === 'coa_report') {
+
             if (reportType === 'monthly') {
-                periodText = `Monthly - ${monthNames[Number(fiscalMonth)] || ''}`;
+
+                periodText =
+                    `Monthly - ${monthNames[Number(fiscalMonth)] || ''}`;
+
             } else if (reportType === 'quarterly') {
-                periodText = `Quarterly - ${fiscalQuarter || ''}`;
+
+                periodText =
+                    `Quarterly - ${fiscalQuarter || ''}`;
+
             } else if (reportType === 'semi_annual') {
-                periodText = fiscalHalf === 'H1'
-                    ? 'Semi-Annual - First Half'
-                    : 'Semi-Annual - Second Half';
+
+                periodText =
+                    fiscalHalf === 'H1'
+                        ? 'Semi-Annual - First Half'
+                        : 'Semi-Annual - Second Half';
+
             } else if (reportType === 'annual') {
+
                 periodText = 'Annual';
             }
         }
 
-        const categoryField = document.getElementById('modalBudgetCategory');
-        const yearField = document.getElementById('modalFiscalYear');
-        const periodField = document.getElementById('modalReportingPeriod');
-        const periodRow = document.getElementById('modalPeriodRow');
+        const categoryField =
+            document.getElementById('modalBudgetCategory');
+
+        const yearField =
+            document.getElementById('modalFiscalYear');
+
+        const periodField =
+            document.getElementById('modalReportingPeriod');
+
+        const periodRow =
+            document.getElementById('modalPeriodRow');
 
         if (categoryField) {
-            categoryField.textContent = categoryLabels[category] || 'Budget / Financial Report';
+            categoryField.textContent =
+                categoryLabels[category]
+                || 'Budget / Financial Report';
         }
 
         if (yearField) {
-            yearField.textContent = fiscalYear ? `FY ${fiscalYear}` : '--';
+            yearField.textContent =
+                fiscalYear
+                    ? `FY ${fiscalYear}`
+                    : '--';
         }
 
         if (periodRow) {
-            periodRow.classList.toggle('hidden', category !== 'coa_report');
+            periodRow.classList.toggle(
+                'hidden',
+                category !== 'coa_report'
+            );
         }
 
         if (periodField) {
-            periodField.textContent = periodText || '--';
+            periodField.textContent =
+                periodText || '--';
         }
     }
 
     function toggleSlotFile(show) {
-        document.getElementById('slotFileSection').classList.toggle('hidden', !show);
+        document
+            .getElementById('slotFileSection')
+            .classList
+            .toggle('hidden', !show);
     }
 
     function syncBudgetSubmissionMode() {
-        const selectedMethod = document.querySelector('input[name="sub_method"]:checked')?.value || 'pdf';
-        const submitButton = document.getElementById('slotSubmitButton');
-        const fileInput = document.querySelector('input[name="report_file"]');
-        const fileName = document.getElementById('slotFileName');
+        const selectedMethod =
+            document.querySelector(
+                'input[name="sub_method"]:checked'
+            )?.value || 'pdf';
 
-        document.querySelectorAll('.slot-mode-label').forEach((label) => {
-            if (label.classList.contains('hidden')) {
-                return;
-            }
+        const submitButton =
+            document.getElementById('slotSubmitButton');
 
-            const isActive = label.dataset.submissionMode === selectedMethod;
+        const fileInput =
+            document.querySelector('input[name="report_file"]');
 
-            label.classList.toggle('border-red-500', isActive);
-            label.classList.toggle('bg-red-50', isActive);
-            label.classList.toggle('text-red-600', isActive);
-            label.classList.toggle('border-gray-100', !isActive);
-            label.classList.toggle('bg-gray-50', !isActive);
-        });
+        const fileName =
+            document.getElementById('slotFileName');
 
-        toggleSlotFile(selectedMethod === 'pdf');
+        /*
+        |--------------------------------------------------------------------------
+        | UPDATE SUBMISSION METHOD DESIGN
+        |--------------------------------------------------------------------------
+        */
+        document
+            .querySelectorAll('.slot-mode-label')
+            .forEach((label) => {
+
+                if (label.classList.contains('hidden')) {
+                    return;
+                }
+
+                const isActive =
+                    label.dataset.submissionMode === selectedMethod;
+
+                label.classList.toggle(
+                    'border-red-500',
+                    isActive
+                );
+
+                label.classList.toggle(
+                    'bg-red-50',
+                    isActive
+                );
+
+                label.classList.toggle(
+                    'text-red-600',
+                    isActive
+                );
+
+                label.classList.toggle(
+                    'border-gray-100',
+                    !isActive
+                );
+
+                label.classList.toggle(
+                    'bg-gray-50',
+                    !isActive
+                );
+            });
+
+        /*
+        |--------------------------------------------------------------------------
+        | PDF FILE FIELD
+        |--------------------------------------------------------------------------
+        */
+        toggleSlotFile(
+            selectedMethod === 'pdf'
+        );
 
         if (fileInput) {
-            fileInput.required = selectedMethod === 'pdf';
+
+            fileInput.required =
+                selectedMethod === 'pdf';
 
             if (selectedMethod !== 'pdf') {
+
                 fileInput.value = '';
 
                 if (fileName) {
@@ -195,49 +378,138 @@
             }
         }
 
+        /*
+        |--------------------------------------------------------------------------
+        | BUTTON LABEL
+        |--------------------------------------------------------------------------
+        */
         if (submitButton) {
+
             if (selectedMethod === 'template') {
-                submitButton.textContent = 'Continue to Template';
-            } else if (currentBudgetCategory === 'annual_budget') {
-                submitButton.textContent = 'Submit Annual Budget';
+
+                submitButton.textContent =
+                    'Continue to Template';
+
+            } else if (
+                currentBudgetCategory === 'annual_budget'
+            ) {
+
+                submitButton.textContent =
+                    'Submit Annual Budget';
+
+            } else if (
+                currentBudgetCategory === 'coa_report'
+                && currentBudgetReportType === 'annual'
+            ) {
+
+                submitButton.textContent =
+                    'Submit Annual COA Report';
+
+            } else if (
+                currentBudgetCategory === 'supplemental_budget'
+            ) {
+
+                submitButton.textContent =
+                    'Submit Supplemental Budget';
+
             } else {
-                submitButton.textContent = 'Submit Report';
+
+                submitButton.textContent =
+                    'Submit Report';
             }
         }
     }
 
-    document.addEventListener('DOMContentLoaded', function () {
-        const fileInput = document.querySelector('input[name="report_file"]');
-        const fileName = document.getElementById('slotFileName');
+    document.addEventListener(
+        'DOMContentLoaded',
+        function () {
 
-        if (fileInput && fileName) {
-            fileInput.addEventListener('change', function () {
-                fileName.textContent = this.files.length
-                    ? this.files[0].name
-                    : '';
-            });
+            const fileInput =
+                document.querySelector(
+                    'input[name="report_file"]'
+                );
+
+            const fileName =
+                document.getElementById(
+                    'slotFileName'
+                );
+
+            /*
+            |--------------------------------------------------------------------------
+            | DISPLAY SELECTED PDF NAME
+            |--------------------------------------------------------------------------
+            */
+            if (fileInput && fileName) {
+
+                fileInput.addEventListener(
+                    'change',
+                    function () {
+
+                        fileName.textContent =
+                            this.files.length
+                                ? this.files[0].name
+                                : '';
+                    }
+                );
+            }
+
+            /*
+            |--------------------------------------------------------------------------
+            | SUBMISSION METHOD CHANGE
+            |--------------------------------------------------------------------------
+            */
+            document
+                .querySelectorAll(
+                    'input[name="sub_method"]'
+                )
+                .forEach((input) => {
+
+                    input.addEventListener(
+                        'change',
+                        syncBudgetSubmissionMode
+                    );
+                });
+
+            /*
+            |--------------------------------------------------------------------------
+            | SUBMISSION MODE CARD CLICK
+            |--------------------------------------------------------------------------
+            */
+            document
+                .querySelectorAll(
+                    '.slot-mode-label'
+                )
+                .forEach((label) => {
+
+                    label.addEventListener(
+                        'click',
+                        function () {
+
+                            if (
+                                this.classList.contains(
+                                    'hidden'
+                                )
+                            ) {
+                                return;
+                            }
+
+                            const input =
+                                this.querySelector(
+                                    'input[name="sub_method"]'
+                                );
+
+                            if (input) {
+
+                                input.checked = true;
+
+                                syncBudgetSubmissionMode();
+                            }
+                        }
+                    );
+                });
+
+            syncBudgetSubmissionMode();
         }
-
-        document.querySelectorAll('input[name="sub_method"]').forEach((input) => {
-            input.addEventListener('change', syncBudgetSubmissionMode);
-        });
-
-        document.querySelectorAll('.slot-mode-label').forEach((label) => {
-            label.addEventListener('click', function () {
-                if (this.classList.contains('hidden')) {
-                    return;
-                }
-
-                const input = this.querySelector('input[name="sub_method"]');
-
-                if (input) {
-                    input.checked = true;
-                    syncBudgetSubmissionMode();
-                }
-            });
-        });
-
-        syncBudgetSubmissionMode();
-    });
+    );
 </script>
 @endpush

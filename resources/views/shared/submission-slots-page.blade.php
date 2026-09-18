@@ -1,29 +1,63 @@
 {{-- File guide: Blade view template for resources/views/shared/submission-slots-page.blade.php. --}}
 <div class="flex h-screen bg-gray-100 overflow-hidden">
+
+    {{-- SIDEBAR --}}
     <div class="w-64 bg-red-600 text-white flex flex-col p-3 overflow-y-auto">
+
         <div class="flex items-center gap-3 mb-4">
-            <img src="{{ asset('images/logo.png') }}" class="w-8 h-8 rounded-full object-cover" alt="logo">
+
+            <img
+                src="{{ asset('images/logo.png') }}"
+                class="w-8 h-8 rounded-full object-cover"
+                alt="logo"
+            >
+
             <div class="leading-tight">
-                <h2 class="text-lg font-extrabold tracking-wide">SK 360°</h2>
-                <p class="text-[10px] opacity-80">Management System</p>
+
+                <h2 class="text-lg font-extrabold tracking-wide">
+                    SK 360°
+                </h2>
+
+                <p class="text-[10px] opacity-80">
+                    Management System
+                </p>
+
             </div>
+
         </div>
 
         <div class="bg-red-500 rounded-lg p-2 flex items-center gap-2 mb-3 shadow text-xs">
-            <div class="bg-yellow-400 text-red-600 p-1 rounded-full text-sm">👤</div>
+
+            <div class="bg-yellow-400 text-red-600 p-1 rounded-full text-sm">
+                👤
+            </div>
 
             <div>
-                <p class="font-semibold text-xs">{{ $fullName }}</p>
-                <p class="text-xs opacity-80">{{ $roleLabel }}</p>
+
+                <p class="font-semibold text-xs">
+                    {{ $fullName }}
+                </p>
+
+                <p class="text-xs opacity-80">
+                    {{ $roleLabel }}
+                </p>
+
             </div>
+
         </div>
 
         <nav class="space-y-1 text-xs">
-            @foreach ($menuItems as $item)
-                @php $isActive = $item['link'] === $currentUrl; @endphp
 
-                <a href="{{ $item['link'] }}"
-                    class="flex items-center gap-2 p-2 rounded-lg {{ $isActive ? 'bg-red-500 shadow-inner' : 'hover:bg-red-500 transition' }}">
+            @foreach ($menuItems as $item)
+
+                @php
+                    $isActive = $item['link'] === $currentUrl;
+                @endphp
+
+                <a
+                    href="{{ $item['link'] }}"
+                    class="flex items-center gap-2 p-2 rounded-lg {{ $isActive ? 'bg-red-500 shadow-inner' : 'hover:bg-red-500 transition' }}"
+                >
 
                     <span class="{{ $isActive ? 'bg-yellow-400 text-red-600' : 'bg-red-400' }} p-1 rounded text-sm">
                         {!! $item['icon'] !!}
@@ -32,13 +66,19 @@
                     <span class="{{ $isActive ? 'text-yellow-300 font-semibold' : '' }}">
                         {{ $item['label'] }}
                     </span>
+
                 </a>
+
             @endforeach
+
         </nav>
+
     </div>
 
+    {{-- MAIN --}}
     <div class="flex-1 flex flex-col overflow-hidden">
 
+        {{-- TOPBAR --}}
         <div class="bg-red-600 text-white px-6 py-3 flex justify-between items-center shadow">
 
             <input
@@ -49,6 +89,7 @@
 
             <div class="flex items-center gap-3 relative">
 
+                {{-- NOTIFICATIONS --}}
                 <div class="relative">
 
                     <button
@@ -75,9 +116,12 @@
                             </div>
 
                         </div>
+
                     </div>
+
                 </div>
 
+                {{-- USER MENU --}}
                 <div class="relative">
 
                     <button
@@ -104,12 +148,16 @@
                             class="flex items-center gap-3 px-5 py-3 hover:bg-gray-100 transition"
                         >
                             <span>👤</span>
+
                             <span class="text-gray-700">
                                 Profile Settings
                             </span>
                         </a>
 
-                        <form method="POST" action="{{ route('logout') }}">
+                        <form
+                            method="POST"
+                            action="{{ route('logout') }}"
+                        >
                             @csrf
 
                             <button
@@ -117,33 +165,48 @@
                                 class="w-full text-left flex items-center gap-3 px-5 py-3 text-red-500 hover:bg-gray-100 transition"
                             >
                                 <span>↩️</span>
-                                <span>Log Out</span>
+
+                                <span>
+                                    Log Out
+                                </span>
                             </button>
+
                         </form>
 
                     </div>
+
                 </div>
 
             </div>
+
         </div>
 
+        {{-- CONTENT --}}
         <main class="flex-1 overflow-y-auto p-8 bg-gray-50">
 
             <div class="max-w-6xl mx-auto">
 
+                {{-- SUCCESS --}}
                 @if (session('report_success'))
+
                     <div class="mb-6 rounded-2xl border border-green-200 bg-green-50 px-5 py-4 text-sm font-semibold text-green-700">
                         {{ session('report_success') }}
                     </div>
+
                 @endif
 
+                {{-- ERROR --}}
                 @if (session('report_error'))
+
                     <div class="mb-6 rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-sm font-semibold text-red-700">
                         {{ session('report_error') }}
                     </div>
+
                 @endif
 
+                {{-- VALIDATION ERRORS --}}
                 @if ($errors->any())
+
                     <div class="mb-6 rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-700">
 
                         <p class="font-bold mb-2">
@@ -151,14 +214,22 @@
                         </p>
 
                         <ul class="list-disc pl-5 space-y-1">
+
                             @foreach ($errors->all() as $error)
-                                <li>{{ $error }}</li>
+
+                                <li>
+                                    {{ $error }}
+                                </li>
+
                             @endforeach
+
                         </ul>
 
                     </div>
+
                 @endif
 
+                {{-- PAGE TITLE --}}
                 <div class="mb-8">
 
                     <h1 class="text-3xl font-black text-gray-800 uppercase tracking-tighter">
@@ -171,6 +242,7 @@
 
                 </div>
 
+                {{-- ACTIVE SLOTS --}}
                 <div class="bg-white rounded-3xl shadow-sm border border-gray-100 p-6 mb-8">
 
                     <div class="flex items-center justify-between mb-5">
@@ -228,8 +300,10 @@
                                         </span>
 
                                     </div>
+
                                 </div>
 
+                                {{-- BUDGET METADATA --}}
                                 @if (($submissionType ?? '') === 'budget')
 
                                     <div class="mt-4 flex flex-wrap gap-2">
@@ -258,6 +332,7 @@
 
                                 @endif
 
+                                {{-- DATES --}}
                                 <div class="mt-4 grid grid-cols-2 gap-3 text-xs text-gray-600">
 
                                     <div class="rounded-xl bg-white px-3 py-3">
@@ -286,6 +361,7 @@
 
                                 </div>
 
+                                {{-- SLOT ACTION --}}
                                 <div class="mt-4 flex justify-end">
 
                                     @if (!empty($slot->is_upcoming))
@@ -346,8 +422,10 @@
                         @endforelse
 
                     </div>
+
                 </div>
 
+                {{-- RECENT SUBMISSIONS --}}
                 <div class="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
 
                     <div class="px-8 py-5 border-b border-gray-50 bg-gray-50/50">
@@ -365,11 +443,25 @@
                             <thead class="text-[10px] text-gray-400 uppercase font-black tracking-widest border-b bg-gray-50">
 
                                 <tr>
-                                    <th class="px-8 py-4">Title</th>
-                                    <th class="px-6 py-4">Method</th>
-                                    <th class="px-6 py-4">Date Submitted</th>
-                                    <th class="px-6 py-4">Status</th>
-                                    <th class="px-8 py-4 text-right">Actions</th>
+                                    <th class="px-8 py-4">
+                                        Title
+                                    </th>
+
+                                    <th class="px-6 py-4">
+                                        Method
+                                    </th>
+
+                                    <th class="px-6 py-4">
+                                        Date Submitted
+                                    </th>
+
+                                    <th class="px-6 py-4">
+                                        Status
+                                    </th>
+
+                                    <th class="px-8 py-4 text-right">
+                                        Actions
+                                    </th>
                                 </tr>
 
                             </thead>
@@ -422,6 +514,7 @@
                                                     class="inline-flex items-center justify-center w-8 h-8 rounded-xl bg-gray-100 text-gray-500 hover:bg-blue-100 hover:text-blue-600 transition shadow-sm"
                                                     title="View submission"
                                                 >
+
                                                     <svg
                                                         class="h-4 w-4"
                                                         viewBox="0 0 24 24"
@@ -432,6 +525,7 @@
                                                         <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"></path>
                                                         <circle cx="12" cy="12" r="3"></circle>
                                                     </svg>
+
                                                 </a>
 
                                             @endif
@@ -444,6 +538,7 @@
                                                     class="inline-flex items-center justify-center w-8 h-8 rounded-xl bg-gray-100 text-gray-500 hover:bg-green-100 hover:text-green-600 transition shadow-sm"
                                                     title="Download submission"
                                                 >
+
                                                     <svg
                                                         class="h-4 w-4"
                                                         viewBox="0 0 24 24"
@@ -455,6 +550,7 @@
                                                         <path d="M7 10l5 5 5-5"></path>
                                                         <path d="M12 15V3"></path>
                                                     </svg>
+
                                                 </a>
 
                                             @endif
@@ -466,30 +562,46 @@
                                 @empty
 
                                     <tr>
-                                        <td colspan="5" class="px-8 py-12 text-center text-sm text-gray-400">
+
+                                        <td
+                                            colspan="5"
+                                            class="px-8 py-12 text-center text-sm text-gray-400"
+                                        >
                                             No submissions yet.
                                         </td>
+
                                     </tr>
 
                                 @endforelse
 
                             </tbody>
+
                         </table>
 
                     </div>
+
                 </div>
 
             </div>
+
         </main>
+
     </div>
+
 </div>
 
+
+{{-- ========================================================= --}}
+{{-- SUBMISSION MODAL --}}
+{{-- ========================================================= --}}
 <div
     id="slotSubmissionModal"
     class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4"
 >
+
     <div class="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden">
 
+        {{-- MODAL HEADER --}}
         <div class="bg-red-600 px-6 py-5 text-white flex justify-between items-center">
 
             <div>
@@ -515,6 +627,7 @@
 
         </div>
 
+        {{-- FORM --}}
         <form
             action="{{ $storeRoute }}"
             method="POST"
@@ -530,6 +643,9 @@
                 value="{{ old('slot_id') }}"
             >
 
+            {{-- ========================================================= --}}
+            {{-- BUDGET DETAILS --}}
+            {{-- ========================================================= --}}
             @if (($submissionType ?? '') === 'budget')
 
                 <div
@@ -543,6 +659,7 @@
 
                     <div class="space-y-3 text-xs">
 
+                        {{-- CATEGORY --}}
                         <div class="flex items-center justify-between gap-4">
 
                             <span class="font-bold text-gray-400 uppercase">
@@ -558,6 +675,7 @@
 
                         </div>
 
+                        {{-- YEAR --}}
                         <div class="flex items-center justify-between gap-4">
 
                             <span class="font-bold text-gray-400 uppercase">
@@ -573,6 +691,7 @@
 
                         </div>
 
+                        {{-- PERIOD --}}
                         <div
                             id="modalPeriodRow"
                             class="flex items-center justify-between gap-4"
@@ -592,9 +711,14 @@
                         </div>
 
                     </div>
+
                 </div>
 
+
+                {{-- ===================================================== --}}
                 {{-- ANNUAL BUDGET AMOUNT --}}
+                {{-- Shown only when category = annual_budget --}}
+                {{-- ===================================================== --}}
                 <div
                     id="annualBudgetAmountSection"
                     class="hidden"
@@ -602,14 +726,14 @@
 
                     <label
                         for="annualBudgetAmount"
-                        class="block text-[10px] font-black text-red-500 uppercase mb-2 ml-1"
+                        class="block text-[10px] font-black text-gray-500 uppercase mb-2 ml-1"
                     >
                         Annual Budget Amount
                     </label>
 
                     <div class="relative">
 
-                        <span class="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-black text-gray-500">
+                        <span class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 font-bold">
                             ₱
                         </span>
 
@@ -621,19 +745,65 @@
                             min="0.01"
                             step="0.01"
                             placeholder="0.00"
-                            class="w-full rounded-xl border border-gray-200 bg-gray-50 pl-9 pr-4 py-3 text-sm font-bold text-gray-700 outline-none focus:border-red-300 focus:ring-2 focus:ring-red-100"
+                            class="w-full rounded-xl border border-gray-200 bg-white pl-9 pr-4 py-3 text-sm font-semibold text-gray-700 focus:outline-none focus:ring-2 focus:ring-red-200 focus:border-red-400"
                         >
 
                     </div>
 
-                    <p class="mt-2 text-[10px] text-gray-400">
-                        Enter the total annual budget amount stated in the submitted Annual Budget document.
+                    <p class="mt-2 text-[10px] leading-relaxed text-gray-400">
+                        Enter the total Annual Budget amount stated in the submitted Annual Budget document.
+                    </p>
+
+                </div>
+
+
+                {{-- ===================================================== --}}
+                {{-- ANNUAL COA ACTUAL EXPENDITURE --}}
+                {{-- Shown only when category = coa_report + annual --}}
+                {{-- ===================================================== --}}
+                <div
+                    id="actualExpenditureSection"
+                    class="hidden"
+                >
+
+                    <label
+                        for="actualExpenditure"
+                        class="block text-[10px] font-black text-gray-500 uppercase mb-2 ml-1"
+                    >
+                        Actual Expenditure
+                    </label>
+
+                    <div class="relative">
+
+                        <span class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 font-bold">
+                            ₱
+                        </span>
+
+                        <input
+                            type="number"
+                            id="actualExpenditure"
+                            name="actual_expenditure"
+                            value="{{ old('actual_expenditure') }}"
+                            min="0.01"
+                            step="0.01"
+                            placeholder="0.00"
+                            class="w-full rounded-xl border border-gray-200 bg-white pl-9 pr-4 py-3 text-sm font-semibold text-gray-700 focus:outline-none focus:ring-2 focus:ring-red-200 focus:border-red-400"
+                        >
+
+                    </div>
+
+                    <p class="mt-2 text-[10px] leading-relaxed text-gray-400">
+                        Enter the summarized total actual expenditure stated in the Annual COA / Financial Report.
                     </p>
 
                 </div>
 
             @endif
 
+
+            {{-- ========================================================= --}}
+            {{-- SUBMISSION METHOD --}}
+            {{-- ========================================================= --}}
             @if (($submissionType ?? '') === 'report')
 
                 <input
@@ -646,6 +816,7 @@
 
                 <div class="grid grid-cols-2 gap-3">
 
+                    {{-- SYSTEM TEMPLATE --}}
                     <label
                         id="templateModeLabel"
                         data-submission-mode="template"
@@ -663,6 +834,7 @@
 
                     </label>
 
+                    {{-- PDF --}}
                     <label
                         id="pdfModeLabel"
                         data-submission-mode="pdf"
@@ -686,12 +858,15 @@
                     id="templateUnavailableNote"
                     class="hidden rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-700"
                 >
-                    The SK360 system template is not currently available for this submission type.
-                    Please upload the prepared PDF report.
+                    The SK360 system template is not currently available for this submission type. Please upload the prepared PDF report.
                 </div>
 
             @endif
 
+
+            {{-- ========================================================= --}}
+            {{-- PDF UPLOAD --}}
+            {{-- ========================================================= --}}
             <div
                 id="slotFileSection"
                 class="{{ ($submissionType ?? '') === 'report' ? '' : 'hidden' }}"
@@ -720,8 +895,11 @@
                     ></p>
 
                 </div>
+
             </div>
 
+
+            {{-- SUBMIT --}}
             <button
                 id="slotSubmitButton"
                 type="submit"
@@ -731,44 +909,80 @@
             </button>
 
         </form>
+
     </div>
+
 </div>
 
+
+{{-- ========================================================= --}}
+{{-- SHARED SCRIPTS --}}
+{{-- ========================================================= --}}
 @push('scripts')
+
 <script>
-    const notifBtn = document.getElementById('notifBtn');
-    const notifDropdown = document.getElementById('notifDropdown');
-    const userMenuBtn = document.getElementById('userMenuBtn');
-    const userDropdown = document.getElementById('userDropdown');
 
-    notifBtn.addEventListener('click', function (e) {
-        e.stopPropagation();
+    const notifBtn =
+        document.getElementById('notifBtn');
 
-        notifDropdown.classList.toggle('hidden');
-        userDropdown.classList.add('hidden');
-    });
+    const notifDropdown =
+        document.getElementById('notifDropdown');
 
-    userMenuBtn.addEventListener('click', function (e) {
-        e.stopPropagation();
+    const userMenuBtn =
+        document.getElementById('userMenuBtn');
 
-        userDropdown.classList.toggle('hidden');
-        notifDropdown.classList.add('hidden');
-    });
+    const userDropdown =
+        document.getElementById('userDropdown');
 
-    document.addEventListener('click', function (e) {
-        if (
-            !notifBtn.contains(e.target) &&
-            !notifDropdown.contains(e.target)
-        ) {
-            notifDropdown.classList.add('hidden');
-        }
 
-        if (
-            !userMenuBtn.contains(e.target) &&
-            !userDropdown.contains(e.target)
-        ) {
+    notifBtn.addEventListener(
+        'click',
+        function (e) {
+
+            e.stopPropagation();
+
+            notifDropdown.classList.toggle('hidden');
+
             userDropdown.classList.add('hidden');
         }
-    });
+    );
+
+
+    userMenuBtn.addEventListener(
+        'click',
+        function (e) {
+
+            e.stopPropagation();
+
+            userDropdown.classList.toggle('hidden');
+
+            notifDropdown.classList.add('hidden');
+        }
+    );
+
+
+    document.addEventListener(
+        'click',
+        function (e) {
+
+            if (
+                !notifBtn.contains(e.target)
+                &&
+                !notifDropdown.contains(e.target)
+            ) {
+                notifDropdown.classList.add('hidden');
+            }
+
+            if (
+                !userMenuBtn.contains(e.target)
+                &&
+                !userDropdown.contains(e.target)
+            ) {
+                userDropdown.classList.add('hidden');
+            }
+        }
+    );
+
 </script>
+
 @endpush
