@@ -292,11 +292,13 @@ class MobileSyncController extends Controller
         ]);
 
         $user = $request->user();
+
         if (! Hash::check($validated['current_password'], $user->password)) {
             return response()->json(['message' => 'Current password is incorrect.'], 422);
         }
 
         $code = (string) random_int(100000, 999999);
+
         DB::table('mobile_password_changes')->updateOrInsert(
             ['user_id' => $user->user_id],
             [
@@ -314,25 +316,40 @@ class MobileSyncController extends Controller
                 ->subject('SK360 Password Change Verification');
         });
 
-        return response()->json(['message' => 'Verification code sent to your registered email.']);
+        return response()->json([
+            'message' => 'Verification code sent to your registered email.',
+        ]);
     }
 
     public function verifyPasswordChange(Request $request): JsonResponse
     {
-        $validated = $request->validate(['code' => ['required', 'digits:6']]);
+        $validated = $request->validate([
+            'code' => ['required', 'digits:6'],
+        ]);
+
         $user = $request->user();
+
         $change = DB::table('mobile_password_changes')
             ->where('user_id', $user->user_id)
             ->first();
 
         if (! $change || ! Hash::check($validated['code'], $change->token) || now()->subMinutes(15)->greaterThan($change->created_at)) {
-            return response()->json(['message' => 'Invalid or expired verification code.'], 422);
+            return response()->json([
+                'message' => 'Invalid or expired verification code.',
+            ], 422);
         }
 
-        $user->update(['password' => $change->password]);
-        DB::table('mobile_password_changes')->where('user_id', $user->user_id)->delete();
+        $user->update([
+            'password' => $change->password,
+        ]);
 
-        return response()->json(['message' => 'Password updated successfully.']);
+        DB::table('mobile_password_changes')
+            ->where('user_id', $user->user_id)
+            ->delete();
+
+        return response()->json([
+            'message' => 'Password updated successfully.',
+        ]);
     }
 
     public function sync(Request $request): JsonResponse
@@ -341,7 +358,10 @@ class MobileSyncController extends Controller
             'since' => ['nullable', 'date'],
         ]);
 
-        $since = isset($validated['since']) ? Carbon::parse($validated['since']) : null;
+        $since = isset($validated['since'])
+            ? Carbon::parse($validated['since'])
+            : null;
+
         $user = $request->user()->loadMissing('barangay');
 
         return response()->json([
@@ -369,13 +389,15 @@ class MobileSyncController extends Controller
     {
         $validated = $request->validate([
             'post_content' => ['required', 'string', 'max:5000'],
-            'post_category' => ['nullable', 'string', 'max:50'],
+            'post_category' => ['nullable', 'in:update,announcement,event,accomplishment'],
         ]);
 
         $category = strtolower($validated['post_category'] ?? 'update');
 
         if ($category === 'announcement' && ! $this->isPresident($request->user())) {
-            return response()->json(['message' => 'Only SK President can create announcements.'], 403);
+            return response()->json([
+                'message' => 'Only SK President can create announcements.',
+            ], 403);
         }
 
         $title = match ($category) {
@@ -404,16 +426,6 @@ class MobileSyncController extends Controller
                 $announcementId,
                 (int) $user->user_id
             );
-
-            if ($category === 'event') {
-                app(RankingPointsService::class)->award(
-                    (int) $user->barangay_id,
-                    RankingPointsService::EVENT_PARTICIPATION,
-                    'wall_post',
-                    $announcementId,
-                    (int) $user->user_id
-                );
-            }
         }
 
         return response()->json([
@@ -432,7 +444,9 @@ class MobileSyncController extends Controller
             ->exists();
 
         if (! $postExists) {
-            return response()->json(['message' => 'Post not found.'], 404);
+            return response()->json([
+                'message' => 'Post not found.',
+            ], 404);
         }
 
         $existing = DB::table('wall_post_likes')
@@ -462,7 +476,9 @@ class MobileSyncController extends Controller
     public function storeEvent(Request $request): JsonResponse
     {
         if (! $this->isPresident($request->user())) {
-            return response()->json(['message' => 'Only SK President can schedule calendar events.'], 403);
+            return response()->json([
+                'message' => 'Only SK President can schedule calendar events.',
+            ], 403);
         }
 
         $validated = $request->validate([
@@ -500,7 +516,9 @@ class MobileSyncController extends Controller
     public function storeMeeting(Request $request): JsonResponse
     {
         if (! $this->isPresident($request->user())) {
-            return response()->json(['message' => 'Only SK President can create meetings.'], 403);
+            return response()->json([
+                'message' => 'Only SK President can create meetings.',
+            ], 403);
         }
 
         $validated = $request->validate([
@@ -538,7 +556,9 @@ class MobileSyncController extends Controller
     public function meetingJoinUrl(Request $request, Meeting $meeting): JsonResponse
     {
         if (! $this->isOfficial($request->user())) {
-            return response()->json(['message' => 'Only SK officials can join meetings.'], 403);
+            return response()->json([
+                'message' => 'Only SK officials can join meetings.',
+            ], 403);
         }
 
         return response()->json([
@@ -575,7 +595,9 @@ class MobileSyncController extends Controller
     public function meetingAgoraToken(Request $request, Meeting $meeting): JsonResponse
     {
         if (! $this->isOfficial($request->user())) {
-            return response()->json(['message' => 'Only SK officials can join meetings.'], 403);
+            return response()->json([
+                'message' => 'Only SK officials can join meetings.',
+            ], 403);
         }
 
         return $this->buildAgoraTokenResponse(
@@ -595,7 +617,10 @@ class MobileSyncController extends Controller
             ], 500);
         }
 
-        $uid = $uid && $uid > 0 ? $uid : random_int(1000, 999999);
+        $uid = $uid && $uid > 0
+            ? $uid
+            : random_int(1000, 999999);
+
         $channel = 'meeting-'.$meeting->meeting_id;
 
         try {
@@ -681,11 +706,15 @@ class MobileSyncController extends Controller
         $user = $request->user();
 
         if ($user->role !== 'sk_chairman') {
-            return response()->json(['message' => 'Only SK Chairman can add SK council members.'], 403);
+            return response()->json([
+                'message' => 'Only SK Chairman can add SK council members.',
+            ], 403);
         }
 
         if (! Schema::hasTable('sk_council')) {
-            return response()->json(['message' => 'SK council table is not available.'], 500);
+            return response()->json([
+                'message' => 'SK council table is not available.',
+            ], 500);
         }
 
         $validated = $request->validate([
@@ -701,7 +730,9 @@ class MobileSyncController extends Controller
             'position' => 'SK Councilor',
             'email' => $validated['email'] ?? null,
             'phone' => $validated['phone'] ?? null,
-            'term' => filled($validated['term'] ?? null) ? $validated['term'] : '2023-2026',
+            'term' => filled($validated['term'] ?? null)
+                ? $validated['term']
+                : '2023-2026',
             'profile_img' => 'default.png',
             'created_at' => now(),
         ], 'council_id');
@@ -734,10 +765,11 @@ class MobileSyncController extends Controller
         ]);
 
         $roleLabel = $user->role === 'sk_chairman' ? 'SK Chairman' : 'SK Secretary';
+        $sourceType = $validated['submission_type'];
 
         $slot = DB::table('submission_slots')
             ->where('slot_id', $validated['slot_id'])
-            ->where('submission_type', $validated['submission_type'])
+            ->where('submission_type', $sourceType)
             ->whereIn('role', [$roleLabel, 'Both'])
             ->where('status', 'open')
             ->first();
@@ -752,63 +784,81 @@ class MobileSyncController extends Controller
             return response()->json(['message' => 'That submission slot is not active today.'], 422);
         }
 
-        $directoryName = $validated['submission_type'] === 'budget_report'
-            ? 'budget_reports'
-            : 'reports';
+        $existing = $this->existingMobileSubmission($user, (int) $slot->slot_id, $sourceType);
+        $isResubmission = (bool) $existing;
 
-        $prefix = $validated['submission_type'] === 'budget_report' ? 'BUD' : 'REP';
+        if ($existing) {
+            $existingSourceId = $sourceType === 'budget_report'
+                ? (int) $existing->budget_report_id
+                : (int) $existing->report_id;
+
+            if ($this->isMobileQualityApproved($sourceType, $existingSourceId)) {
+                return response()->json([
+                    'message' => 'This submission has already been approved for Quality Documentation and can no longer be replaced.',
+                ], 422);
+            }
+        }
+
+        $directoryName = $sourceType === 'budget_report' ? 'budget_reports' : 'reports';
+        $prefix = $sourceType === 'budget_report' ? 'BUD' : 'REP';
         $directory = public_path("uploads/{$directoryName}");
-
         File::ensureDirectoryExists($directory);
 
         $file = $request->file('report_file');
-        $filename = $prefix.'_'.time().'_'.$user->barangay_id.'.pdf';
+        $originalName = $file->getClientOriginalName();
+        $filename = $prefix.'_'.now()->format('YmdHisv').'_'.$user->barangay_id.'.pdf';
+        $newPath = "uploads/{$directoryName}/{$filename}";
+        $oldPath = $existing->uploaded_file_path ?? null;
 
         $file->move($directory, $filename);
+        $validated['uploaded_file_name'] = $originalName;
+        $validated['uploaded_file_path'] = $newPath;
 
-        $validated['uploaded_file_name'] = $file->getClientOriginalName();
-        $validated['uploaded_file_path'] = "uploads/{$directoryName}/{$filename}";
+        try {
+            $sourceId = DB::transaction(function () use ($user, $slot, $validated, $sourceType, $existing) {
+                $sourceId = $sourceType === 'budget_report'
+                    ? $this->saveMobileBudgetSubmission($user, $slot, $validated)
+                    : $this->saveMobileAccomplishmentSubmission($user, $slot, $validated);
 
-        if ($validated['submission_type'] === 'budget_report') {
-            $sourceId = $this->saveMobileBudgetSubmission($user, $slot, $validated);
-            $sourceType = 'budget_report';
+                if ($existing) {
+                    $this->resetMobileQualityReviewForResubmission($sourceType, $sourceId);
+                }
 
-            $row = DB::table('budget_reports')
-                ->where('budget_report_id', $sourceId)
-                ->first();
-        } else {
-            $sourceId = $this->saveMobileAccomplishmentSubmission($user, $slot, $validated);
-            $sourceType = 'accomplishment_report';
+                return $sourceId;
+            });
+        } catch (\Throwable $e) {
+            $this->deleteMobileSubmissionFile($newPath, $sourceType);
+            report($e);
 
-            $row = DB::table('accomplishment_reports')
-                ->where('report_id', $sourceId)
-                ->first();
+            return response()->json(['message' => 'The submission could not be saved. Please try again.'], 500);
         }
 
-        $isOnTime = $now->lessThanOrEqualTo(
-            Carbon::parse($slot->end_date)->endOfDay()
-        );
+        if ($isResubmission && $oldPath && $oldPath !== $newPath) {
+            $this->deleteMobileSubmissionFile($oldPath, $sourceType);
+        }
 
-        $points->award(
-            (int) $user->barangay_id,
-            $isOnTime
-                ? RankingPointsService::ON_TIME_REPORT_SUBMISSION
-                : RankingPointsService::LATE_SUBMISSION,
-            $sourceType,
-            $sourceId,
-            (int) $user->user_id
-        );
+        if (! $isResubmission) {
+            $isOnTime = $now->lessThanOrEqualTo(Carbon::parse($slot->end_date)->endOfDay());
 
-        $points->award(
-            (int) $user->barangay_id,
-            RankingPointsService::QUALITY_DOCUMENTATION,
-            $sourceType,
-            $sourceId,
-            (int) $user->user_id
-        );
+            $points->award(
+                (int) $user->barangay_id,
+                $isOnTime ? RankingPointsService::ON_TIME_REPORT_SUBMISSION : RankingPointsService::LATE_SUBMISSION,
+                $sourceType,
+                $sourceId,
+                (int) $user->user_id
+            );
+        }
+
+        $row = $sourceType === 'budget_report'
+            ? DB::table('budget_reports')->where('budget_report_id', $sourceId)->first()
+            : DB::table('accomplishment_reports')->where('report_id', $sourceId)->first();
+
+        $row = $this->attachMobileQualityReview($row, $sourceType, $sourceId);
 
         return response()->json([
-            'message' => 'Submission synced.',
+            'message' => $isResubmission
+                ? 'Corrected submission synced and returned to Pending Quality Review.'
+                : 'Submission synced.',
             'submission' => $row,
         ], 201);
     }
@@ -816,7 +866,9 @@ class MobileSyncController extends Controller
     public function submissionSlots(Request $request): JsonResponse
     {
         if (! $this->isPresident($request->user())) {
-            return response()->json(['message' => 'Only SK President can manage submission slots.'], 403);
+            return response()->json([
+                'message' => 'Only SK President can manage submission slots.',
+            ], 403);
         }
 
         $slots = DB::table('submission_slots')
@@ -836,7 +888,9 @@ class MobileSyncController extends Controller
     public function storeSubmissionSlot(Request $request, NotificationService $notifications): JsonResponse
     {
         if (! $this->isPresident($request->user())) {
-            return response()->json(['message' => 'Only SK President can create submission slots.'], 403);
+            return response()->json([
+                'message' => 'Only SK President can create submission slots.',
+            ], 403);
         }
 
         $validated = $request->validate([
@@ -878,7 +932,9 @@ class MobileSyncController extends Controller
     public function deleteSubmissionSlot(Request $request, int $slotId): JsonResponse
     {
         if (! $this->isPresident($request->user())) {
-            return response()->json(['message' => 'Only SK President can delete submission slots.'], 403);
+            return response()->json([
+                'message' => 'Only SK President can delete submission slots.',
+            ], 403);
         }
 
         $deleted = DB::table('submission_slots')
@@ -886,7 +942,9 @@ class MobileSyncController extends Controller
             ->delete();
 
         if ($deleted === 0) {
-            return response()->json(['message' => 'Submission slot not found.'], 404);
+            return response()->json([
+                'message' => 'Submission slot not found.',
+            ], 404);
         }
 
         return response()->json([
@@ -897,7 +955,9 @@ class MobileSyncController extends Controller
     public function consolidation(Request $request): JsonResponse
     {
         if (! $this->isPresident($request->user())) {
-            return response()->json(['message' => 'Only SK President can view consolidated reports.'], 403);
+            return response()->json([
+                'message' => 'Only SK President can view consolidated reports.',
+            ], 403);
         }
 
         $filters = $this->consolidationFilters($request);
@@ -922,7 +982,9 @@ class MobileSyncController extends Controller
             ]);
 
         if ($updated === 0) {
-            return response()->json(['message' => 'Notification not found.'], 404);
+            return response()->json([
+                'message' => 'Notification not found.',
+            ], 404);
         }
 
         return response()->json([
@@ -1004,7 +1066,8 @@ class MobileSyncController extends Controller
             return false;
         }
 
-        return $target === $stored || substr($target, -10) === substr($stored, -10);
+        return $target === $stored ||
+            substr($target, -10) === substr($stored, -10);
     }
 
     protected function phoneDigits(string $phone): string
@@ -1092,13 +1155,15 @@ class MobileSyncController extends Controller
                     ->count()
                 : 0;
 
-            $post->liked_by_current_user = Schema::hasTable('wall_post_likes')
-                && DB::table('wall_post_likes')
+            $post->liked_by_current_user =
+                Schema::hasTable('wall_post_likes') &&
+                DB::table('wall_post_likes')
                     ->where('announcement_id', $post->announcement_id)
                     ->where('user_id', $user->user_id)
                     ->exists();
 
-            $post->author_name = trim((string) $post->author_name) ?: 'SK 360 Official';
+            $post->author_name = trim((string) $post->author_name)
+                ?: 'SK 360 Official';
         }
 
         return $posts;
@@ -1148,7 +1213,8 @@ class MobileSyncController extends Controller
         );
 
         return array_map(function ($meeting) {
-            $meeting->call_url = url("/sk_pres/meetings/{$meeting->meeting_id}/call");
+            $meeting->call_url =
+                url("/sk_pres/meetings/{$meeting->meeting_id}/call");
 
             return $meeting;
         }, $meetings);
@@ -1194,7 +1260,8 @@ class MobileSyncController extends Controller
         );
 
         return array_map(function ($row) {
-            $row->report_file_url = $this->publicUrl($row->report_file_path ?? null);
+            $row->report_file_url =
+                $this->publicUrl($row->report_file_path ?? null);
 
             return $row;
         }, $rows);
@@ -1217,18 +1284,17 @@ class MobileSyncController extends Controller
                 }
             });
 
-        $rows = $this->finish(
-            $query,
-            'accomplishment_reports',
-            $since,
-            'report_id'
-        );
+        $rows = $this->finish($query, 'accomplishment_reports', $since, 'report_id');
 
         return array_map(function ($row) {
             $row->uploaded_file_url = $this->publicUrl($row->uploaded_file_path ?? null);
             $row->generated_pdf_url = $this->publicUrl($row->generated_pdf_path ?? null);
 
-            return $row;
+            return $this->attachMobileQualityReview(
+                $row,
+                'accomplishment_report',
+                (int) $row->report_id
+            );
         }, $rows);
     }
 
@@ -1249,18 +1315,17 @@ class MobileSyncController extends Controller
                 }
             });
 
-        $rows = $this->finish(
-            $query,
-            'budget_reports',
-            $since,
-            'budget_report_id'
-        );
+        $rows = $this->finish($query, 'budget_reports', $since, 'budget_report_id');
 
         return array_map(function ($row) {
             $row->uploaded_file_url = $this->publicUrl($row->uploaded_file_path ?? null);
             $row->generated_pdf_url = $this->publicUrl($row->generated_pdf_path ?? null);
 
-            return $row;
+            return $this->attachMobileQualityReview(
+                $row,
+                'budget_report',
+                (int) $row->budget_report_id
+            );
         }, $rows);
     }
 
@@ -1270,7 +1335,12 @@ class MobileSyncController extends Controller
 
         if (Schema::hasTable('accomplishment_reports')) {
             $query = DB::table('accomplishment_reports as ar')
-                ->leftJoin('barangays as b', 'ar.barangay_id', '=', 'b.barangay_id')
+                ->leftJoin(
+                    'barangays as b',
+                    'ar.barangay_id',
+                    '=',
+                    'b.barangay_id'
+                )
                 ->select(
                     DB::raw("'accomplishment_report' as source_type"),
                     'ar.report_id as source_id',
@@ -1283,7 +1353,10 @@ class MobileSyncController extends Controller
                 );
 
             if (! $this->isPresident($user) && $user->barangay_id) {
-                $query->where('ar.barangay_id', $user->barangay_id);
+                $query->where(
+                    'ar.barangay_id',
+                    $user->barangay_id
+                );
             }
 
             $this->applySince(
@@ -1292,12 +1365,18 @@ class MobileSyncController extends Controller
                 $since
             );
 
-            $documents = $documents->merge($query->get());
+            $documents =
+                $documents->merge($query->get());
         }
 
         if (Schema::hasTable('budget_reports')) {
             $query = DB::table('budget_reports as br')
-                ->leftJoin('barangays as b', 'br.barangay_id', '=', 'b.barangay_id')
+                ->leftJoin(
+                    'barangays as b',
+                    'br.barangay_id',
+                    '=',
+                    'b.barangay_id'
+                )
                 ->select(
                     DB::raw("'budget_report' as source_type"),
                     'br.budget_report_id as source_id',
@@ -1310,7 +1389,10 @@ class MobileSyncController extends Controller
                 );
 
             if (! $this->isPresident($user) && $user->barangay_id) {
-                $query->where('br.barangay_id', $user->barangay_id);
+                $query->where(
+                    'br.barangay_id',
+                    $user->barangay_id
+                );
             }
 
             $this->applySince(
@@ -1319,19 +1401,25 @@ class MobileSyncController extends Controller
                 $since
             );
 
-            $documents = $documents->merge($query->get());
+            $documents =
+                $documents->merge($query->get());
         }
 
         return $documents
             ->sortByDesc('created_at')
             ->take(500)
             ->map(function ($row) {
-                $path = $row->uploaded_file_path ?? $row->generated_pdf_path ?? null;
+                $path =
+                    $row->uploaded_file_path
+                    ?? $row->generated_pdf_path
+                    ?? null;
 
                 $row->file_url = $this->publicUrl($path);
-                $row->document_type = $row->source_type === 'budget_report'
-                    ? 'Budget'
-                    : 'Report';
+
+                $row->document_type =
+                    $row->source_type === 'budget_report'
+                        ? 'Budget'
+                        : 'Report';
 
                 return $row;
             })
@@ -1344,7 +1432,10 @@ class MobileSyncController extends Controller
         $leaders = collect();
 
         $userLeaders = DB::table('users')
-            ->whereIn('role', ['sk_chairman', 'sk_secretary'])
+            ->whereIn(
+                'role',
+                ['sk_chairman', 'sk_secretary']
+            )
             ->whereNotNull('barangay_id')
             ->select(
                 DB::raw('user_id as leadership_id'),
@@ -1416,22 +1507,33 @@ class MobileSyncController extends Controller
         }
 
         if (! $this->isPresident($user) && $user->barangay_id) {
-            $leaders = $leaders->where('barangay_id', $user->barangay_id);
+            $leaders = $leaders->where(
+                'barangay_id',
+                $user->barangay_id
+            );
         }
 
         return $leaders
-            ->filter(fn ($leader) => ! empty($leader->barangay_id))
-            ->unique(fn ($leader) => strtolower(
-                ($leader->full_name ?? '').'|'.
-                ($leader->position ?? '').'|'.
-                ($leader->barangay_id ?? '')
-            ))
+            ->filter(
+                fn ($leader) =>
+                    ! empty($leader->barangay_id)
+            )
+            ->unique(
+                fn ($leader) => strtolower(
+                    ($leader->full_name ?? '').'|'.
+                    ($leader->position ?? '').'|'.
+                    ($leader->barangay_id ?? '')
+                )
+            )
             ->values()
             ->all();
     }
 
-    protected function tableRows(string $table, ?Carbon $since, string $orderColumn): array
-    {
+    protected function tableRows(
+        string $table,
+        ?Carbon $since,
+        string $orderColumn
+    ): array {
         if (! Schema::hasTable($table)) {
             return [];
         }
@@ -1444,9 +1546,17 @@ class MobileSyncController extends Controller
         );
     }
 
-    protected function finish(Builder $query, string $table, ?Carbon $since, string $orderColumn): array
-    {
-        $this->applySince($query, $table, $since);
+    protected function finish(
+        Builder $query,
+        string $table,
+        ?Carbon $since,
+        string $orderColumn
+    ): array {
+        $this->applySince(
+            $query,
+            $table,
+            $since
+        );
 
         return $query
             ->orderBy($orderColumn)
@@ -1455,15 +1565,29 @@ class MobileSyncController extends Controller
             ->all();
     }
 
-    protected function applySince(Builder $query, string $table, ?Carbon $since): void
-    {
+    protected function applySince(
+        Builder $query,
+        string $table,
+        ?Carbon $since
+    ): void {
         if (! $since) {
             return;
         }
 
-        foreach (['updated_at', 'created_at', 'submitted_at', 'start_datetime'] as $column) {
+        foreach (
+            [
+                'updated_at',
+                'created_at',
+                'submitted_at',
+                'start_datetime',
+            ] as $column
+        ) {
             if (Schema::hasColumn($table, $column)) {
-                $query->where($column, '>', $since);
+                $query->where(
+                    $column,
+                    '>',
+                    $since
+                );
 
                 return;
             }
@@ -1476,18 +1600,40 @@ class MobileSyncController extends Controller
             return null;
         }
 
-        if (Str::startsWith($path, ['http://', 'https://'])) {
+        if (Str::startsWith(
+            $path,
+            ['http://', 'https://']
+        )) {
             return $path;
         }
 
-        return url(ltrim($path, '/'));
+        return url(
+            ltrim($path, '/')
+        );
     }
 
     protected function saveMobileAccomplishmentSubmission(User $user, object $slot, array $validated): int
     {
-        $year = (int) ($validated['reporting_year'] ?? now()->year);
-        $month = (int) ($validated['reporting_month'] ?? now()->month);
-        $reportType = $validated['report_type'] ?? 'monthly';
+        $existing = DB::table('accomplishment_reports')
+            ->where('barangay_id', $user->barangay_id)
+            ->where('slot_id', $slot->slot_id)
+            ->first();
+
+        if ($existing) {
+            $reportType = $existing->report_type ?? 'monthly';
+            $year = (int) ($existing->reporting_year ?? now()->year);
+            $month = $existing->reporting_month;
+            $quarter = $existing->reporting_quarter;
+        } else {
+            $reportType = $validated['report_type'] ?? 'monthly';
+            $year = (int) ($validated['reporting_year'] ?? now()->year);
+            $month = $reportType === 'monthly'
+                ? (int) ($validated['reporting_month'] ?? now()->month)
+                : null;
+            $quarter = $reportType === 'quarterly'
+                ? ($validated['reporting_quarter'] ?? 'Q'.ceil(now()->month / 3))
+                : null;
+        }
 
         $data = [
             'user_id' => $user->user_id,
@@ -1498,9 +1644,7 @@ class MobileSyncController extends Controller
             'title' => $slot->title,
             'reporting_year' => $year,
             'reporting_month' => $reportType === 'monthly' ? $month : null,
-            'reporting_quarter' => $reportType === 'quarterly'
-                ? ($validated['reporting_quarter'] ?? 'Q1')
-                : null,
+            'reporting_quarter' => $reportType === 'quarterly' ? $quarter : null,
             'generated_pdf_path' => null,
             'uploaded_file_name' => $validated['uploaded_file_name'] ?? null,
             'uploaded_file_path' => $validated['uploaded_file_path'] ?? null,
@@ -1510,12 +1654,9 @@ class MobileSyncController extends Controller
             'created_at' => now(),
         ];
 
-        $existing = DB::table('accomplishment_reports')
-            ->where('barangay_id', $user->barangay_id)
-            ->where('slot_id', $slot->slot_id)
-            ->first();
-
         if ($existing) {
+            unset($data['created_at']);
+
             DB::table('accomplishment_reports')
                 ->where('report_id', $existing->report_id)
                 ->update($data);
@@ -1523,14 +1664,28 @@ class MobileSyncController extends Controller
             return (int) $existing->report_id;
         }
 
-        return (int) DB::table('accomplishment_reports')
-            ->insertGetId($data, 'report_id');
+        return (int) DB::table('accomplishment_reports')->insertGetId($data, 'report_id');
     }
 
     protected function saveMobileBudgetSubmission(User $user, object $slot, array $validated): int
     {
-        $reportType = $validated['report_type'] ?? 'annual';
-        $year = (int) ($validated['reporting_year'] ?? now()->year);
+        $existing = DB::table('budget_reports')
+            ->where('barangay_id', $user->barangay_id)
+            ->where('slot_id', $slot->slot_id)
+            ->first();
+
+        $budgetCategory = $slot->budget_category ?? ($existing->budget_category ?? null);
+        $reportType = $slot->budget_period_type
+            ?? ($existing->budget_period_type ?? null)
+            ?? ($validated['report_type'] ?? 'annual');
+        $year = (int) ($slot->fiscal_year ?? ($existing->fiscal_year ?? null) ?? ($validated['reporting_year'] ?? now()->year));
+        $month = $slot->fiscal_month
+            ?? ($existing->fiscal_month ?? null)
+            ?? ($validated['reporting_month'] ?? now()->month);
+        $quarter = $slot->fiscal_quarter
+            ?? ($existing->fiscal_quarter ?? null)
+            ?? ($validated['reporting_quarter'] ?? 'Q1');
+        $half = $slot->fiscal_half ?? ($existing->fiscal_half ?? null);
 
         $data = [
             'user_id' => $user->user_id,
@@ -1544,29 +1699,35 @@ class MobileSyncController extends Controller
             'template_data' => null,
             'uploaded_file_name' => $validated['uploaded_file_name'] ?? null,
             'uploaded_file_path' => $validated['uploaded_file_path'] ?? null,
-            'total_amount' => 0,
+            'total_amount' => $existing->total_amount ?? 0,
             'status' => 'recorded',
             'submitted_at' => now(),
             'created_at' => now(),
         ];
 
-        if (Schema::hasColumn('budget_reports', 'budget_period_type')) {
-            $data['budget_period_type'] = $reportType;
-            $data['fiscal_month'] = $reportType === 'monthly'
-                ? ($validated['reporting_month'] ?? now()->month)
-                : null;
-
-            $data['fiscal_quarter'] = $reportType === 'quarterly'
-                ? ($validated['reporting_quarter'] ?? 'Q1')
-                : null;
+        if (Schema::hasColumn('budget_reports', 'budget_category')) {
+            $data['budget_category'] = $budgetCategory;
         }
 
-        $existing = DB::table('budget_reports')
-            ->where('barangay_id', $user->barangay_id)
-            ->where('slot_id', $slot->slot_id)
-            ->first();
+        if (Schema::hasColumn('budget_reports', 'budget_period_type')) {
+            $data['budget_period_type'] = $budgetCategory === 'coa_report' ? $reportType : null;
+        }
+
+        if (Schema::hasColumn('budget_reports', 'fiscal_month')) {
+            $data['fiscal_month'] = $reportType === 'monthly' ? $month : null;
+        }
+
+        if (Schema::hasColumn('budget_reports', 'fiscal_quarter')) {
+            $data['fiscal_quarter'] = $reportType === 'quarterly' ? $quarter : null;
+        }
+
+        if (Schema::hasColumn('budget_reports', 'fiscal_half')) {
+            $data['fiscal_half'] = $reportType === 'semi_annual' ? $half : null;
+        }
 
         if ($existing) {
+            unset($data['created_at']);
+
             DB::table('budget_reports')
                 ->where('budget_report_id', $existing->budget_report_id)
                 ->update($data);
@@ -1574,23 +1735,140 @@ class MobileSyncController extends Controller
             return (int) $existing->budget_report_id;
         }
 
-        return (int) DB::table('budget_reports')
-            ->insertGetId($data, 'budget_report_id');
+        return (int) DB::table('budget_reports')->insertGetId($data, 'budget_report_id');
+    }
+
+    protected function existingMobileSubmission(User $user, int $slotId, string $sourceType): ?object
+    {
+        if ($sourceType === 'budget_report') {
+            return DB::table('budget_reports')
+                ->where('barangay_id', $user->barangay_id)
+                ->where('slot_id', $slotId)
+                ->first();
+        }
+
+        return DB::table('accomplishment_reports')
+            ->where('barangay_id', $user->barangay_id)
+            ->where('slot_id', $slotId)
+            ->first();
+    }
+
+    protected function isMobileQualityApproved(string $sourceType, int $sourceId): bool
+    {
+        if (! Schema::hasTable('submission_quality_reviews')) {
+            return false;
+        }
+
+        return DB::table('submission_quality_reviews')
+            ->where('source_type', $sourceType)
+            ->where('source_id', $sourceId)
+            ->where('status', 'approved')
+            ->exists();
+    }
+
+    protected function resetMobileQualityReviewForResubmission(string $sourceType, int $sourceId): void
+    {
+        if (! Schema::hasTable('submission_quality_reviews')) {
+            return;
+        }
+
+        $review = DB::table('submission_quality_reviews')
+            ->where('source_type', $sourceType)
+            ->where('source_id', $sourceId)
+            ->first();
+
+        if (! $review || strtolower((string) $review->status) !== 'needs_revision') {
+            return;
+        }
+
+        DB::table('submission_quality_reviews')
+            ->where('review_id', $review->review_id)
+            ->update([
+                'reviewer_id' => null,
+                'status' => 'pending',
+                'complete_contents' => false,
+                'correct_document' => false,
+                'correct_period' => false,
+                'readable_organized' => false,
+                'supporting_documents' => false,
+                'remarks' => null,
+                'reviewed_at' => null,
+                'updated_at' => now(),
+            ]);
+    }
+
+    protected function attachMobileQualityReview(?object $row, string $sourceType, int $sourceId): ?object
+    {
+        if (! $row) {
+            return null;
+        }
+
+        $review = Schema::hasTable('submission_quality_reviews')
+            ? DB::table('submission_quality_reviews')
+                ->where('source_type', $sourceType)
+                ->where('source_id', $sourceId)
+                ->first()
+            : null;
+
+        $row->quality_status = $review->status ?? 'pending';
+        $row->quality_remarks = $review->remarks ?? null;
+        $row->quality_reviewed_at = $review->reviewed_at ?? null;
+
+        return $row;
+    }
+
+    protected function deleteMobileSubmissionFile(?string $path, string $sourceType): void
+    {
+        if (! $path) {
+            return;
+        }
+
+        $path = str_replace('\\', '/', ltrim($path, '/'));
+        $allowedPrefix = $sourceType === 'budget_report'
+            ? 'uploads/budget_reports/'
+            : 'uploads/reports/';
+
+        if (! str_starts_with($path, $allowedPrefix)) {
+            return;
+        }
+
+        $fullPath = public_path($path);
+
+        if (File::exists($fullPath)) {
+            File::delete($fullPath);
+        }
     }
 
     protected function decorateMobileMeeting(Meeting $meeting): Meeting
     {
-        $scheduledAt = $meeting->scheduled_at;
+        $scheduledAt =
+            $meeting->scheduled_at;
 
-        $meeting->scheduled_at = $scheduledAt;
-        $meeting->ends_at = $scheduledAt->copy()->addHour();
-        $meeting->display_datetime = $scheduledAt->format('Y-m-d h:i A');
-        $meeting->preview_datetime = $scheduledAt->format('M d, Y h:i A');
+        $meeting->scheduled_at =
+            $scheduledAt;
 
-        $meeting->status_label = match ($meeting->status) {
+        $meeting->ends_at =
+            $scheduledAt
+                ->copy()
+                ->addHour();
+
+        $meeting->display_datetime =
+            $scheduledAt
+                ->format('Y-m-d h:i A');
+
+        $meeting->preview_datetime =
+            $scheduledAt
+                ->format('M d, Y h:i A');
+
+        $meeting->status_label = match (
+            $meeting->status
+        ) {
             'completed' => 'Completed',
             'cancelled' => 'Cancelled',
-            default => $meeting->scheduled_at->isFuture() ? 'Upcoming' : 'Ready',
+            default =>
+                $meeting->scheduled_at->isFuture()
+                    ? 'Upcoming'
+                    : 'Ready',
         };
 
         return $meeting;
@@ -1600,7 +1878,11 @@ class MobileSyncController extends Controller
     {
         return in_array(
             $user->role,
-            ['sk_president', 'sk_chairman', 'sk_secretary'],
+            [
+                'sk_president',
+                'sk_chairman',
+                'sk_secretary',
+            ],
             true
         );
     }
@@ -1612,206 +1894,448 @@ class MobileSyncController extends Controller
 
     protected function consolidationFilters(Request $request): array
     {
-        $year = (int) $request->query('year', now()->year);
-        $period = (string) $request->query('period', 'all');
-        $month = (int) $request->query('month', now()->month);
-        $quarter = (string) $request->query(
-            'quarter',
-            'Q'.ceil(now()->month / 3)
-        );
+        $year =
+            (int) $request->query(
+                'year',
+                now()->year
+            );
 
-        if (! in_array($period, ['all', 'monthly', 'quarterly', 'annual'], true)) {
+        $period =
+            (string) $request->query(
+                'period',
+                'all'
+            );
+
+        $month =
+            (int) $request->query(
+                'month',
+                now()->month
+            );
+
+        $quarter =
+            (string) $request->query(
+                'quarter',
+                'Q'.ceil(now()->month / 3)
+            );
+
+        if (
+            ! in_array(
+                $period,
+                [
+                    'all',
+                    'monthly',
+                    'quarterly',
+                    'annual',
+                ],
+                true
+            )
+        ) {
             $period = 'all';
         }
 
         return [
-            'year' => $year > 2000 && $year < 2100 ? $year : now()->year,
+            'year' =>
+                $year > 2000 && $year < 2100
+                    ? $year
+                    : now()->year,
+
             'period' => $period,
-            'month' => $month >= 1 && $month <= 12 ? $month : now()->month,
-            'quarter' => in_array($quarter, ['Q1', 'Q2', 'Q3', 'Q4'], true)
-                ? $quarter
-                : 'Q'.ceil(now()->month / 3),
+
+            'month' =>
+                $month >= 1 && $month <= 12
+                    ? $month
+                    : now()->month,
+
+            'quarter' =>
+                in_array(
+                    $quarter,
+                    ['Q1', 'Q2', 'Q3', 'Q4'],
+                    true
+                )
+                    ? $quarter
+                    : 'Q'.ceil(now()->month / 3),
         ];
     }
 
     protected function consolidatedSubmissions(array $filters)
     {
-        $reports = Schema::hasTable('accomplishment_reports')
-            ? DB::table('accomplishment_reports')
-                ->where('reporting_year', $filters['year'])
-                ->when(
-                    $filters['period'] === 'monthly',
-                    fn ($query) => $query
-                        ->where('report_type', 'monthly')
-                        ->where('reporting_month', $filters['month'])
-                )
-                ->when(
-                    $filters['period'] === 'quarterly',
-                    fn ($query) => $query
-                        ->where('report_type', 'quarterly')
-                        ->where('reporting_quarter', $filters['quarter'])
-                )
-                ->when(
-                    $filters['period'] === 'annual',
-                    fn ($query) => $query->where('report_type', 'annual')
-                )
-                ->get()
-                ->groupBy('barangay_id')
-            : collect();
+        $reports =
+            Schema::hasTable('accomplishment_reports')
+                ? DB::table('accomplishment_reports')
+                    ->where(
+                        'reporting_year',
+                        $filters['year']
+                    )
+                    ->when(
+                        $filters['period'] === 'monthly',
+                        fn ($query) =>
+                            $query
+                                ->where(
+                                    'report_type',
+                                    'monthly'
+                                )
+                                ->where(
+                                    'reporting_month',
+                                    $filters['month']
+                                )
+                    )
+                    ->when(
+                        $filters['period'] === 'quarterly',
+                        fn ($query) =>
+                            $query
+                                ->where(
+                                    'report_type',
+                                    'quarterly'
+                                )
+                                ->where(
+                                    'reporting_quarter',
+                                    $filters['quarter']
+                                )
+                    )
+                    ->when(
+                        $filters['period'] === 'annual',
+                        fn ($query) =>
+                            $query->where(
+                                'report_type',
+                                'annual'
+                            )
+                    )
+                    ->get()
+                    ->groupBy('barangay_id')
+                : collect();
 
-        $hasBudgetPeriods = Schema::hasTable('budget_reports')
-            && Schema::hasColumn('budget_reports', 'budget_period_type');
+        $hasBudgetPeriods =
+            Schema::hasTable('budget_reports')
+            &&
+            Schema::hasColumn(
+                'budget_reports',
+                'budget_period_type'
+            );
 
-        $budgets = Schema::hasTable('budget_reports')
-            ? DB::table('budget_reports')
-                ->where('fiscal_year', $filters['year'])
-                ->when(
-                    $hasBudgetPeriods && $filters['period'] === 'monthly',
-                    fn ($query) => $query
-                        ->where('budget_period_type', 'monthly')
-                        ->where('fiscal_month', $filters['month'])
-                )
-                ->when(
-                    $hasBudgetPeriods && $filters['period'] === 'quarterly',
-                    fn ($query) => $query
-                        ->where('budget_period_type', 'quarterly')
-                        ->where('fiscal_quarter', $filters['quarter'])
-                )
-                ->when(
-                    $hasBudgetPeriods && $filters['period'] === 'annual',
-                    fn ($query) => $query->where('budget_period_type', 'annual')
-                )
-                ->get()
-                ->groupBy('barangay_id')
-            : collect();
+        $budgets =
+            Schema::hasTable('budget_reports')
+                ? DB::table('budget_reports')
+                    ->where(
+                        'fiscal_year',
+                        $filters['year']
+                    )
+                    ->when(
+                        $hasBudgetPeriods &&
+                        $filters['period'] === 'monthly',
+                        fn ($query) =>
+                            $query
+                                ->where(
+                                    'budget_period_type',
+                                    'monthly'
+                                )
+                                ->where(
+                                    'fiscal_month',
+                                    $filters['month']
+                                )
+                    )
+                    ->when(
+                        $hasBudgetPeriods &&
+                        $filters['period'] === 'quarterly',
+                        fn ($query) =>
+                            $query
+                                ->where(
+                                    'budget_period_type',
+                                    'quarterly'
+                                )
+                                ->where(
+                                    'fiscal_quarter',
+                                    $filters['quarter']
+                                )
+                    )
+                    ->when(
+                        $hasBudgetPeriods &&
+                        $filters['period'] === 'annual',
+                        fn ($query) =>
+                            $query->where(
+                                'budget_period_type',
+                                'annual'
+                            )
+                    )
+                    ->get()
+                    ->groupBy('barangay_id')
+                : collect();
 
         return DB::table('barangays')
             ->orderBy('barangay_name')
-            ->get(['barangay_id', 'barangay_name'])
-            ->map(function ($barangay) use ($reports, $budgets, $hasBudgetPeriods) {
-                $reportItems = $reports->get($barangay->barangay_id, collect());
-                $budgetItems = $budgets->get($barangay->barangay_id, collect());
+            ->get([
+                'barangay_id',
+                'barangay_name',
+            ])
+            ->map(function ($barangay) use (
+                $reports,
+                $budgets,
+                $hasBudgetPeriods
+            ) {
+                $reportItems =
+                    $reports->get(
+                        $barangay->barangay_id,
+                        collect()
+                    );
 
-                $monthlyReports = $reportItems->where('report_type', 'monthly')->count();
-                $quarterlyReports = $reportItems->where('report_type', 'quarterly')->count();
-                $annualReports = $reportItems->where('report_type', 'annual')->count();
+                $budgetItems =
+                    $budgets->get(
+                        $barangay->barangay_id,
+                        collect()
+                    );
 
-                $monthlyBudgets = $hasBudgetPeriods
-                    ? $budgetItems->where('budget_period_type', 'monthly')->count()
-                    : 0;
+                $monthlyReports =
+                    $reportItems
+                        ->where(
+                            'report_type',
+                            'monthly'
+                        )
+                        ->count();
 
-                $quarterlyBudgets = $hasBudgetPeriods
-                    ? $budgetItems->where('budget_period_type', 'quarterly')->count()
-                    : 0;
+                $quarterlyReports =
+                    $reportItems
+                        ->where(
+                            'report_type',
+                            'quarterly'
+                        )
+                        ->count();
 
-                $annualBudgets = $hasBudgetPeriods
-                    ? $budgetItems->where('budget_period_type', 'annual')->count()
-                    : $budgetItems->count();
+                $annualReports =
+                    $reportItems
+                        ->where(
+                            'report_type',
+                            'annual'
+                        )
+                        ->count();
 
-                $allItems = $reportItems->merge($budgetItems);
-                $lastSubmission = $allItems->sortByDesc('submitted_at')->first();
+                $monthlyBudgets =
+                    $hasBudgetPeriods
+                        ? $budgetItems
+                            ->where(
+                                'budget_period_type',
+                                'monthly'
+                            )
+                            ->count()
+                        : 0;
+
+                $quarterlyBudgets =
+                    $hasBudgetPeriods
+                        ? $budgetItems
+                            ->where(
+                                'budget_period_type',
+                                'quarterly'
+                            )
+                            ->count()
+                        : 0;
+
+                $annualBudgets =
+                    $hasBudgetPeriods
+                        ? $budgetItems
+                            ->where(
+                                'budget_period_type',
+                                'annual'
+                            )
+                            ->count()
+                        : $budgetItems->count();
+
+                $allItems =
+                    $reportItems->merge(
+                        $budgetItems
+                    );
+
+                $lastSubmission =
+                    $allItems
+                        ->sortByDesc('submitted_at')
+                        ->first();
 
                 return [
-                    'barangay_id' => $barangay->barangay_id,
-                    'barangay' => $barangay->barangay_name,
-                    'monthly_count' => $monthlyReports + $monthlyBudgets,
-                    'quarterly_count' => $quarterlyReports + $quarterlyBudgets,
-                    'annual_count' => $annualReports + $annualBudgets,
-                    'monthly' => $this->consolidationStatusLabel(
-                        $monthlyReports + $monthlyBudgets,
-                        $monthlyReports,
-                        $monthlyBudgets
-                    ),
-                    'quarterly' => $this->consolidationStatusLabel(
-                        $quarterlyReports + $quarterlyBudgets,
-                        $quarterlyReports,
-                        $quarterlyBudgets
-                    ),
-                    'annual' => $this->consolidationStatusLabel(
-                        $annualReports + $annualBudgets,
-                        $annualReports,
-                        $annualBudgets
-                    ),
-                    'last_submission' => $lastSubmission?->submitted_at
-                        ? date(
-                            'M d, Y h:i A',
-                            strtotime((string) $lastSubmission->submitted_at)
-                        )
-                        : 'No submission',
-                    'status' => $allItems->isNotEmpty() ? 'submitted' : 'pending',
+                    'barangay_id' =>
+                        $barangay->barangay_id,
+
+                    'barangay' =>
+                        $barangay->barangay_name,
+
+                    'monthly_count' =>
+                        $monthlyReports +
+                        $monthlyBudgets,
+
+                    'quarterly_count' =>
+                        $quarterlyReports +
+                        $quarterlyBudgets,
+
+                    'annual_count' =>
+                        $annualReports +
+                        $annualBudgets,
+
+                    'monthly' =>
+                        $this->consolidationStatusLabel(
+                            $monthlyReports +
+                            $monthlyBudgets,
+                            $monthlyReports,
+                            $monthlyBudgets
+                        ),
+
+                    'quarterly' =>
+                        $this->consolidationStatusLabel(
+                            $quarterlyReports +
+                            $quarterlyBudgets,
+                            $quarterlyReports,
+                            $quarterlyBudgets
+                        ),
+
+                    'annual' =>
+                        $this->consolidationStatusLabel(
+                            $annualReports +
+                            $annualBudgets,
+                            $annualReports,
+                            $annualBudgets
+                        ),
+
+                    'last_submission' =>
+                        $lastSubmission?->submitted_at
+                            ? date(
+                                'M d, Y h:i A',
+                                strtotime(
+                                    (string)
+                                    $lastSubmission
+                                        ->submitted_at
+                                )
+                            )
+                            : 'No submission',
+
+                    'status' =>
+                        $allItems->isNotEmpty()
+                            ? 'submitted'
+                            : 'pending',
                 ];
             });
     }
 
     protected function consolidationStats($submissions): array
     {
-        $total = $submissions->count();
-        $submitted = $submissions->where('status', 'submitted')->count();
+        $total =
+            $submissions->count();
+
+        $submitted =
+            $submissions
+                ->where(
+                    'status',
+                    'submitted'
+                )
+                ->count();
 
         return [
             'total_barangays' => $total,
             'submitted' => $submitted,
-            'pending' => max($total - $submitted, 0),
+            'pending' =>
+                max(
+                    $total - $submitted,
+                    0
+                ),
             'late' => 0,
         ];
     }
 
     protected function mobileRankings(): array
     {
-        return $this->rankingsLeaderboard()
+        return $this
+            ->rankingsLeaderboard()
             ->map(function ($row) {
                 return [
-                    'barangay_id' => $row->barangay_id,
-                    'barangay_name' => $row->name,
-                    'rank' => $row->rank,
-                    'total_points' => $row->points,
-                    'timely_submission_points' => $row->timely_submission_points,
-                    'completeness_points' => $row->completeness_points,
-                    'participation_points' => $row->participation_points,
-                    'on_time' => $row->on_time,
-                    'completion' => $row->completion,
-                    'engagement' => $row->engagement,
-                    'trend' => $row->trend,
+                    'barangay_id' =>
+                        $row->barangay_id,
+                    'barangay_name' =>
+                        $row->name,
+                    'rank' =>
+                        $row->rank,
+                    'total_points' =>
+                        $row->points,
+                    'timely_submission_points' =>
+                        $row->timely_submission_points,
+                    'completeness_points' =>
+                        $row->completeness_points,
+                    'participation_points' =>
+                        $row->participation_points,
+                    'on_time' =>
+                        $row->on_time,
+                    'completion' =>
+                        $row->completion,
+                    'engagement' =>
+                        $row->engagement,
+                    'trend' =>
+                        $row->trend,
                 ];
             })
             ->values()
             ->all();
     }
 
-    protected function consolidationStatusLabel(int $count, int $reportCount = 0, int $budgetCount = 0): string
-    {
+    protected function consolidationStatusLabel(
+        int $count,
+        int $reportCount = 0,
+        int $budgetCount = 0
+    ): string {
         if ($count <= 0) {
             return 'Pending';
         }
 
-        return $count.' submitted (R: '.$reportCount.', B: '.$budgetCount.')';
+        return $count
+            .' submitted (R: '
+            .$reportCount
+            .', B: '
+            .$budgetCount
+            .')';
     }
 
     protected function consolidationYears(): array
     {
-        $reportYears = Schema::hasTable('accomplishment_reports')
-            ? DB::table('accomplishment_reports')
-                ->select('reporting_year')
-                ->distinct()
-                ->pluck('reporting_year')
-                ->map(fn ($year) => (int) $year)
-            : collect();
+        $reportYears =
+            Schema::hasTable(
+                'accomplishment_reports'
+            )
+                ? DB::table(
+                    'accomplishment_reports'
+                )
+                    ->select(
+                        'reporting_year'
+                    )
+                    ->distinct()
+                    ->pluck(
+                        'reporting_year'
+                    )
+                    ->map(
+                        fn ($year) =>
+                            (int) $year
+                    )
+                : collect();
 
-        $budgetYears = Schema::hasTable('budget_reports')
-            ? DB::table('budget_reports')
-                ->select('fiscal_year')
-                ->distinct()
-                ->pluck('fiscal_year')
-                ->map(fn ($year) => (int) $year)
-            : collect();
+        $budgetYears =
+            Schema::hasTable(
+                'budget_reports'
+            )
+                ? DB::table(
+                    'budget_reports'
+                )
+                    ->select(
+                        'fiscal_year'
+                    )
+                    ->distinct()
+                    ->pluck(
+                        'fiscal_year'
+                    )
+                    ->map(
+                        fn ($year) =>
+                            (int) $year
+                    )
+                : collect();
 
-        $years = $reportYears
-            ->merge($budgetYears)
-            ->filter()
-            ->unique()
-            ->sortDesc()
-            ->values()
-            ->all();
+        $years =
+            $reportYears
+                ->merge($budgetYears)
+                ->filter()
+                ->unique()
+                ->sortDesc()
+                ->values()
+                ->all();
 
         return $years ?: [now()->year];
     }

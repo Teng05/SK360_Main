@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\sk_secretary;
 
 use App\Http\Controllers\Controller;
+use App\Services\NotificationService;
 use App\Services\RankingPointsService;
 use App\Services\SubmissionSlotService;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -28,33 +29,51 @@ class BudgetController extends Controller
         $slots = app(SubmissionSlotService::class)
             ->secretaryBudgetSlots((int) $user->barangay_id);
 
-        $submissions = DB::table('budget_reports')
-            ->leftJoin(
-                'submission_slots',
-                'submission_slots.slot_id',
-                '=',
-                'budget_reports.slot_id'
-            )
-            ->where('budget_reports.barangay_id', $user->barangay_id)
-            ->select([
-                'budget_reports.*',
-                'submission_slots.budget_category as slot_budget_category',
-                'submission_slots.fiscal_year as slot_fiscal_year',
-                'submission_slots.budget_period_type as slot_budget_period_type',
-                'submission_slots.fiscal_month as slot_fiscal_month',
-                'submission_slots.fiscal_quarter as slot_fiscal_quarter',
-                'submission_slots.fiscal_half as slot_fiscal_half',
-            ])
-            ->orderByDesc('budget_reports.submitted_at')
-            ->orderByDesc('budget_reports.created_at')
+        $submissionsQuery = DB::table('budget_reports as br')
+            ->leftJoin('submission_slots as ss', 'ss.slot_id', '=', 'br.slot_id')
+            ->where('br.barangay_id', $user->barangay_id);
+
+        if (Schema::hasTable('submission_quality_reviews')) {
+            $submissionsQuery
+                ->leftJoin('submission_quality_reviews as qr', function ($join) {
+                    $join->on('qr.source_id', '=', 'br.budget_report_id')
+                        ->where('qr.source_type', '=', 'budget_report');
+                })
+                ->select([
+                    'br.*',
+                    'ss.budget_category as slot_budget_category',
+                    'ss.fiscal_year as slot_fiscal_year',
+                    'ss.budget_period_type as slot_budget_period_type',
+                    'ss.fiscal_month as slot_fiscal_month',
+                    'ss.fiscal_quarter as slot_fiscal_quarter',
+                    'ss.fiscal_half as slot_fiscal_half',
+                    'qr.status as quality_status',
+                    'qr.remarks as quality_remarks',
+                    'qr.reviewed_at as quality_reviewed_at',
+                ]);
+        } else {
+            $submissionsQuery->select([
+                'br.*',
+                'ss.budget_category as slot_budget_category',
+                'ss.fiscal_year as slot_fiscal_year',
+                'ss.budget_period_type as slot_budget_period_type',
+                'ss.fiscal_month as slot_fiscal_month',
+                'ss.fiscal_quarter as slot_fiscal_quarter',
+                'ss.fiscal_half as slot_fiscal_half',
+                DB::raw("'pending' as quality_status"),
+                DB::raw('NULL as quality_remarks'),
+                DB::raw('NULL as quality_reviewed_at'),
+            ]);
+        }
+
+        $submissions = $submissionsQuery
+            ->orderByDesc('br.submitted_at')
+            ->orderByDesc('br.created_at')
             ->get()
             ->map(function ($submission) {
                 $status = strtolower((string) ($submission->status ?? 'submitted'));
-
-                $method = strtolower((string) $submission->submission_method)
-                    === 'file_upload'
-                        ? 'pdf'
-                        : 'template';
+                $method = strtolower((string) $submission->submission_method) === 'file_upload' ? 'pdf' : 'template';
+                $qualityStatus = strtolower((string) ($submission->quality_status ?? 'pending'));
 
                 $submission->submitted_at = $submission->submitted_at
                     ? Carbon::parse($submission->submitted_at)
@@ -70,27 +89,29 @@ class BudgetController extends Controller
                     ? 'bg-purple-100 text-purple-600'
                     : 'bg-blue-100 text-blue-600';
 
-                $submission->method_label = $method === 'pdf'
-                    ? 'PDF Upload'
-                    : 'Template';
-
+                $submission->method_label = $method === 'pdf' ? 'PDF Upload' : 'Template';
                 $submission->period_label = $this->periodLabel($submission);
 
-                $submission->download_url =
-                    $method === 'pdf' && !empty($submission->uploaded_file_path)
-                        ? asset($submission->uploaded_file_path)
-                        : route(
-                            'sk_secretary.budget.template.download',
-                            $submission->budget_report_id
-                        );
+                $submission->quality_status = $qualityStatus;
+                $submission->quality_status_label = match ($qualityStatus) {
+                    'approved' => 'Approved',
+                    'needs_revision' => 'Needs Revision',
+                    default => 'Pending Review',
+                };
 
-                $submission->view_url =
-                    $method === 'pdf' && !empty($submission->uploaded_file_path)
-                        ? asset($submission->uploaded_file_path)
-                        : route(
-                            'sk_secretary.budget.template.view',
-                            $submission->budget_report_id
-                        );
+                $submission->quality_status_badge = match ($qualityStatus) {
+                    'approved' => 'bg-green-100 text-green-700',
+                    'needs_revision' => 'bg-red-100 text-red-700',
+                    default => 'bg-yellow-100 text-yellow-700',
+                };
+
+                $submission->download_url = $method === 'pdf' && !empty($submission->uploaded_file_path)
+                    ? asset($submission->uploaded_file_path)
+                    : route('sk_secretary.budget.template.download', $submission->budget_report_id);
+
+                $submission->view_url = $method === 'pdf' && !empty($submission->uploaded_file_path)
+                    ? asset($submission->uploaded_file_path)
+                    : route('sk_secretary.budget.template.view', $submission->budget_report_id);
 
                 return $submission;
             });
@@ -123,6 +144,8 @@ class BudgetController extends Controller
     {
         abort_unless(auth()->check() && auth()->user()->role === 'sk_secretary', 403);
 
+        $user = auth()->user();
+
         $validated = $request->validate([
             'slot_id' => ['required', 'integer'],
             'sub_method' => ['required', 'in:template,pdf'],
@@ -131,48 +154,39 @@ class BudgetController extends Controller
             'report_file' => ['nullable', 'file', 'mimes:pdf', 'max:5120'],
         ]);
 
-        $slot = app(SubmissionSlotService::class)
-            ->resolveOpenSlot(
-                (int) $validated['slot_id'],
-                'budget_report',
-                ['SK Secretary', 'Both']
-            );
+        $slot = app(SubmissionSlotService::class)->resolveOpenSlot(
+            (int) $validated['slot_id'],
+            'budget_report',
+            ['SK Secretary', 'Both']
+        );
 
         if (!$slot) {
+            return back()->with('report_error', 'That budget submission slot is no longer available.');
+        }
+
+        $existing = $this->existingBudgetSubmission((int) $slot->slot_id);
+
+        if ($existing && $this->isQualityApproved((int) $existing->budget_report_id)) {
             return back()->with(
                 'report_error',
-                'That budget submission slot is no longer available.'
+                'This budget document has already been approved for Quality Documentation and can no longer be replaced.'
             );
         }
 
-        $isAnnualBudget =
-            ($slot->budget_category ?? null) === 'annual_budget';
+        $isResubmission = (bool) $existing;
+        $isAnnualBudget = ($slot->budget_category ?? null) === 'annual_budget';
+        $isAnnualCoa = ($slot->budget_category ?? null) === 'coa_report'
+            && ($slot->budget_period_type ?? null) === 'annual';
 
-        $isAnnualCoa =
-            ($slot->budget_category ?? null) === 'coa_report' &&
-            ($slot->budget_period_type ?? null) === 'annual';
-
-        if (
-            $isAnnualBudget &&
-            !$request->filled('annual_budget_amount')
-        ) {
+        if ($isAnnualBudget && !$request->filled('annual_budget_amount')) {
             return back()
-                ->withErrors([
-                    'annual_budget_amount' =>
-                        'Please enter the Annual Budget amount.',
-                ])
+                ->withErrors(['annual_budget_amount' => 'Please enter the Annual Budget amount.'])
                 ->withInput();
         }
 
-        if (
-            $isAnnualCoa &&
-            !$request->filled('actual_expenditure')
-        ) {
+        if ($isAnnualCoa && !$request->filled('actual_expenditure')) {
             return back()
-                ->withErrors([
-                    'actual_expenditure' =>
-                        'Please enter the Actual Expenditure.',
-                ])
+                ->withErrors(['actual_expenditure' => 'Please enter the Actual Expenditure.'])
                 ->withInput();
         }
 
@@ -184,86 +198,96 @@ class BudgetController extends Controller
                 );
             }
 
-            $params = [
-                'slot_id' => $slot->slot_id,
-            ];
+            $params = ['slot_id' => $slot->slot_id];
 
             if ($isAnnualCoa) {
-                $params['actual_expenditure'] =
-                    $validated['actual_expenditure'];
+                $params['actual_expenditure'] = $validated['actual_expenditure'];
             }
 
-            return redirect()->route(
-                'sk_secretary.budget.template.create',
-                $params
-            );
+            return redirect()->route('sk_secretary.budget.template.create', $params);
         }
 
         if (!$request->hasFile('report_file')) {
             return back()
-                ->withErrors([
-                    'report_file' => 'A PDF file is required for PDF Upload.'
-                ])
+                ->withErrors(['report_file' => 'A PDF file is required for PDF Upload.'])
                 ->withInput();
         }
 
         $directory = public_path('uploads/budget_reports');
         File::ensureDirectoryExists($directory);
 
-        $filename = 'BUD_'
-            .time()
-            .'_'
-            .auth()->user()->barangay_id
-            .'.pdf';
+        $file = $request->file('report_file');
+        $filename = 'BUD_'.time().'_'.$user->barangay_id.'.pdf';
+        $uploadPath = 'uploads/budget_reports/'.$filename;
 
-        $request->file('report_file')->move(
-            $directory,
-            $filename
-        );
+        $file->move($directory, $filename);
 
         $data = [
-            'user_id' => auth()->user()->user_id,
-            'barangay_id' => auth()->user()->barangay_id,
+            'user_id' => $user->user_id,
+            'barangay_id' => $user->barangay_id,
             'slot_id' => $slot->slot_id,
             'submission_method' => 'file_upload',
             'document_type' => 'financial_record',
             'fiscal_year' => $slot->fiscal_year ?? now()->year,
             'title' => $slot->title,
             'generated_pdf_path' => null,
-            'uploaded_file_name' => $request
-                ->file('report_file')
-                ->getClientOriginalName(),
-            'uploaded_file_path' =>
-                'uploads/budget_reports/'.$filename,
-
+            'template_data' => null,
+            'uploaded_file_name' => $file->getClientOriginalName(),
+            'uploaded_file_path' => $uploadPath,
             'total_amount' => $isAnnualBudget
                 ? (float) $validated['annual_budget_amount']
                 : 0,
-
             'actual_expenditure' => $isAnnualCoa
                 ? (float) $validated['actual_expenditure']
                 : null,
-
             'status' => 'recorded',
             'submitted_at' => now(),
             'created_at' => now(),
         ];
 
-        $data = $this->applySlotMetadata(
-            $data,
-            $slot
-        );
+        $data = $this->applySlotMetadata($data, $slot);
 
-        $budgetReportId = $this->saveBudgetSubmission(
-            $data,
-            (int) $slot->slot_id
-        );
+        try {
+            $budgetReportId = DB::transaction(function () use ($data, $slot, $existing) {
+                $budgetReportId = $this->saveBudgetSubmission($data, (int) $slot->slot_id);
 
-        $this->scoreSubmission(
-            $slot,
-            $budgetReportId,
-            'budget_report'
-        );
+                if ($existing) {
+                    $this->resetQualityReviewForResubmission($budgetReportId);
+                }
+
+                return $budgetReportId;
+            });
+        } catch (\Throwable $e) {
+            $this->deleteBudgetFile($uploadPath);
+
+            return back()->with(
+                'report_error',
+                'The budget document could not be saved. Please try again.'
+            );
+        }
+
+        if (
+            $existing &&
+            !empty($existing->uploaded_file_path) &&
+            $existing->uploaded_file_path !== $uploadPath
+        ) {
+            $this->deleteBudgetFile($existing->uploaded_file_path);
+        }
+
+        if (!$isResubmission) {
+            $this->scoreSubmission($slot, $budgetReportId, 'budget_report');
+        }
+
+        $this->notifyPresidentOfBudgetSubmission($budgetReportId, $isResubmission);
+
+        if ($isResubmission) {
+            return redirect()
+                ->route('sk_secretary.budget')
+                ->with(
+                    'report_success',
+                    'Your corrected budget document has been resubmitted successfully and returned to Pending Quality Review.'
+                );
+        }
 
         return redirect()
             ->route('sk_secretary.budget')
@@ -283,19 +307,26 @@ class BudgetController extends Controller
 
         $slotId = (int) $request->query('slot_id');
 
-        $slot = app(SubmissionSlotService::class)
-            ->resolveOpenSlot(
-                $slotId,
-                'budget_report',
-                ['SK Secretary', 'Both']
-            );
+        $slot = app(SubmissionSlotService::class)->resolveOpenSlot(
+            $slotId,
+            'budget_report',
+            ['SK Secretary', 'Both']
+        );
 
         if (!$slot) {
             return redirect()
                 ->route('sk_secretary.budget')
+                ->with('report_error', 'That budget submission slot is no longer available.');
+        }
+
+        $existing = $this->existingBudgetSubmission($slotId);
+
+        if ($existing && $this->isQualityApproved((int) $existing->budget_report_id)) {
+            return redirect()
+                ->route('sk_secretary.budget')
                 ->with(
                     'report_error',
-                    'That budget submission slot is no longer available.'
+                    'This budget document has already been approved for Quality Documentation and can no longer be replaced.'
                 );
         }
 
@@ -308,24 +339,17 @@ class BudgetController extends Controller
                 );
         }
 
-        $isAnnualCoa =
-            ($slot->budget_category ?? null) === 'coa_report' &&
-            ($slot->budget_period_type ?? null) === 'annual';
+        $isAnnualCoa = ($slot->budget_category ?? null) === 'coa_report'
+            && ($slot->budget_period_type ?? null) === 'annual';
 
         $actualExpenditure = $isAnnualCoa
             ? $request->query('actual_expenditure')
             : null;
 
-        if (
-            $isAnnualCoa &&
-            (!is_numeric($actualExpenditure) || (float) $actualExpenditure <= 0)
-        ) {
+        if ($isAnnualCoa && (!is_numeric($actualExpenditure) || (float) $actualExpenditure <= 0)) {
             return redirect()
                 ->route('sk_secretary.budget')
-                ->with(
-                    'report_error',
-                    'Please enter a valid Actual Expenditure.'
-                );
+                ->with('report_error', 'Please enter a valid Actual Expenditure.');
         }
 
         $user = auth()->user();
@@ -334,9 +358,7 @@ class BudgetController extends Controller
             'slot' => $slot,
             'submitRoute' => route('sk_secretary.budget.template.store'),
             'backRoute' => route('sk_secretary.budget'),
-            'fullName' => trim(
-                ($user->first_name ?? '').' '.($user->last_name ?? '')
-            ) ?: 'User',
+            'fullName' => trim(($user->first_name ?? '').' '.($user->last_name ?? '')) ?: 'User',
             'barangayName' => $user->barangay->barangay_name ?? 'Barangay',
             'reportType' => $slot->budget_period_type,
             'reportingYear' => (int) $slot->fiscal_year,
@@ -354,16 +376,13 @@ class BudgetController extends Controller
         $validated = $request->validate([
             'slot_id' => ['required', 'integer'],
             'actual_expenditure' => ['nullable', 'numeric', 'min:0.01'],
-
             'monitoring_officer' => ['nullable', 'string', 'max:255'],
             'sheet_no' => ['nullable', 'string', 'max:255'],
             'city' => ['nullable', 'string', 'max:255'],
             'province' => ['nullable', 'string', 'max:255'],
             'program_project_activity' => ['nullable', 'string', 'max:255'],
-
             'object_headers' => ['nullable', 'array'],
             'object_headers.*' => ['nullable', 'string', 'max:255'],
-
             'rows' => ['nullable', 'array'],
             'rows.*.particulars' => ['nullable', 'string', 'max:255'],
             'rows.*.date' => ['nullable', 'date'],
@@ -373,30 +392,25 @@ class BudgetController extends Controller
             'rows.*.object_2' => ['nullable', 'numeric'],
             'rows.*.object_3' => ['nullable', 'numeric'],
             'rows.*.object_4' => ['nullable', 'numeric'],
-
             'spf_carried_forward' => ['nullable', 'numeric'],
             'commitments_carried_forward' => ['nullable', 'numeric'],
             'payments_carried_forward' => ['nullable', 'numeric'],
             'available_balance' => ['nullable', 'numeric'],
             'unpaid_commitments' => ['nullable', 'numeric'],
             'certified_date' => ['nullable', 'date'],
-
             'bank_name' => ['nullable', 'string', 'max:255'],
             'branch' => ['nullable', 'string', 'max:255'],
             'current_account_no' => ['nullable', 'string', 'max:255'],
             'prepared_by' => ['nullable', 'string', 'max:255'],
             'approved_by' => ['nullable', 'string', 'max:255'],
-
             'bank_rows' => ['nullable', 'array'],
             'bank_rows.*.particulars' => ['nullable', 'string', 'max:255'],
             'bank_rows.*.rcb' => ['nullable', 'string', 'max:255'],
             'bank_rows.*.bank' => ['nullable', 'string', 'max:255'],
             'bank_rows.*.comment' => ['nullable', 'string', 'max:500'],
-
             'accountable_officer' => ['nullable', 'string', 'max:255'],
             'official_designation' => ['nullable', 'string', 'max:255'],
             'assumption_date' => ['nullable', 'date'],
-
             'inventory_rows' => ['nullable', 'array'],
             'inventory_rows.*.article' => ['nullable', 'string', 'max:255'],
             'inventory_rows.*.description' => ['nullable', 'string', 'max:255'],
@@ -408,27 +422,35 @@ class BudgetController extends Controller
             'inventory_rows.*.shortage_quantity' => ['nullable', 'numeric'],
             'inventory_rows.*.shortage_value' => ['nullable', 'numeric'],
             'inventory_rows.*.remarks' => ['nullable', 'string', 'max:255'],
-
             'committee_members' => ['nullable', 'array'],
             'committee_members.*' => ['nullable', 'string', 'max:255'],
             'chairperson_name' => ['nullable', 'string', 'max:255'],
         ]);
 
-        $slot = app(SubmissionSlotService::class)
-            ->resolveOpenSlot(
-                (int) $validated['slot_id'],
-                'budget_report',
-                ['SK Secretary', 'Both']
-            );
+        $slot = app(SubmissionSlotService::class)->resolveOpenSlot(
+            (int) $validated['slot_id'],
+            'budget_report',
+            ['SK Secretary', 'Both']
+        );
 
         if (!$slot) {
             return redirect()
                 ->route('sk_secretary.budget')
+                ->with('report_error', 'That budget submission slot is no longer available.');
+        }
+
+        $existing = $this->existingBudgetSubmission((int) $slot->slot_id);
+
+        if ($existing && $this->isQualityApproved((int) $existing->budget_report_id)) {
+            return redirect()
+                ->route('sk_secretary.budget')
                 ->with(
                     'report_error',
-                    'That budget submission slot is no longer available.'
+                    'This budget document has already been approved for Quality Documentation and can no longer be replaced.'
                 );
         }
+
+        $isResubmission = (bool) $existing;
 
         if (!$this->templateAvailableForSlot($slot)) {
             return redirect()
@@ -439,20 +461,13 @@ class BudgetController extends Controller
                 );
         }
 
-        $isAnnualCoa =
-            ($slot->budget_category ?? null) === 'coa_report' &&
-            ($slot->budget_period_type ?? null) === 'annual';
+        $isAnnualCoa = ($slot->budget_category ?? null) === 'coa_report'
+            && ($slot->budget_period_type ?? null) === 'annual';
 
-        if (
-            $isAnnualCoa &&
-            empty($validated['actual_expenditure'])
-        ) {
+        if ($isAnnualCoa && empty($validated['actual_expenditure'])) {
             return redirect()
                 ->route('sk_secretary.budget')
-                ->with(
-                    'report_error',
-                    'Actual Expenditure is required for Annual COA.'
-                );
+                ->with('report_error', 'Actual Expenditure is required for Annual COA.');
         }
 
         $templateData = array_merge($validated, [
@@ -473,30 +488,19 @@ class BudgetController extends Controller
             'fiscal_year' => $slot->fiscal_year ?? now()->year,
             'title' => $slot->title,
             'generated_pdf_path' => 'TEMPLATE_GEN',
-            'template_data' => json_encode(
-                $templateData,
-                JSON_UNESCAPED_UNICODE
-            ),
+            'template_data' => json_encode($templateData, JSON_UNESCAPED_UNICODE),
             'uploaded_file_name' => null,
             'uploaded_file_path' => null,
-
             'total_amount' =>
-                collect($validated['rows'] ?? [])
-                    ->sum(
-                        fn ($row) =>
-                            (float) ($row['total_amount'] ?? 0)
-                    )
-                +
-                collect($validated['inventory_rows'] ?? [])
-                    ->sum(
-                        fn ($row) =>
-                            (float) ($row['shortage_value'] ?? 0)
-                    ),
-
+                collect($validated['rows'] ?? [])->sum(
+                    fn ($row) => (float) ($row['total_amount'] ?? 0)
+                ) +
+                collect($validated['inventory_rows'] ?? [])->sum(
+                    fn ($row) => (float) ($row['shortage_value'] ?? 0)
+                ),
             'actual_expenditure' => $isAnnualCoa
                 ? (float) $validated['actual_expenditure']
                 : null,
-
             'status' => 'recorded',
             'submitted_at' => now(),
             'created_at' => now(),
@@ -504,16 +508,43 @@ class BudgetController extends Controller
 
         $data = $this->applySlotMetadata($data, $slot);
 
-        $budgetReportId = $this->saveBudgetSubmission(
-            $data,
-            (int) $slot->slot_id
-        );
+        try {
+            $budgetReportId = DB::transaction(function () use ($data, $slot, $existing) {
+                $budgetReportId = $this->saveBudgetSubmission($data, (int) $slot->slot_id);
 
-        $this->scoreSubmission(
-            $slot,
-            $budgetReportId,
-            'budget_report'
-        );
+                if ($existing) {
+                    $this->resetQualityReviewForResubmission($budgetReportId);
+                }
+
+                return $budgetReportId;
+            });
+        } catch (\Throwable $e) {
+            return redirect()
+                ->route('sk_secretary.budget')
+                ->with(
+                    'report_error',
+                    'The budget template could not be saved. Please try again.'
+                );
+        }
+
+        if ($existing && !empty($existing->uploaded_file_path)) {
+            $this->deleteBudgetFile($existing->uploaded_file_path);
+        }
+
+        if (!$isResubmission) {
+            $this->scoreSubmission($slot, $budgetReportId, 'budget_report');
+        }
+
+        $this->notifyPresidentOfBudgetSubmission($budgetReportId, $isResubmission);
+
+        if ($isResubmission) {
+            return redirect()
+                ->route('sk_secretary.budget')
+                ->with(
+                    'report_success',
+                    'Your corrected budget document has been resubmitted successfully and returned to Pending Quality Review.'
+                );
+        }
 
         return redirect()
             ->route('sk_secretary.budget')
@@ -537,32 +568,20 @@ class BudgetController extends Controller
         if (!$submission || empty($submission->template_data)) {
             return redirect()
                 ->route('sk_secretary.budget')
-                ->with(
-                    'report_error',
-                    'Template submission not found.'
-                );
+                ->with('report_error', 'Template submission not found.');
         }
 
-        $data = json_decode(
-            $submission->template_data,
-            true
-        ) ?: [];
-
+        $data = json_decode($submission->template_data, true) ?: [];
         $paper = ($data['report_type'] ?? 'quarterly') === 'monthly'
             ? 'portrait'
             : 'landscape';
 
-        $pdf = Pdf::loadView(
-            'shared.budget-template-download',
-            [
-                'data' => $data,
-                'barangayName' => auth()->user()->barangay->barangay_name ?? 'Barangay',
-            ]
-        )->setPaper('a4', $paper);
+        $pdf = Pdf::loadView('shared.budget-template-download', [
+            'data' => $data,
+            'barangayName' => auth()->user()->barangay->barangay_name ?? 'Barangay',
+        ])->setPaper('a4', $paper);
 
-        return $pdf->download(
-            'budget-template-'.$budgetReportId.'.pdf'
-        );
+        return $pdf->download('budget-template-'.$budgetReportId.'.pdf');
     }
 
     public function viewTemplate(int $budgetReportId): Response|RedirectResponse
@@ -577,32 +596,20 @@ class BudgetController extends Controller
         if (!$submission || empty($submission->template_data)) {
             return redirect()
                 ->route('sk_secretary.budget')
-                ->with(
-                    'report_error',
-                    'Template submission not found.'
-                );
+                ->with('report_error', 'Template submission not found.');
         }
 
-        $data = json_decode(
-            $submission->template_data,
-            true
-        ) ?: [];
-
+        $data = json_decode($submission->template_data, true) ?: [];
         $paper = ($data['report_type'] ?? 'quarterly') === 'monthly'
             ? 'portrait'
             : 'landscape';
 
-        $pdf = Pdf::loadView(
-            'shared.budget-template-download',
-            [
-                'data' => $data,
-                'barangayName' => auth()->user()->barangay->barangay_name ?? 'Barangay',
-            ]
-        )->setPaper('a4', $paper);
+        $pdf = Pdf::loadView('shared.budget-template-download', [
+            'data' => $data,
+            'barangayName' => auth()->user()->barangay->barangay_name ?? 'Barangay',
+        ])->setPaper('a4', $paper);
 
-        return $pdf->stream(
-            'budget-template-'.$budgetReportId.'.pdf'
-        );
+        return $pdf->stream('budget-template-'.$budgetReportId.'.pdf');
     }
 
     protected function templateAvailableForSlot(object $slot): bool
@@ -622,31 +629,27 @@ class BudgetController extends Controller
         }
 
         if (Schema::hasColumn('budget_reports', 'budget_period_type')) {
-            $data['budget_period_type'] =
-                ($slot->budget_category ?? null) === 'coa_report'
-                    ? $slot->budget_period_type
-                    : null;
+            $data['budget_period_type'] = ($slot->budget_category ?? null) === 'coa_report'
+                ? $slot->budget_period_type
+                : null;
         }
 
         if (Schema::hasColumn('budget_reports', 'fiscal_month')) {
-            $data['fiscal_month'] =
-                ($slot->budget_period_type ?? null) === 'monthly'
-                    ? $slot->fiscal_month
-                    : null;
+            $data['fiscal_month'] = ($slot->budget_period_type ?? null) === 'monthly'
+                ? $slot->fiscal_month
+                : null;
         }
 
         if (Schema::hasColumn('budget_reports', 'fiscal_quarter')) {
-            $data['fiscal_quarter'] =
-                ($slot->budget_period_type ?? null) === 'quarterly'
-                    ? $slot->fiscal_quarter
-                    : null;
+            $data['fiscal_quarter'] = ($slot->budget_period_type ?? null) === 'quarterly'
+                ? $slot->fiscal_quarter
+                : null;
         }
 
         if (Schema::hasColumn('budget_reports', 'fiscal_half')) {
-            $data['fiscal_half'] =
-                ($slot->budget_period_type ?? null) === 'semi_annual'
-                    ? $slot->fiscal_half
-                    : null;
+            $data['fiscal_half'] = ($slot->budget_period_type ?? null) === 'semi_annual'
+                ? $slot->fiscal_half
+                : null;
         }
 
         return $data;
@@ -667,18 +670,11 @@ class BudgetController extends Controller
         ];
     }
 
-    protected function scoreSubmission(
-        object $slot,
-        int $sourceId,
-        string $sourceType
-    ): void {
+    protected function scoreSubmission(object $slot, int $sourceId, string $sourceType): void
+    {
         $user = auth()->user();
-
         $points = app(RankingPointsService::class);
-
-        $isOnTime = now()->lessThanOrEqualTo(
-            Carbon::parse($slot->end_date)->endOfDay()
-        );
+        $isOnTime = now()->lessThanOrEqualTo(Carbon::parse($slot->end_date)->endOfDay());
 
         $submissionAction = $isOnTime
             ? RankingPointsService::ON_TIME_REPORT_SUBMISSION
@@ -691,53 +687,136 @@ class BudgetController extends Controller
             $sourceId,
             (int) $user->user_id
         );
-
-        $points->award(
-            (int) $user->barangay_id,
-            RankingPointsService::QUALITY_DOCUMENTATION,
-            $sourceType,
-            $sourceId,
-            (int) $user->user_id
-        );
     }
 
-    protected function saveBudgetSubmission(
-        array $data,
-        int $slotId
-    ): int {
+    protected function saveBudgetSubmission(array $data, int $slotId): int
+    {
         $existing = DB::table('budget_reports')
-            ->where(
-                'barangay_id',
-                auth()->user()->barangay_id
-            )
+            ->where('barangay_id', auth()->user()->barangay_id)
             ->where('slot_id', $slotId)
             ->first();
 
         if ($existing) {
+            unset($data['created_at']);
+
             DB::table('budget_reports')
-                ->where(
-                    'budget_report_id',
-                    $existing->budget_report_id
-                )
+                ->where('budget_report_id', $existing->budget_report_id)
                 ->update($data);
 
             return (int) $existing->budget_report_id;
         }
 
         return (int) DB::table('budget_reports')
-            ->insertGetId(
-                $data,
-                'budget_report_id'
-            );
+            ->insertGetId($data, 'budget_report_id');
+    }
+
+    protected function existingBudgetSubmission(int $slotId): ?object
+    {
+        return DB::table('budget_reports')
+            ->where('barangay_id', auth()->user()->barangay_id)
+            ->where('slot_id', $slotId)
+            ->first();
+    }
+
+    protected function isQualityApproved(int $budgetReportId): bool
+    {
+        if (!Schema::hasTable('submission_quality_reviews')) {
+            return false;
+        }
+
+        return DB::table('submission_quality_reviews')
+            ->where('source_type', 'budget_report')
+            ->where('source_id', $budgetReportId)
+            ->where('status', 'approved')
+            ->exists();
+    }
+
+    protected function resetQualityReviewForResubmission(int $budgetReportId): void
+    {
+        if (!Schema::hasTable('submission_quality_reviews')) {
+            return;
+        }
+
+        $review = DB::table('submission_quality_reviews')
+            ->where('source_type', 'budget_report')
+            ->where('source_id', $budgetReportId)
+            ->first();
+
+        if (!$review || strtolower((string) $review->status) !== 'needs_revision') {
+            return;
+        }
+
+        DB::table('submission_quality_reviews')
+            ->where('review_id', $review->review_id)
+            ->update([
+                'reviewer_id' => null,
+                'status' => 'pending',
+                'complete_contents' => false,
+                'correct_document' => false,
+                'correct_period' => false,
+                'readable_organized' => false,
+                'supporting_documents' => false,
+                'remarks' => null,
+                'reviewed_at' => null,
+                'updated_at' => now(),
+            ]);
+    }
+
+    protected function notifyPresidentOfBudgetSubmission(int $budgetReportId, bool $isResubmission): void
+    {
+        $submission = DB::table('budget_reports')
+            ->where('budget_report_id', $budgetReportId)
+            ->first();
+
+        if (!$submission || !auth()->check()) {
+            return;
+        }
+
+        try {
+            $notifications = app(NotificationService::class);
+            $user = auth()->user();
+
+            if ($isResubmission) {
+                $notifications->notifySubmissionResubmitted(
+                    $submission,
+                    'budget_report',
+                    $user
+                );
+            } else {
+                $notifications->notifySubmissionReceived(
+                    $submission,
+                    'budget_report',
+                    $user
+                );
+            }
+        } catch (\Throwable $e) {
+            report($e);
+        }
+    }
+
+    protected function deleteBudgetFile(?string $path): void
+    {
+        if (!$path) {
+            return;
+        }
+
+        $path = str_replace('\\', '/', ltrim($path, '/'));
+
+        if (!str_starts_with($path, 'uploads/budget_reports/')) {
+            return;
+        }
+
+        $fullPath = public_path($path);
+
+        if (File::exists($fullPath)) {
+            File::delete($fullPath);
+        }
     }
 
     protected function periodLabel(object $submission): string
     {
         $category = $submission->slot_budget_category ?? null;
-
-        $year = $submission->slot_fiscal_year
-            ?? $submission->fiscal_year
-            ?? '';
+        $year = $submission->slot_fiscal_year ?? $submission->fiscal_year ?? '';
 
         if ($category === 'annual_budget') {
             return 'Annual Budget FY '.$year;
@@ -754,11 +833,7 @@ class BudgetController extends Controller
         return match ($periodType) {
             'monthly' => Carbon::create(
                 (int) $year,
-                (int) (
-                    $submission->slot_fiscal_month
-                    ?? $submission->fiscal_month
-                    ?? 1
-                ),
+                (int) ($submission->slot_fiscal_month ?? $submission->fiscal_month ?? 1),
                 1
             )->format('F Y'),
 

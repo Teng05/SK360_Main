@@ -21,6 +21,10 @@ class RankingController extends Controller
         $fullName = trim(($user->first_name ?? '') . ' ' . ($user->last_name ?? '')) ?: 'User';
         $leaderboard = $this->rankingsLeaderboard();
 
+        $rankingsLiveRoute = request()->filled('period')
+            ? route('sk_chairman.rankings.live', ['period' => request('period')])
+            : route('sk_chairman.rankings.live');
+
         return view('sk_chairman.rankings', [
             'fullName' => $fullName,
             'roleLabel' => 'SK Chairman',
@@ -29,9 +33,11 @@ class RankingController extends Controller
             'topRankings' => $this->topRankings($leaderboard),
             'leaderboard' => $leaderboard,
             'latestPeriod' => $this->latestRankingPeriod(),
+            'rankingPeriods' => $this->rankingPeriodOptions(),
+            'selectedPeriod' => $this->selectedRankingPeriodValue(),
             'pointSystem' => $this->rankingPointSystem(),
             'profileRoute' => route('sk_chairman.profile'),
-            'rankingsLiveRoute' => route('sk_chairman.rankings.live'),
+            'rankingsLiveRoute' => $rankingsLiveRoute,
         ]);
     }
 
@@ -54,15 +60,15 @@ class RankingController extends Controller
     {
         return [
             ['link' => route('sk_chairman.home'), 'icon' => '&#127968;', 'label' => 'Home'],
-            ['link' => route('sk_chairman.reports'), 'icon' => '&#128196;', 'label' => 'Reports'],
-            ['link' => route('sk_chairman.budget'), 'icon' => '&#128229;', 'label' => 'Budget'],
+            ['link' => route('sk_chairman.reports'), 'icon' => '&#128203;', 'label' => 'Reports'],
+            ['link' => route('sk_chairman.budget'), 'icon' => '&#128176;', 'label' => 'Budget'],
             ['link' => route('sk_chairman.announcements'), 'icon' => '&#128226;', 'label' => 'Announcements'],
             ['link' => route('sk_chairman.calendar'), 'icon' => '&#128197;', 'label' => 'Calendar'],
             ['link' => route('sk_chairman.chat'), 'icon' => '&#128172;', 'label' => 'Chat'],
             ['link' => route('sk_chairman.meetings'), 'icon' => '&#128222;', 'label' => 'Meetings'],
             ['link' => route('sk_chairman.rankings'), 'icon' => '&#127942;', 'label' => 'Rankings'],
             ['link' => route('sk_chairman.leadership'), 'icon' => '&#128101;', 'label' => 'Leadership'],
-            ['link' => route('sk_chairman.archive'), 'icon' => '&#128465;', 'label' => 'Archive'],
+            ['link' => route('sk_chairman.archive'), 'icon' => '&#128450;&#65039;', 'label' => 'Archive'],
         ];
     }
 }

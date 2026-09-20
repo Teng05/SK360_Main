@@ -5,7 +5,11 @@
 namespace App\Http\Controllers\sk_pres;
 
 use App\Http\Controllers\Controller;
+use App\Services\NotificationService;
+use App\Services\RankingPointsService;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Carbon\Carbon;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -35,7 +39,6 @@ class ConsolidationController extends Controller
             ['link' => route('sk_pres.chat'), 'icon' => '💬', 'label' => 'Chat'],
             ['link' => route('sk_pres.meetings'), 'icon' => '📞', 'label' => 'Meetings'],
             ['link' => route('sk_pres.rankings'), 'icon' => '🏆', 'label' => 'Rankings'],
-            
             ['link' => route('sk_pres.leadership'), 'icon' => '👥', 'label' => 'Leadership'],
             ['link' => route('sk_pres.archive'), 'icon' => '🗂️', 'label' => 'Archive'],
             ['link' => route('sk_pres.user-management'), 'icon' => '👤', 'label' => 'User Management'],
@@ -46,6 +49,7 @@ class ConsolidationController extends Controller
             'menuItems' => $menuItems,
             'stats' => $stats,
             'submissions' => $submissions,
+            'qualitySubmissions' => $this->qualitySubmissions($filters),
             'filters' => $filters,
             'years' => $this->availableYears(),
             'months' => $this->months(),
@@ -72,6 +76,173 @@ class ConsolidationController extends Controller
         return $pdf->download('consolidated-reports-'.$filters['year'].'-'.$filters['period'].'.pdf');
     }
 
+    public function reviewQuality(
+        Request $request,
+        RankingPointsService $points,
+        NotificationService $notifications
+    ): RedirectResponse
+    {
+        abort_unless(auth()->check() && auth()->user()->role === 'sk_president', 403);
+
+        $validated = $request->validate([
+            'source_type' => ['required', 'in:accomplishment_report,budget_report'],
+            'source_id' => ['required', 'integer', 'min:1'],
+            'status' => ['required', 'in:approved,needs_revision'],
+            'complete_contents' => ['nullable', 'boolean'],
+            'correct_document' => ['nullable', 'boolean'],
+            'correct_period' => ['nullable', 'boolean'],
+            'readable_organized' => ['nullable', 'boolean'],
+            'supporting_documents' => ['nullable', 'boolean'],
+            'remarks' => ['nullable', 'required_if:status,needs_revision', 'string', 'max:2000'],
+        ]);
+
+        $sourceType = $validated['source_type'];
+        $sourceId = (int) $validated['source_id'];
+
+        $table = $sourceType === 'accomplishment_report'
+            ? 'accomplishment_reports'
+            : 'budget_reports';
+
+        $primaryKey = $sourceType === 'accomplishment_report'
+            ? 'report_id'
+            : 'budget_report_id';
+
+        $submission = DB::table($table)
+            ->where($primaryKey, $sourceId)
+            ->first();
+
+        abort_unless($submission, 404);
+
+        $completeContents = $request->boolean('complete_contents');
+        $correctDocument = $request->boolean('correct_document');
+        $correctPeriod = $request->boolean('correct_period');
+        $readableOrganized = $request->boolean('readable_organized');
+        $supportingDocuments = $request->boolean('supporting_documents');
+
+        if (
+            $validated['status'] === 'approved' &&
+            (!$completeContents || !$correctDocument || !$correctPeriod || !$readableOrganized)
+        ) {
+            return back()
+                ->withInput()
+                ->withErrors([
+                    'quality_review' => 'Complete Contents, Correct Document, Correct Period, and Readable / Organized must be checked before approving Quality Documentation.',
+                ]);
+        }
+
+        $existingReview = DB::table('submission_quality_reviews')
+            ->where('source_type', $sourceType)
+            ->where('source_id', $sourceId)
+            ->first();
+
+        if (
+            $existingReview &&
+            $existingReview->status === 'approved' &&
+            $validated['status'] === 'needs_revision'
+        ) {
+            return back()->withErrors([
+                'quality_review' => 'This document has already been approved for Quality Documentation and cannot be changed to Needs Revision.',
+            ]);
+        }
+
+        $submissionDate = $submission->submitted_at
+            ?? $submission->created_at
+            ?? null;
+
+        $resubmittedAfterReview = false;
+
+        if (
+            $existingReview &&
+            $existingReview->reviewed_at &&
+            $submissionDate
+        ) {
+            $resubmittedAfterReview = Carbon::parse($submissionDate)
+                ->gt(Carbon::parse($existingReview->reviewed_at));
+        }
+
+        $shouldNotifyRevision =
+            $validated['status'] === 'needs_revision' &&
+            (
+                !$existingReview ||
+                $existingReview->status !== 'needs_revision' ||
+                $resubmittedAfterReview
+            );
+
+        $reviewData = [
+            'barangay_id' => $submission->barangay_id,
+            'reviewer_id' => auth()->user()->user_id,
+            'status' => $validated['status'],
+            'complete_contents' => $completeContents,
+            'correct_document' => $correctDocument,
+            'correct_period' => $correctPeriod,
+            'readable_organized' => $readableOrganized,
+            'supporting_documents' => $supportingDocuments,
+            'remarks' => $validated['remarks'] ?? null,
+            'reviewed_at' => now(),
+            'updated_at' => now(),
+        ];
+
+        DB::transaction(function () use (
+            $existingReview,
+            $reviewData,
+            $sourceType,
+            $sourceId,
+            $validated,
+            $submission,
+            $points
+        ) {
+            if ($existingReview) {
+                DB::table('submission_quality_reviews')
+                    ->where('review_id', $existingReview->review_id)
+                    ->update($reviewData);
+            } else {
+                DB::table('submission_quality_reviews')->insert([
+                    'source_type' => $sourceType,
+                    'source_id' => $sourceId,
+                    ...$reviewData,
+                    'created_at' => now(),
+                ]);
+            }
+
+            if (
+                $validated['status'] === 'approved' &&
+                (!$existingReview || $existingReview->status !== 'approved')
+            ) {
+                $submittedAt = $submission->submitted_at
+                    ?? $submission->created_at
+                    ?? now();
+
+                $period = Carbon::parse($submittedAt)->format('F Y');
+
+                $points->award(
+                    (int) $submission->barangay_id,
+                    RankingPointsService::QUALITY_DOCUMENTATION,
+                    $sourceType,
+                    $sourceId,
+                    (int) auth()->user()->user_id,
+                    $period
+                );
+            }
+        });
+
+        if ($shouldNotifyRevision) {
+            $notifications->notifySubmissionNeedsRevision(
+                $submission,
+                $sourceType,
+                auth()->user(),
+                trim((string) $validated['remarks'])
+            );
+        }
+
+        $message = $validated['status'] === 'approved'
+            ? 'Quality Documentation approved.'
+            : ($shouldNotifyRevision
+                ? 'Document marked as Needs Revision. The submitter has been notified.'
+                : 'Document remains marked as Needs Revision.');
+
+        return back()->with('quality_status', $message);
+    }
+
     protected function filters(Request $request): array
     {
         $year = (int) $request->query('year', now()->year);
@@ -87,7 +258,9 @@ class ConsolidationController extends Controller
             'year' => $year > 2000 && $year < 2100 ? $year : now()->year,
             'period' => $period,
             'month' => $month >= 1 && $month <= 12 ? $month : now()->month,
-            'quarter' => in_array($quarter, ['Q1', 'Q2', 'Q3', 'Q4'], true) ? $quarter : 'Q'.ceil(now()->month / 3),
+            'quarter' => in_array($quarter, ['Q1', 'Q2', 'Q3', 'Q4'], true)
+                ? $quarter
+                : 'Q'.ceil(now()->month / 3),
         ];
     }
 
@@ -107,6 +280,7 @@ class ConsolidationController extends Controller
             ->groupBy('barangay_id');
 
         $hasBudgetPeriods = Schema::hasColumn('budget_reports', 'budget_period_type');
+
         $budgets = DB::table('budget_reports')
             ->where('fiscal_year', $filters['year'])
             ->when($hasBudgetPeriods && $filters['period'] === 'monthly', fn ($query) => $query
@@ -131,9 +305,17 @@ class ConsolidationController extends Controller
                 $quarterlyReports = $reportItems->where('report_type', 'quarterly')->count();
                 $annualReports = $reportItems->where('report_type', 'annual')->count();
 
-                $monthlyBudgets = $hasBudgetPeriods ? $budgetItems->where('budget_period_type', 'monthly')->count() : 0;
-                $quarterlyBudgets = $hasBudgetPeriods ? $budgetItems->where('budget_period_type', 'quarterly')->count() : 0;
-                $annualBudgets = $hasBudgetPeriods ? $budgetItems->where('budget_period_type', 'annual')->count() : $budgetItems->count();
+                $monthlyBudgets = $hasBudgetPeriods
+                    ? $budgetItems->where('budget_period_type', 'monthly')->count()
+                    : 0;
+
+                $quarterlyBudgets = $hasBudgetPeriods
+                    ? $budgetItems->where('budget_period_type', 'quarterly')->count()
+                    : 0;
+
+                $annualBudgets = $hasBudgetPeriods
+                    ? $budgetItems->where('budget_period_type', 'annual')->count()
+                    : $budgetItems->count();
 
                 $allItems = $reportItems->merge($budgetItems);
                 $lastSubmission = $allItems->sortByDesc('submitted_at')->first();
@@ -144,14 +326,155 @@ class ConsolidationController extends Controller
                     'monthly_count' => $monthlyReports + $monthlyBudgets,
                     'quarterly_count' => $quarterlyReports + $quarterlyBudgets,
                     'annual_count' => $annualReports + $annualBudgets,
-                    'monthly' => $this->statusLabel($monthlyReports + $monthlyBudgets, $monthlyReports, $monthlyBudgets),
-                    'quarterly' => $this->statusLabel($quarterlyReports + $quarterlyBudgets, $quarterlyReports, $quarterlyBudgets),
-                    'annual' => $this->statusLabel($annualReports + $annualBudgets, $annualReports, $annualBudgets),
+                    'monthly' => $this->statusLabel(
+                        $monthlyReports + $monthlyBudgets,
+                        $monthlyReports,
+                        $monthlyBudgets
+                    ),
+                    'quarterly' => $this->statusLabel(
+                        $quarterlyReports + $quarterlyBudgets,
+                        $quarterlyReports,
+                        $quarterlyBudgets
+                    ),
+                    'annual' => $this->statusLabel(
+                        $annualReports + $annualBudgets,
+                        $annualReports,
+                        $annualBudgets
+                    ),
                     'last_submission' => $lastSubmission?->submitted_at
                         ? date('M d, Y h:i A', strtotime((string) $lastSubmission->submitted_at))
                         : 'No submission',
                     'status' => $allItems->isNotEmpty() ? 'submitted' : 'pending',
                 ];
+            });
+    }
+
+    protected function qualitySubmissions(array $filters): Collection
+    {
+        $reportQuery = DB::table('accomplishment_reports as ar')
+            ->leftJoin('barangays as b', 'ar.barangay_id', '=', 'b.barangay_id')
+            ->leftJoin('submission_quality_reviews as qr', function ($join) {
+                $join->on('qr.source_id', '=', 'ar.report_id')
+                    ->where('qr.source_type', '=', 'accomplishment_report');
+            })
+            ->where('ar.reporting_year', $filters['year'])
+            ->when($filters['period'] === 'monthly', fn ($query) => $query
+                ->where('ar.report_type', 'monthly')
+                ->where('ar.reporting_month', $filters['month']))
+            ->when($filters['period'] === 'quarterly', fn ($query) => $query
+                ->where('ar.report_type', 'quarterly')
+                ->where('ar.reporting_quarter', $filters['quarter']))
+            ->when($filters['period'] === 'annual', fn ($query) => $query
+                ->where('ar.report_type', 'annual'));
+
+        if (Schema::hasColumn('accomplishment_reports', 'status')) {
+            $reportQuery->where('ar.status', '!=', 'draft');
+        }
+
+        $reports = $reportQuery->select(
+            DB::raw("'accomplishment_report' as source_type"),
+            'ar.report_id as source_id',
+            'ar.barangay_id',
+            'b.barangay_name',
+            'ar.title',
+            'ar.report_type as period_type',
+            'ar.reporting_year as year',
+            'ar.reporting_month as month',
+            'ar.reporting_quarter as quarter',
+            'ar.uploaded_file_path',
+            'ar.generated_pdf_path',
+            'ar.submitted_at',
+            'ar.created_at',
+            'qr.status as quality_status',
+            'qr.complete_contents',
+            'qr.correct_document',
+            'qr.correct_period',
+            'qr.readable_organized',
+            'qr.supporting_documents',
+            'qr.remarks as quality_remarks',
+            'qr.reviewed_at'
+        )->get();
+
+        $hasBudgetPeriods = Schema::hasColumn('budget_reports', 'budget_period_type');
+
+        $budgetQuery = DB::table('budget_reports as br')
+            ->leftJoin('barangays as b', 'br.barangay_id', '=', 'b.barangay_id')
+            ->leftJoin('submission_quality_reviews as qr', function ($join) {
+                $join->on('qr.source_id', '=', 'br.budget_report_id')
+                    ->where('qr.source_type', '=', 'budget_report');
+            })
+            ->where('br.fiscal_year', $filters['year'])
+            ->when($hasBudgetPeriods && $filters['period'] === 'monthly', fn ($query) => $query
+                ->where('br.budget_period_type', 'monthly')
+                ->where('br.fiscal_month', $filters['month']))
+            ->when($hasBudgetPeriods && $filters['period'] === 'quarterly', fn ($query) => $query
+                ->where('br.budget_period_type', 'quarterly')
+                ->where('br.fiscal_quarter', $filters['quarter']))
+            ->when($hasBudgetPeriods && $filters['period'] === 'annual', fn ($query) => $query
+                ->where('br.budget_period_type', 'annual'));
+
+        if (Schema::hasColumn('budget_reports', 'status')) {
+            $budgetQuery->where('br.status', '!=', 'draft');
+        }
+
+        $budgets = $budgetQuery->select(
+            DB::raw("'budget_report' as source_type"),
+            'br.budget_report_id as source_id',
+            'br.barangay_id',
+            'b.barangay_name',
+            'br.title',
+            DB::raw(($hasBudgetPeriods ? 'br.budget_period_type' : "'annual'").' as period_type'),
+            'br.fiscal_year as year',
+            DB::raw(($hasBudgetPeriods ? 'br.fiscal_month' : 'NULL').' as month'),
+            DB::raw(($hasBudgetPeriods ? 'br.fiscal_quarter' : 'NULL').' as quarter'),
+            'br.uploaded_file_path',
+            'br.generated_pdf_path',
+            'br.submitted_at',
+            'br.created_at',
+            'qr.status as quality_status',
+            'qr.complete_contents',
+            'qr.correct_document',
+            'qr.correct_period',
+            'qr.readable_organized',
+            'qr.supporting_documents',
+            'qr.remarks as quality_remarks',
+            'qr.reviewed_at'
+        )->get();
+
+        return $reports
+            ->merge($budgets)
+            ->sortByDesc(fn ($item) => $item->submitted_at ?? $item->created_at)
+            ->values()
+            ->map(function ($item) {
+                $item->quality_status = $item->quality_status ?: 'pending';
+
+                $item->source_label = $item->source_type === 'budget_report'
+                    ? 'Budget Report'
+                    : 'Accomplishment Report';
+
+                $item->period_label = match ($item->period_type) {
+                    'monthly' => isset($item->month)
+                        ? Carbon::create((int) $item->year, (int) $item->month, 1)->format('F Y')
+                        : 'Monthly '.$item->year,
+
+                    'quarterly' => ($item->quarter ?: 'Quarterly').' '.$item->year,
+
+                    default => 'Annual '.$item->year,
+                };
+
+                $path = $item->uploaded_file_path ?: $item->generated_pdf_path;
+
+                $item->file_url = $path
+                    ? asset(ltrim($path, '/'))
+                    : null;
+
+                $date = $item->submitted_at ?: $item->created_at;
+
+                $item->submitted_label = $date
+                    ? Carbon::parse($date)->format('M d, Y h:i A')
+                    : 'Unknown';
+
+                return $item;
             });
     }
 

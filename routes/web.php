@@ -112,6 +112,7 @@ Route::middleware('auth')->prefix('sk_pres')->name('sk_pres.')->group(function()
 
     Route::get('/consolidation',[ConsolidationController::class,'index'])->name('consolidation');
     Route::get('/consolidation/download',[ConsolidationController::class,'download'])->name('consolidation.download');
+    Route::post('/consolidation/quality-review',[ConsolidationController::class,'reviewQuality'])->name('consolidation.quality-review');
 
     Route::get('/module',[ModuleController::class,'index'])->name('module');
     Route::get('/module/live',[ModuleController::class,'live'])->name('module.live');

@@ -21,6 +21,10 @@ class RankingController extends Controller
         $fullName = trim(($user->first_name ?? '') . ' ' . ($user->last_name ?? '')) ?: 'User';
         $leaderboard = $this->rankingsLeaderboard();
 
+        $rankingsLiveRoute = request()->filled('period')
+            ? route('sk_pres.rankings.live', ['period' => request('period')])
+            : route('sk_pres.rankings.live');
+
         return view('sk_pres.rankings', [
             'fullName' => $fullName,
             'roleLabel' => 'SK President',
@@ -29,9 +33,11 @@ class RankingController extends Controller
             'topRankings' => $this->topRankings($leaderboard),
             'leaderboard' => $leaderboard,
             'latestPeriod' => $this->latestRankingPeriod(),
+            'rankingPeriods' => $this->rankingPeriodOptions(),
+            'selectedPeriod' => $this->selectedRankingPeriodValue(),
             'pointSystem' => $this->rankingPointSystem(),
             'profileRoute' => route('sk_pres.profile'),
-            'rankingsLiveRoute' => route('sk_pres.rankings.live'),
+            'rankingsLiveRoute' => $rankingsLiveRoute,
         ]);
     }
 
@@ -62,7 +68,6 @@ class RankingController extends Controller
             ['link' => route('sk_pres.chat'), 'icon' => '&#128172;', 'label' => 'Chat'],
             ['link' => route('sk_pres.meetings'), 'icon' => '&#128222;', 'label' => 'Meetings'],
             ['link' => route('sk_pres.rankings'), 'icon' => '&#127942;', 'label' => 'Rankings'],
-            
             ['link' => route('sk_pres.leadership'), 'icon' => '&#128101;', 'label' => 'Leadership'],
             ['link' => route('sk_pres.archive'), 'icon' => '&#128450;&#65039;', 'label' => 'Archive'],
             ['link' => route('sk_pres.user-management'), 'icon' => '&#128100;', 'label' => 'User Management'],

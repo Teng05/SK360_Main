@@ -17,10 +17,11 @@ class WallPostController extends Controller
 
         $validated = $request->validate([
             'post_content' => ['required', 'string', 'max:5000'],
-            'post_category' => ['nullable', 'string', 'max:50'],
+            'post_category' => ['nullable', 'in:update,announcement,event,accomplishment'],
         ]);
 
         $category = strtolower($validated['post_category'] ?? 'update');
+
         $title = match ($category) {
             'announcement' => 'Announcement',
             'event' => 'Event Update',
@@ -38,7 +39,8 @@ class WallPostController extends Controller
         ], 'announcement_id');
 
         $user = auth()->user();
-        if (! empty($user->barangay_id)) {
+
+        if (!empty($user->barangay_id)) {
             app(RankingPointsService::class)->award(
                 (int) $user->barangay_id,
                 RankingPointsService::COMMUNITY_ENGAGEMENT,
@@ -46,16 +48,6 @@ class WallPostController extends Controller
                 $announcementId,
                 (int) $user->user_id
             );
-
-            if ($category === 'event') {
-                app(RankingPointsService::class)->award(
-                    (int) $user->barangay_id,
-                    RankingPointsService::EVENT_PARTICIPATION,
-                    'wall_post',
-                    $announcementId,
-                    (int) $user->user_id
-                );
-            }
         }
 
         return back()->with('wall_status', 'Post published to everyone.');
