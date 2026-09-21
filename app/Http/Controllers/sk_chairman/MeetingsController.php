@@ -8,8 +8,8 @@ use App\Http\Controllers\Controller;
 use App\Models\Meeting;
 use App\Models\User;
 use App\Services\RankingPointsService;
-use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 use TaylanUnutmaz\AgoraTokenBuilder\RtcTokenBuilder;
 
@@ -17,201 +17,383 @@ class MeetingsController extends Controller
 {
     public function index(): View
     {
-        [$fullName, $menuItems] = $this->pageContext();
-        $this->completeElapsedMeetings();
+        [$fullName,$menuItems]=$this->pageContext();
 
-        $meetings = Meeting::query()
-            ->orderByDesc('meeting_date')
-            ->orderByDesc('meeting_time')
-            ->get()
-            ->map(fn (Meeting $meeting) => $this->decorateMeeting($meeting));
+        $currentTermId=$this->currentTermId();
 
-        $upcomingMeetings = $meetings
-            ->filter(fn (Meeting $meeting) => in_array($meeting->status, ['scheduled'], true) && $meeting->scheduled_at->isFuture())
-            ->sortBy(fn (Meeting $meeting) => $meeting->scheduled_at->timestamp)
+        $this->completeElapsedMeetings(
+            $currentTermId
+        );
+
+        $meetings=$currentTermId
+            ? Meeting::query()
+                ->where('term_id',$currentTermId)
+                ->orderByDesc('meeting_date')
+                ->orderByDesc('meeting_time')
+                ->get()
+                ->map(
+                    fn(Meeting $meeting)=>
+                        $this->decorateMeeting($meeting)
+                )
+            : collect();
+
+        $upcomingMeetings=$meetings
+            ->filter(
+                fn(Meeting $meeting)=>
+                    in_array(
+                        $meeting->status,
+                        ['scheduled'],
+                        true
+                    )
+                    &&
+                    $meeting->scheduled_at->isFuture()
+            )
+            ->sortBy(
+                fn(Meeting $meeting)=>
+                    $meeting->scheduled_at->timestamp
+            )
             ->values();
 
-        $activeMeetings = $meetings
-            ->filter(fn (Meeting $meeting) => $meeting->status === 'scheduled' && $meeting->scheduled_at->isPast() && $meeting->ends_at->isFuture())
-            ->sortBy(fn (Meeting $meeting) => $meeting->scheduled_at->timestamp)
+        $activeMeetings=$meetings
+            ->filter(
+                fn(Meeting $meeting)=>
+                    $meeting->status==='scheduled'
+                    &&
+                    $meeting->scheduled_at->isPast()
+                    &&
+                    $meeting->ends_at->isFuture()
+            )
+            ->sortBy(
+                fn(Meeting $meeting)=>
+                    $meeting->scheduled_at->timestamp
+            )
             ->values();
 
-        $pastMeetings = $meetings
-            ->filter(fn (Meeting $meeting) => $meeting->status !== 'scheduled')
-            ->sortByDesc(fn (Meeting $meeting) => $meeting->scheduled_at->timestamp)
+        $pastMeetings=$meetings
+            ->filter(
+                fn(Meeting $meeting)=>
+                    $meeting->status!=='scheduled'
+            )
+            ->sortByDesc(
+                fn(Meeting $meeting)=>
+                    $meeting->scheduled_at->timestamp
+            )
             ->values();
 
-        return view('sk_chairman.meetings', [
-            'fullName' => $fullName,
-            'menuItems' => $menuItems,
-            'currentUrl' => route('sk_chairman.meetings'),
-            'upcomingMeetings' => $upcomingMeetings,
-            'activeMeetings' => $activeMeetings,
-            'pastMeetings' => $pastMeetings,
+        return view('sk_chairman.meetings',[
+            'fullName'=>$fullName,
+            'menuItems'=>$menuItems,
+            'currentUrl'=>route('sk_chairman.meetings'),
+            'upcomingMeetings'=>$upcomingMeetings,
+            'activeMeetings'=>$activeMeetings,
+            'pastMeetings'=>$pastMeetings,
         ]);
     }
 
     public function call(Meeting $meeting): View
     {
-        [$fullName, $menuItems] = $this->pageContext();
+        [$fullName,$menuItems]=$this->pageContext();
 
-        return view('sk_pres.video-call', [
-            'fullName' => $fullName,
-            'menuItems' => $menuItems,
-            'currentUrl' => route('sk_chairman.meetings'),
-            'meeting' => $this->decorateMeeting($meeting),
-            'channelName' => $this->channelName($meeting),
-            'backRoute' => route('sk_chairman.meetings'),
-            'tokenRoute' => route('sk_chairman.meetings.agora.token', $meeting->meeting_id),
-            'participantNames' => $this->participantNames(),
+        $this->ensureCurrentTermMeeting(
+            $meeting
+        );
+
+        return view('sk_pres.video-call',[
+            'fullName'=>$fullName,
+            'menuItems'=>$menuItems,
+            'currentUrl'=>route('sk_chairman.meetings'),
+            'meeting'=>$this->decorateMeeting($meeting),
+            'channelName'=>$this->channelName($meeting),
+            'backRoute'=>route('sk_chairman.meetings'),
+            'tokenRoute'=>route(
+                'sk_chairman.meetings.agora.token',
+                $meeting->meeting_id
+            ),
+            'participantNames'=>$this->participantNames(),
         ]);
     }
 
     public function token(Meeting $meeting): JsonResponse
     {
-        abort_unless(auth()->check() && auth()->user()->role === 'sk_chairman', 403);
+        abort_unless(
+            auth()->check()
+            &&
+            auth()->user()->role==='sk_chairman',
+            403
+        );
 
-        $appId = config('services.agora.app_id');
-        $appCertificate = config('services.agora.app_certificate');
+        $this->ensureCurrentTermMeeting(
+            $meeting
+        );
 
-        if (! filled($appId) || ! filled($appCertificate)) {
+        $appId=config(
+            'services.agora.app_id'
+        );
+
+        $appCertificate=config(
+            'services.agora.app_certificate'
+        );
+
+        if(
+            !filled($appId)
+            ||
+            !filled($appCertificate)
+        ){
             return response()->json([
-                'message' => 'Agora is not configured. Set AGORA_APP_ID and AGORA_APP_CERTIFICATE in .env.',
-            ], 500);
+                'message'=>
+                    'Agora is not configured. Set AGORA_APP_ID and AGORA_APP_CERTIFICATE in .env.',
+            ],500);
         }
 
-        $uid = (int) request('uid', (auth()->user()->user_id ?? 0));
-        if ($uid <= 0) {
-            $uid = random_int(1000, 999999);
-        }
+        $uid=(int)request(
+            'uid',
+            auth()->user()->user_id ?? 0
+        );
 
-        try {
-            $expireAt = now()->addHours(4)->timestamp;
-            $token = RtcTokenBuilder::buildTokenWithUid(
-                $appId,
-                $appCertificate,
-                $this->channelName($meeting),
-                $uid,
-                RtcTokenBuilder::RolePublisher,
-                $expireAt
+        if($uid<=0){
+            $uid=random_int(
+                1000,
+                999999
             );
-        } catch (\Throwable $e) {
+        }
+
+        try{
+            $expireAt=now()
+                ->addHours(4)
+                ->timestamp;
+
+            $token=
+                RtcTokenBuilder::buildTokenWithUid(
+                    $appId,
+                    $appCertificate,
+                    $this->channelName($meeting),
+                    $uid,
+                    RtcTokenBuilder::RolePublisher,
+                    $expireAt
+                );
+
+        }catch(\Throwable $e){
             report($e);
 
             return response()->json([
-                'message' => 'Failed to generate Agora RTC token.',
-            ], 500);
+                'message'=>
+                    'Failed to generate Agora RTC token.',
+            ],500);
         }
 
-        $this->scoreMeetingAttendance($meeting);
+        $this->scoreMeetingAttendance(
+            $meeting
+        );
 
         return response()->json([
-            'appId' => $appId,
-            'token' => $token,
-            'channel' => $this->channelName($meeting),
-            'uid' => $uid,
-            'name' => $this->currentUserName(),
-            'title' => $meeting->title,
+            'appId'=>$appId,
+            'token'=>$token,
+            'channel'=>$this->channelName($meeting),
+            'uid'=>$uid,
+            'name'=>$this->currentUserName(),
+            'title'=>$meeting->title,
         ]);
     }
 
     protected function pageContext(): array
     {
-        abort_unless(auth()->check() && auth()->user()->role === 'sk_chairman', 403);
+        abort_unless(
+            auth()->check()
+            &&
+            auth()->user()->role==='sk_chairman',
+            403
+        );
 
-        // Shared topbar/sidebar data for the SK Chairman meetings page.
-        $user = auth()->user();
-        $fullName = trim(($user->first_name ?? '') . ' ' . ($user->last_name ?? '')) ?: 'User';
+        $user=auth()->user();
 
-        $menuItems = [
-            ['link' => route('sk_chairman.home'), 'icon' => '&#127968;', 'label' => 'Home'],
-            ['link' => route('sk_chairman.reports'), 'icon' => '&#128196;', 'label' => 'Reports'],
-            ['link' => route('sk_chairman.budget'), 'icon' => '&#128229;', 'label' => 'Budget'],
-            ['link' => route('sk_chairman.announcements'), 'icon' => '&#128226;', 'label' => 'Announcements'],
-            ['link' => route('sk_chairman.calendar'), 'icon' => '&#128197;', 'label' => 'Calendar'],
-            ['link' => route('sk_chairman.chat'), 'icon' => '&#128172;', 'label' => 'Chat'],
-            ['link' => route('sk_chairman.meetings'), 'icon' => '&#128222;', 'label' => 'Meetings'],
-            ['link' => route('sk_chairman.rankings'), 'icon' => '&#127942;', 'label' => 'Rankings'],
-            ['link' => route('sk_chairman.leadership'), 'icon' => '&#128101;', 'label' => 'Leadership'],
-            ['link' => route('sk_chairman.archive'), 'icon' => '&#128465;', 'label' => 'Archive'],
+        $fullName=trim(
+            ($user->first_name ?? '').
+            ' '.
+            ($user->last_name ?? '')
+        ) ?: 'User';
+
+        $menuItems=[
+            ['link'=>route('sk_chairman.home'),'icon'=>'&#127968;','label'=>'Home'],
+            ['link'=>route('sk_chairman.reports'),'icon'=>'&#128196;','label'=>'Reports'],
+            ['link'=>route('sk_chairman.budget'),'icon'=>'&#128229;','label'=>'Budget'],
+            ['link'=>route('sk_chairman.announcements'),'icon'=>'&#128226;','label'=>'Announcements'],
+            ['link'=>route('sk_chairman.calendar'),'icon'=>'&#128197;','label'=>'Calendar'],
+            ['link'=>route('sk_chairman.chat'),'icon'=>'&#128172;','label'=>'Chat'],
+            ['link'=>route('sk_chairman.meetings'),'icon'=>'&#128222;','label'=>'Meetings'],
+            ['link'=>route('sk_chairman.rankings'),'icon'=>'&#127942;','label'=>'Rankings'],
+            ['link'=>route('sk_chairman.leadership'),'icon'=>'&#128101;','label'=>'Leadership'],
+            ['link'=>route('sk_chairman.archive'),'icon'=>'&#128465;','label'=>'Archive'],
         ];
 
-        return [$fullName, $menuItems];
+        return [
+            $fullName,
+            $menuItems,
+        ];
     }
 
     protected function currentUserName(): string
     {
-        $user = auth()->user();
+        $user=auth()->user();
 
-        return trim(($user->first_name ?? '') . ' ' . ($user->last_name ?? '')) ?: 'User';
+        return trim(
+            ($user->first_name ?? '').
+            ' '.
+            ($user->last_name ?? '')
+        ) ?: 'User';
     }
 
     protected function participantNames(): array
     {
         return User::query()
-            ->whereIn('role', ['sk_president', 'sk_chairman', 'sk_secretary'])
-            ->get(['user_id', 'first_name', 'last_name', 'email'])
-            ->mapWithKeys(function (User $user) {
-                $name = trim(($user->first_name ?? '') . ' ' . ($user->last_name ?? '')) ?: ($user->email ?: 'User');
+            ->whereIn('role',[
+                'sk_president',
+                'sk_chairman',
+                'sk_secretary',
+            ])
+            ->where('status','active')
+            ->whereNull('archived_at')
+            ->get([
+                'user_id',
+                'first_name',
+                'last_name',
+                'email',
+            ])
+            ->mapWithKeys(function(User $user){
+                $name=trim(
+                    ($user->first_name ?? '').
+                    ' '.
+                    ($user->last_name ?? '')
+                ) ?: (
+                    $user->email
+                    ?: 'User'
+                );
 
-                return [(string) $user->user_id => $name];
+                return [
+                    (string)$user->user_id=>$name,
+                ];
             })
             ->all();
     }
 
     protected function decorateMeeting(Meeting $meeting): Meeting
     {
-        // Adds display-only fields used by the meeting cards.
-        $scheduledAt = $meeting->scheduled_at;
-        $meeting->scheduled_at = $scheduledAt;
-        $meeting->ends_at = $scheduledAt->copy()->addHour();
-        $meeting->display_datetime = $scheduledAt->format('Y-m-d h:i A');
-        $meeting->preview_datetime = $scheduledAt->format('M d, Y h:i A');
-        $meeting->status_label = match ($meeting->status) {
-            'completed' => 'Completed',
-            'cancelled' => 'Cancelled',
-            default => $meeting->scheduled_at->isFuture() ? 'Upcoming' : 'Ready',
-        };
+        $scheduledAt=$meeting->scheduled_at;
+
+        $meeting->scheduled_at=
+            $scheduledAt;
+
+        $meeting->ends_at=
+            $scheduledAt
+                ->copy()
+                ->addHour();
+
+        $meeting->display_datetime=
+            $scheduledAt->format(
+                'Y-m-d h:i A'
+            );
+
+        $meeting->preview_datetime=
+            $scheduledAt->format(
+                'M d, Y h:i A'
+            );
+
+        $meeting->status_label=
+            match($meeting->status){
+                'completed'=>'Completed',
+                'cancelled'=>'Cancelled',
+
+                default=>
+                    $meeting->scheduled_at->isFuture()
+                        ? 'Upcoming'
+                        : 'Ready',
+            };
 
         return $meeting;
     }
 
-    protected function completeElapsedMeetings(): void
+    protected function completeElapsedMeetings(?int $termId): void
     {
-        // Moves meetings to Past Meetings after their one-hour meeting window ends.
-        Meeting::query()
-            ->where('status', 'scheduled')
-            ->get()
-            ->each(function (Meeting $meeting) {
-                $scheduledAt = $meeting->scheduled_at;
+        if(!$termId){
+            return;
+        }
 
-                if ($scheduledAt->copy()->addHour()->isPast()) {
-                    $meeting->status = 'completed';
-                    $meeting->updated_at = now();
+        Meeting::query()
+            ->where('term_id',$termId)
+            ->where('status','scheduled')
+            ->get()
+            ->each(function(Meeting $meeting){
+                $scheduledAt=
+                    $meeting->scheduled_at;
+
+                if(
+                    $scheduledAt
+                        ->copy()
+                        ->addHour()
+                        ->isPast()
+                ){
+                    $meeting->status='completed';
+                    $meeting->updated_at=now();
                     $meeting->save();
                 }
             });
     }
 
-    protected function channelName(Meeting $meeting): string
-    {
-        return 'meeting-' . $meeting->meeting_id;
-    }
-
     protected function scoreMeetingAttendance(Meeting $meeting): void
     {
-        $user = auth()->user();
+        $user=auth()->user();
 
-        if (empty($user->barangay_id)) {
+        if(empty($user->barangay_id)){
             return;
         }
 
         app(RankingPointsService::class)->award(
-            (int) $user->barangay_id,
+            (int)$user->barangay_id,
             RankingPointsService::MEETING_ATTENDANCE,
             'meeting',
             $meeting->meeting_id,
-            (int) $user->user_id
+            (int)$user->user_id
         );
+    }
+
+    protected function ensureCurrentTermMeeting(Meeting $meeting): void
+    {
+        $currentTermId=
+            $this->currentTermId();
+
+        abort_unless(
+            $currentTermId
+            &&
+            (int)$meeting->term_id===
+                $currentTermId,
+            404
+        );
+    }
+
+    protected function currentTermId(): ?int
+    {
+        $termId=DB::table(
+            'administration_terms'
+        )
+            ->where(
+                'status',
+                'current'
+            )
+            ->orderByDesc(
+                'term_id'
+            )
+            ->value(
+                'term_id'
+            );
+
+        return $termId
+            ? (int)$termId
+            : null;
+    }
+
+    protected function channelName(Meeting $meeting): string
+    {
+        return
+            'meeting-'.
+            $meeting->meeting_id;
     }
 }

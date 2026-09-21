@@ -11,9 +11,10 @@ class AnnouncementController extends Controller
 {
     public function index(Request $request): View
     {
-        abort_unless(auth()->check() && auth()->user()->role === 'sk_secretary', 403);
+        abort_unless(auth()->check() && auth()->user()->role === 'sk_secretary',403);
 
         $user=auth()->user();
+        $currentTermId=$this->currentTermId();
 
         $fullName=trim(
             ($user->first_name ?? '').
@@ -39,6 +40,7 @@ class AnnouncementController extends Controller
             ])
             ->select(
                 'a.announcement_id',
+                'a.term_id',
                 'a.user_id',
                 'a.title',
                 'a.content',
@@ -54,6 +56,15 @@ class AnnouncementController extends Controller
                     ) as author_name"
                 )
             );
+
+        if($currentTermId){
+            $query->where(
+                'a.term_id',
+                $currentTermId
+            );
+        }else{
+            $query->whereRaw('1 = 0');
+        }
 
         if($search!==''){
             $query->where(function($q) use($search){
@@ -168,6 +179,18 @@ class AnnouncementController extends Controller
             'search'=>$search,
             'sort'=>$sort,
         ]);
+    }
+
+    protected function currentTermId(): ?int
+    {
+        $termId=DB::table('administration_terms')
+            ->where('status','current')
+            ->orderByDesc('term_id')
+            ->value('term_id');
+
+        return $termId
+            ? (int)$termId
+            : null;
     }
 
     protected function menuItems(): array

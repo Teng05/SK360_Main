@@ -13,10 +13,19 @@ class HomeController extends Controller
     public function index(): View
     {
         $visitorToken=$this->visitorToken();
+        $currentTermId=$this->currentTermId();
+
+        if(!$currentTermId){
+            return view('public_portal.home',[
+                'latestUpdates'=>collect(),
+                'upcomingEvents'=>collect(),
+            ]);
+        }
 
         $announcementUpdates=DB::table('announcements as a')
             ->leftJoin('users as u','a.user_id','=','u.user_id')
             ->leftJoin('barangays as b','u.barangay_id','=','b.barangay_id')
+            ->where('a.term_id',$currentTermId)
             ->where('a.visibility','public')
             ->select(
                 'a.announcement_id',
@@ -86,6 +95,7 @@ class HomeController extends Controller
             });
 
         $eventUpdates=DB::table('events')
+            ->where('term_id',$currentTermId)
             ->where('visibility','public')
             ->orderByDesc('created_at')
             ->limit(10)
@@ -106,6 +116,7 @@ class HomeController extends Controller
             ->values();
 
         $upcomingEvents=DB::table('events')
+            ->where('term_id',$currentTermId)
             ->where('visibility','public')
             ->where('end_datetime','>=',now())
             ->orderBy('start_datetime')
@@ -116,6 +127,16 @@ class HomeController extends Controller
             'latestUpdates'=>$latestUpdates,
             'upcomingEvents'=>$upcomingEvents,
         ]);
+    }
+
+    protected function currentTermId(): ?int
+    {
+        $termId=DB::table('administration_terms')
+            ->where('status','current')
+            ->orderByDesc('term_id')
+            ->value('term_id');
+
+        return $termId ? (int)$termId : null;
     }
 
     protected function visitorToken(): string

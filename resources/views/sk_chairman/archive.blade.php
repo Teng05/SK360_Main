@@ -11,12 +11,12 @@
 <div class="flex h-screen bg-gray-100">
     <div class="w-64 bg-red-600 text-white flex flex-col p-3 overflow-y-auto">
         <div class="flex items-center gap-3 mb-4">
-    <img src="{{ asset('images/logo.png') }}" class="w-8 h-8 rounded-full object-cover"  alt="logo">
-    <div class="leading-tight">
-        <h2 class="text-lg font-extrabold tracking-wide">SK 360°</h2>
-        <p class="text-[10px] opacity-80">Management System</p>
-    </div>
-</div>
+            <img src="{{ asset('images/logo.png') }}" class="w-8 h-8 rounded-full object-cover" alt="logo">
+            <div class="leading-tight">
+                <h2 class="text-lg font-extrabold tracking-wide">SK 360°</h2>
+                <p class="text-[10px] opacity-80">Management System</p>
+            </div>
+        </div>
 
         <div class="bg-red-500 rounded-lg p-2 flex items-center gap-2 mb-3 shadow text-xs">
             <div class="bg-yellow-400 text-red-600 p-1 rounded-full text-sm">&#128100;</div>
@@ -90,7 +90,7 @@
                 <div class="mb-6 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                     <div>
                         <h2 class="text-lg font-bold text-gray-900">All Documents</h2>
-                        <p class="text-sm text-gray-500">Search and filter archived documents</p>
+                        <p class="text-sm text-gray-500">Search and filter archived documents by administration, year, and type</p>
                     </div>
                     <a href="{{ route('sk_chairman.archive.bulk-download', request()->query()) }}" class="rounded-xl bg-gray-100 px-4 py-2 text-xs font-bold text-gray-700 hover:bg-gray-200 transition">
                         &#128229; Bulk Download
@@ -104,7 +104,22 @@
                 @endif
 
                 <form method="GET" action="{{ route('sk_chairman.archive') }}" class="mb-5 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                    <div class="flex flex-col gap-3 sm:flex-row">
+                    <div class="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+                        <label class="sr-only" for="archive_term">Filter by administration</label>
+                        <select
+                            id="archive_term"
+                            name="term_id"
+                            onchange="this.form.submit()"
+                            class="min-w-[220px] rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-red-300"
+                        >
+                            <option value="">All Administrations</option>
+                            @foreach ($administrationTerms as $term)
+                                <option value="{{ $term->term_id }}" {{ (int) ($filters['term_id'] ?? 0) === (int) $term->term_id ? 'selected' : '' }}>
+                                    Administration {{ $term->start_year }}-{{ $term->end_year }}
+                                </option>
+                            @endforeach
+                        </select>
+
                         <label class="sr-only" for="archive_year">Filter by year</label>
                         <select
                             id="archive_year"
@@ -132,13 +147,27 @@
                         </select>
                     </div>
 
-                    @if ($filters['year'] !== '' || $filters['type'] !== '')
+                    @if (($filters['term_id'] ?? null) || $filters['year'] !== '' || $filters['type'] !== '')
                         <a href="{{ route('sk_chairman.archive') }}" class="text-xs font-bold text-red-600 hover:text-red-700">Clear filters</a>
                     @endif
                 </form>
 
                 <div class="mb-4 flex items-center justify-between text-xs text-gray-400">
                     <span>Showing {{ $documentCount }} documents</span>
+
+                    @if ($filters['term_id'] ?? null)
+                        @php
+                            $selectedAdministration = $administrationTerms->firstWhere('term_id', $filters['term_id']);
+                        @endphp
+
+                        @if ($selectedAdministration)
+                            <span class="rounded-full bg-red-50 px-3 py-1 font-bold text-red-600">
+                                Administration {{ $selectedAdministration->start_year }}-{{ $selectedAdministration->end_year }}
+                            </span>
+                        @endif
+                    @else
+                        <span>All completed administrations</span>
+                    @endif
                 </div>
 
                 <div class="space-y-3">
@@ -149,6 +178,9 @@
                                 <div>
                                     <h3 class="text-sm font-bold text-gray-800">{{ $document->title }}</h3>
                                     <div class="mt-2 flex flex-wrap items-center gap-2 text-[10px]">
+                                        <span class="rounded-full bg-red-50 px-2 py-1 font-bold text-red-600">
+                                            {{ $document->administration_label }}
+                                        </span>
                                         <span class="rounded-full bg-blue-50 px-2 py-1 font-bold text-blue-600">{{ $document->category }}</span>
                                         <span class="rounded-full bg-gray-100 px-2 py-1 font-bold text-gray-600">{{ $document->badge }}</span>
                                         <span class="rounded-full bg-gray-100 px-2 py-1 font-bold text-gray-600">{{ $document->owner ?: $barangayName }}</span>
@@ -168,14 +200,14 @@
                             @endif
                         </div>
                     @empty
-                        <p class="text-sm text-gray-400 italic">No archived documents found.</p>
+                        <p class="text-sm text-gray-400 italic">No archived documents found for the selected filters.</p>
                     @endforelse
                 </div>
             </div>
 
             <div class="mt-6 rounded-2xl border border-purple-100 bg-purple-50 p-5 text-sm text-purple-700">
                 <h3 class="mb-2 font-black">Archive Information</h3>
-                <p>This archive shows documents tied to Barangay {{ $barangayName }} plus federation-wide records that apply to SK Chairmen.</p>
+                <p>This archive shows historical records from completed SK administrations for Barangay {{ $barangayName }}, together with federation-wide records available to SK Chairmen.</p>
             </div>
         </main>
     </div>
@@ -201,4 +233,3 @@
     }
 </script>
 @endpush
-

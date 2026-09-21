@@ -11,6 +11,8 @@ class BudgetController extends Controller
 {
     public function index(Request $request): View
     {
+        $currentTermId = $this->currentTermId();
+
         $barangays = DB::table('barangays')
             ->orderBy('barangay_name')
             ->get([
@@ -18,76 +20,97 @@ class BudgetController extends Controller
                 'barangay_name',
             ]);
 
-        $availableYears = DB::table('budget_reports')
-            ->where('budget_category', 'annual_budget')
-            ->whereNotNull('fiscal_year')
-            ->whereIn('status', [
-                'recorded',
-                'submitted',
-                'archived',
-            ])
-            ->distinct()
-            ->orderByDesc('fiscal_year')
-            ->pluck('fiscal_year')
-            ->map(fn ($year) => (int) $year)
-            ->values();
+        $availableYears = collect();
+
+        if ($currentTermId) {
+            $availableYears = DB::table('budget_reports')
+                ->where('term_id', $currentTermId)
+                ->where('budget_category', 'annual_budget')
+                ->whereNotNull('fiscal_year')
+                ->whereIn('status', [
+                    'recorded',
+                    'submitted',
+                    'archived',
+                ])
+                ->distinct()
+                ->orderByDesc('fiscal_year')
+                ->pluck('fiscal_year')
+                ->map(fn ($year) => (int) $year)
+                ->values();
+        }
 
         $selectedYear = $request->filled('year')
             ? (int) $request->query('year')
             : (int) ($availableYears->first() ?? now()->year);
 
+        if (!$availableYears->contains($selectedYear) && $availableYears->isNotEmpty()) {
+            $selectedYear = (int) $availableYears->first();
+        }
+
         $selectedBarangay = $request->filled('barangay_id')
             ? (int) $request->query('barangay_id')
             : null;
 
-        $budgetQuery = DB::table('budget_reports as br')
-            ->join(
-                'barangays as b',
-                'b.barangay_id',
-                '=',
-                'br.barangay_id'
-            )
-            ->where(
-                'br.budget_category',
-                'annual_budget'
-            )
-            ->where(
-                'br.fiscal_year',
-                $selectedYear
-            )
-            ->whereIn(
-                'br.status',
-                [
-                    'recorded',
-                    'submitted',
-                    'archived',
-                ]
-            );
-
-        if ($selectedBarangay) {
-            $budgetQuery->where(
-                'br.barangay_id',
-                $selectedBarangay
-            );
+        if ($selectedBarangay && !$barangays->contains('barangay_id', $selectedBarangay)) {
+            $selectedBarangay = null;
         }
 
-        $budgetRecords = $budgetQuery
-            ->orderByDesc('br.submitted_at')
-            ->orderByDesc('br.budget_report_id')
-            ->get([
-                'br.budget_report_id',
-                'br.barangay_id',
-                'br.fiscal_year',
-                'br.title',
-                'br.total_amount',
-                'br.uploaded_file_name',
-                'br.uploaded_file_path',
-                'br.status',
-                'br.submitted_at',
-                'b.barangay_name',
-            ])
-            ->unique('barangay_id')
-            ->keyBy('barangay_id');
+        $budgetRecords = collect();
+
+        if ($currentTermId) {
+            $budgetQuery = DB::table('budget_reports as br')
+                ->join(
+                    'barangays as b',
+                    'b.barangay_id',
+                    '=',
+                    'br.barangay_id'
+                )
+                ->where(
+                    'br.term_id',
+                    $currentTermId
+                )
+                ->where(
+                    'br.budget_category',
+                    'annual_budget'
+                )
+                ->where(
+                    'br.fiscal_year',
+                    $selectedYear
+                )
+                ->whereIn(
+                    'br.status',
+                    [
+                        'recorded',
+                        'submitted',
+                        'archived',
+                    ]
+                );
+
+            if ($selectedBarangay) {
+                $budgetQuery->where(
+                    'br.barangay_id',
+                    $selectedBarangay
+                );
+            }
+
+            $budgetRecords = $budgetQuery
+                ->orderByDesc('br.submitted_at')
+                ->orderByDesc('br.budget_report_id')
+                ->get([
+                    'br.budget_report_id',
+                    'br.barangay_id',
+                    'br.fiscal_year',
+                    'br.title',
+                    'br.total_amount',
+                    'br.uploaded_file_name',
+                    'br.uploaded_file_path',
+                    'br.status',
+                    'br.submitted_at',
+                    'b.barangay_name',
+                ])
+                ->unique('barangay_id')
+                ->keyBy('barangay_id');
+        }
 
         $displayBarangays = $barangays;
 
@@ -186,5 +209,15 @@ class BudgetController extends Controller
                     $totalBudget,
             ]
         );
+    }
+
+    protected function currentTermId(): ?int
+    {
+        $termId = DB::table('administration_terms')
+            ->where('status', 'current')
+            ->orderByDesc('term_id')
+            ->value('term_id');
+
+        return $termId ? (int) $termId : null;
     }
 }

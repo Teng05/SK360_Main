@@ -1,7 +1,5 @@
 <?php
 
-// File guide: Handles route logic and page data for app/Http/Controllers/sk_pres/ModuleController.php.
-
 namespace App\Http\Controllers\sk_pres;
 
 use App\Http\Controllers\Controller;
@@ -17,140 +15,225 @@ class ModuleController extends Controller
 {
     public function index(): View
     {
-        abort_unless(auth()->check() && auth()->user()->role === 'sk_president', 403);
+        abort_unless(auth()->check() && auth()->user()->role === 'sk_president',403);
 
-        $user = auth()->user();
-        $fullName = trim(($user->first_name ?? '').' '.($user->last_name ?? '')) ?: 'User';
+        $user=auth()->user();
+        $fullName=trim(($user->first_name ?? '').' '.($user->last_name ?? '')) ?: 'User';
+        $currentTermId=$this->currentTermId();
 
-        $menuItems = [
-            ['link' => route('sk_pres.home'), 'icon' => '🏠', 'label' => 'Home'],
-            ['link' => route('sk_pres.dashboard'), 'icon' => '📊', 'label' => 'Dashboard'],
-            ['link' => route('sk_pres.consolidation'), 'icon' => '📁', 'label' => 'Consolidation'],
-            ['link' => route('sk_pres.module'), 'icon' => '⚙️', 'label' => 'Module Management'],
-            ['link' => route('sk_pres.announcements'), 'icon' => '📢', 'label' => 'Announcements'],
-            ['link' => route('sk_pres.calendar'), 'icon' => '📅', 'label' => 'Calendar'],
-            ['link' => route('sk_pres.chat'), 'icon' => '💬', 'label' => 'Chat'],
-            ['link' => route('sk_pres.meetings'), 'icon' => '📞', 'label' => 'Meetings'],
-            ['link' => route('sk_pres.rankings'), 'icon' => '🏆', 'label' => 'Rankings'],
-            ['link' => route('sk_pres.leadership'), 'icon' => '👥', 'label' => 'Leadership'],
-            ['link' => route('sk_pres.archive'), 'icon' => '🗂️', 'label' => 'Archive'],
-            ['link' => route('sk_pres.user-management'), 'icon' => '👤', 'label' => 'User Management'],
+        $menuItems=[
+            ['link'=>route('sk_pres.home'),'icon'=>'🏠','label'=>'Home'],
+            ['link'=>route('sk_pres.dashboard'),'icon'=>'📊','label'=>'Dashboard'],
+            ['link'=>route('sk_pres.consolidation'),'icon'=>'📁','label'=>'Consolidation'],
+            ['link'=>route('sk_pres.module'),'icon'=>'⚙️','label'=>'Module Management'],
+            ['link'=>route('sk_pres.announcements'),'icon'=>'📢','label'=>'Announcements'],
+            ['link'=>route('sk_pres.calendar'),'icon'=>'📅','label'=>'Calendar'],
+            ['link'=>route('sk_pres.chat'),'icon'=>'💬','label'=>'Chat'],
+            ['link'=>route('sk_pres.meetings'),'icon'=>'📞','label'=>'Meetings'],
+            ['link'=>route('sk_pres.rankings'),'icon'=>'🏆','label'=>'Rankings'],
+            ['link'=>route('sk_pres.leadership'),'icon'=>'👥','label'=>'Leadership'],
+            ['link'=>route('sk_pres.archive'),'icon'=>'🗂️','label'=>'Archive'],
+            ['link'=>route('sk_pres.user-management'),'icon'=>'👤','label'=>'User Management'],
         ];
 
-        $slots = DB::table('submission_slots')
-            ->orderByDesc('created_at')
-            ->get();
+        $slots=$currentTermId
+            ? DB::table('submission_slots')
+                ->where('term_id',$currentTermId)
+                ->orderByDesc('created_at')
+                ->get()
+            : collect();
 
-        $totalSlots = $slots->count();
-        $openSlots = $slots->where('status', 'open')->count();
-        $currentSubmissionValue = $openSlots.'/'.$totalSlots;
-        $allTimeTotal = $totalSlots;
+        $totalSlots=$slots->count();
+        $openSlots=$slots->where('status','open')->count();
+        $currentSubmissionValue=$openSlots.'/'.$totalSlots;
 
-        return view('sk_pres.module', [
-            'fullName' => $fullName,
-            'menuItems' => $menuItems,
-            'currentUrl' => url()->current(),
-            'slots' => $slots,
-            'summaryCards' => [
-                ['label' => 'Total Slots', 'value' => $totalSlots, 'border' => 'border-red-400', 'iconBg' => 'bg-red-50', 'iconColor' => 'text-red-500', 'icon' => '📋'],
-                ['label' => 'Open Slots', 'value' => $openSlots, 'border' => 'border-green-400', 'iconBg' => 'bg-green-50', 'iconColor' => 'text-green-500', 'icon' => '🔓'],
-                ['label' => 'Current Submissions', 'value' => $currentSubmissionValue, 'border' => 'border-blue-400', 'iconBg' => 'bg-blue-50', 'iconColor' => 'text-blue-500', 'icon' => '☑️'],
-                ['label' => 'All-Time Total', 'value' => $allTimeTotal, 'border' => 'border-yellow-400', 'iconBg' => 'bg-yellow-50', 'iconColor' => 'text-yellow-500', 'icon' => '👥'],
+        $allTimeTotal=DB::table('submission_slots')->count();
+
+        return view('sk_pres.module',[
+            'fullName'=>$fullName,
+            'menuItems'=>$menuItems,
+            'currentUrl'=>url()->current(),
+            'slots'=>$slots,
+            'summaryCards'=>[
+                [
+                    'label'=>'Total Slots',
+                    'value'=>$totalSlots,
+                    'border'=>'border-red-400',
+                    'iconBg'=>'bg-red-50',
+                    'iconColor'=>'text-red-500',
+                    'icon'=>'📋',
+                ],
+                [
+                    'label'=>'Open Slots',
+                    'value'=>$openSlots,
+                    'border'=>'border-green-400',
+                    'iconBg'=>'bg-green-50',
+                    'iconColor'=>'text-green-500',
+                    'icon'=>'🔓',
+                ],
+                [
+                    'label'=>'Current Submissions',
+                    'value'=>$currentSubmissionValue,
+                    'border'=>'border-blue-400',
+                    'iconBg'=>'bg-blue-50',
+                    'iconColor'=>'text-blue-500',
+                    'icon'=>'☑️',
+                ],
+                [
+                    'label'=>'All-Time Total',
+                    'value'=>$allTimeTotal,
+                    'border'=>'border-yellow-400',
+                    'iconBg'=>'bg-yellow-50',
+                    'iconColor'=>'text-yellow-500',
+                    'icon'=>'👥',
+                ],
             ],
         ]);
     }
 
     public function live(): JsonResponse
     {
-        abort_unless(auth()->check() && auth()->user()->role === 'sk_president', 403);
+        abort_unless(auth()->check() && auth()->user()->role === 'sk_president',403);
 
         return response()->json($this->modulePayload());
     }
 
-    public function storeLive(Request $request, NotificationService $notifications): JsonResponse
+    public function storeLive(Request $request,NotificationService $notifications): JsonResponse
     {
-        abort_unless(auth()->check() && auth()->user()->role === 'sk_president', 403);
+        abort_unless(auth()->check() && auth()->user()->role === 'sk_president',403);
 
-        $validated = $this->validateSlot($request);
+        $currentTermId=$this->currentTermId();
 
-        DB::table('submission_slots')->insert(
-            $this->slotData($validated)
+        if(!$currentTermId){
+            return response()->json([
+                'message'=>'There is no active administration term. Start a new administration term first.',
+            ],422);
+        }
+
+        $validated=$this->validateSlot($request);
+
+        $slotId=DB::table('submission_slots')->insertGetId(
+            $this->slotData($validated,$currentTermId),
+            'slot_id'
         );
 
         $notifications->notifySubmissionSlotCreated([
-            'submission_type' => $validated['submission_type'],
-            'title' => $validated['submission_title'],
-            'role' => $validated['submission_role'],
-            'start_date' => $validated['start_date'],
-            'end_date' => $validated['end_date'],
-        ], auth()->user());
+            'slot_id'=>$slotId,
+            'submission_type'=>$validated['submission_type'],
+            'title'=>$validated['submission_title'],
+            'role'=>$validated['submission_role'],
+            'start_date'=>$validated['start_date'],
+            'end_date'=>$validated['end_date'],
+        ],auth()->user());
 
         return response()->json($this->modulePayload());
     }
 
     public function destroyLive(int $slotId): JsonResponse
     {
-        abort_unless(auth()->check() && auth()->user()->role === 'sk_president', 403);
+        abort_unless(auth()->check() && auth()->user()->role === 'sk_president',403);
 
-        DB::table('submission_slots')
-            ->where('slot_id', $slotId)
+        $currentTermId=$this->currentTermId();
+
+        if(!$currentTermId){
+            return response()->json([
+                'message'=>'There is no active administration term.',
+            ],422);
+        }
+
+        $deleted=DB::table('submission_slots')
+            ->where('slot_id',$slotId)
+            ->where('term_id',$currentTermId)
             ->delete();
+
+        if(!$deleted){
+            return response()->json([
+                'message'=>'Submission slot was not found in the current administration.',
+            ],404);
+        }
 
         return response()->json($this->modulePayload());
     }
 
-    public function store(Request $request, NotificationService $notifications): RedirectResponse
+    public function store(Request $request,NotificationService $notifications): RedirectResponse
     {
-        abort_unless(auth()->check() && auth()->user()->role === 'sk_president', 403);
+        abort_unless(auth()->check() && auth()->user()->role === 'sk_president',403);
 
-        $validated = $this->validateSlot($request);
+        $currentTermId=$this->currentTermId();
 
-        DB::table('submission_slots')->insert(
-            $this->slotData($validated)
+        if(!$currentTermId){
+            return back()
+                ->withInput()
+                ->with('warning','There is no active administration term. Start a new administration term first.');
+        }
+
+        $validated=$this->validateSlot($request);
+
+        $slotId=DB::table('submission_slots')->insertGetId(
+            $this->slotData($validated,$currentTermId),
+            'slot_id'
         );
 
         $notifications->notifySubmissionSlotCreated([
-            'submission_type' => $validated['submission_type'],
-            'title' => $validated['submission_title'],
-            'role' => $validated['submission_role'],
-            'start_date' => $validated['start_date'],
-            'end_date' => $validated['end_date'],
-        ], auth()->user());
+            'slot_id'=>$slotId,
+            'submission_type'=>$validated['submission_type'],
+            'title'=>$validated['submission_title'],
+            'role'=>$validated['submission_role'],
+            'start_date'=>$validated['start_date'],
+            'end_date'=>$validated['end_date'],
+        ],auth()->user());
 
         return redirect()
             ->route('sk_pres.module')
-            ->with('status', 'Submission slot created successfully.');
+            ->with('status','Submission slot created successfully.');
     }
 
     public function destroy(int $slotId): RedirectResponse
     {
-        abort_unless(auth()->check() && auth()->user()->role === 'sk_president', 403);
+        abort_unless(auth()->check() && auth()->user()->role === 'sk_president',403);
 
-        DB::table('submission_slots')
-            ->where('slot_id', $slotId)
+        $currentTermId=$this->currentTermId();
+
+        if(!$currentTermId){
+            return back()->with(
+                'warning',
+                'There is no active administration term.'
+            );
+        }
+
+        $deleted=DB::table('submission_slots')
+            ->where('slot_id',$slotId)
+            ->where('term_id',$currentTermId)
             ->delete();
+
+        if(!$deleted){
+            return back()->with(
+                'warning',
+                'Submission slot was not found in the current administration.'
+            );
+        }
 
         return redirect()
             ->route('sk_pres.module')
-            ->with('status', 'Submission slot deleted successfully.');
+            ->with('status','Submission slot deleted successfully.');
     }
 
     protected function validateSlot(Request $request): array
     {
-        $isBudget = $request->input('submission_type') === 'budget_report';
+        $isBudget=$request->input('submission_type') === 'budget_report';
 
-        $isCoaReport = $isBudget &&
+        $isCoaReport=$isBudget &&
             $request->input('budget_category') === 'coa_report';
 
-        $period = $request->input('budget_period_type');
+        $period=$request->input('budget_period_type');
 
         return $request->validate([
-            'submission_type' => [
+            'submission_type'=>[
                 'required',
                 'in:accomplishment_report,budget_report',
             ],
 
-            'budget_category' => [
+            'budget_category'=>[
                 Rule::requiredIf($isBudget),
                 'nullable',
                 Rule::in([
@@ -160,7 +243,7 @@ class ModuleController extends Controller
                 ]),
             ],
 
-            'fiscal_year' => [
+            'fiscal_year'=>[
                 Rule::requiredIf($isBudget),
                 'nullable',
                 'integer',
@@ -168,7 +251,7 @@ class ModuleController extends Controller
                 'max:2100',
             ],
 
-            'budget_period_type' => [
+            'budget_period_type'=>[
                 Rule::requiredIf($isCoaReport),
                 'nullable',
                 Rule::in([
@@ -179,7 +262,7 @@ class ModuleController extends Controller
                 ]),
             ],
 
-            'fiscal_month' => [
+            'fiscal_month'=>[
                 Rule::requiredIf($isCoaReport && $period === 'monthly'),
                 'nullable',
                 'integer',
@@ -187,40 +270,48 @@ class ModuleController extends Controller
                 'max:12',
             ],
 
-            'fiscal_quarter' => [
+            'fiscal_quarter'=>[
                 Rule::requiredIf($isCoaReport && $period === 'quarterly'),
                 'nullable',
-                Rule::in(['Q1', 'Q2', 'Q3', 'Q4']),
+                Rule::in([
+                    'Q1',
+                    'Q2',
+                    'Q3',
+                    'Q4',
+                ]),
             ],
 
-            'fiscal_half' => [
+            'fiscal_half'=>[
                 Rule::requiredIf($isCoaReport && $period === 'semi_annual'),
                 'nullable',
-                Rule::in(['H1', 'H2']),
+                Rule::in([
+                    'H1',
+                    'H2',
+                ]),
             ],
 
-            'submission_title' => [
+            'submission_title'=>[
                 'required',
                 'string',
                 'max:255',
             ],
 
-            'description' => [
+            'description'=>[
                 'nullable',
                 'string',
             ],
 
-            'submission_role' => [
+            'submission_role'=>[
                 'required',
                 'in:SK Chairman,SK Secretary,Both',
             ],
 
-            'start_date' => [
+            'start_date'=>[
                 'required',
                 'date',
             ],
 
-            'end_date' => [
+            'end_date'=>[
                 'required',
                 'date',
                 'after_or_equal:start_date',
@@ -228,71 +319,89 @@ class ModuleController extends Controller
         ]);
     }
 
-    protected function slotData(array $validated): array
+    protected function slotData(array $validated,int $termId): array
     {
-        $isBudget = $validated['submission_type'] === 'budget_report';
+        $isBudget=$validated['submission_type'] === 'budget_report';
 
-        $isCoaReport = $isBudget &&
+        $isCoaReport=$isBudget &&
             ($validated['budget_category'] ?? null) === 'coa_report';
 
-        $period = $isCoaReport
+        $period=$isCoaReport
             ? ($validated['budget_period_type'] ?? null)
             : null;
 
         return [
-            'submission_type' => $validated['submission_type'],
+            'term_id'=>$termId,
+            'submission_type'=>$validated['submission_type'],
 
-            'budget_category' => $isBudget
+            'budget_category'=>$isBudget
                 ? ($validated['budget_category'] ?? null)
                 : null,
 
-            'fiscal_year' => $isBudget
+            'fiscal_year'=>$isBudget
                 ? ($validated['fiscal_year'] ?? null)
                 : null,
 
-            'budget_period_type' => $isCoaReport
+            'budget_period_type'=>$isCoaReport
                 ? $period
                 : null,
 
-            'fiscal_month' => $isCoaReport && $period === 'monthly'
+            'fiscal_month'=>$isCoaReport && $period === 'monthly'
                 ? ($validated['fiscal_month'] ?? null)
                 : null,
 
-            'fiscal_quarter' => $isCoaReport && $period === 'quarterly'
+            'fiscal_quarter'=>$isCoaReport && $period === 'quarterly'
                 ? ($validated['fiscal_quarter'] ?? null)
                 : null,
 
-            'fiscal_half' => $isCoaReport && $period === 'semi_annual'
+            'fiscal_half'=>$isCoaReport && $period === 'semi_annual'
                 ? ($validated['fiscal_half'] ?? null)
                 : null,
 
-            'title' => $validated['submission_title'],
-            'description' => $validated['description'] ?? null,
-            'role' => $validated['submission_role'],
-            'start_date' => $validated['start_date'],
-            'end_date' => $validated['end_date'],
-            'status' => 'open',
-            'created_at' => now(),
+            'title'=>$validated['submission_title'],
+            'description'=>$validated['description'] ?? null,
+            'role'=>$validated['submission_role'],
+            'start_date'=>$validated['start_date'],
+            'end_date'=>$validated['end_date'],
+            'status'=>'open',
+            'created_at'=>now(),
         ];
     }
 
     protected function modulePayload(): array
     {
-        $slots = DB::table('submission_slots')
-            ->orderByDesc('created_at')
-            ->get();
+        $currentTermId=$this->currentTermId();
+
+        $slots=$currentTermId
+            ? DB::table('submission_slots')
+                ->where('term_id',$currentTermId)
+                ->orderByDesc('created_at')
+                ->get()
+            : collect();
 
         return [
-            'slots' => $slots,
+            'slots'=>$slots,
 
-            'summary' => [
-                'totalSlots' => $slots->count(),
-                'openSlots' => $slots->where('status', 'open')->count(),
-                'closedSlots' => $slots->where('status', 'closed')->count(),
-                'allTimeTotal' => $slots->count(),
+            'summary'=>[
+                'totalSlots'=>$slots->count(),
+                'openSlots'=>$slots->where('status','open')->count(),
+                'closedSlots'=>$slots->where('status','closed')->count(),
+                'allTimeTotal'=>DB::table('submission_slots')->count(),
             ],
 
-            'updatedAt' => now()->format('M d, Y h:i A'),
+            'updatedAt'=>now()->format('M d, Y h:i A'),
         ];
+    }
+
+    protected function currentTermId(): ?int
+    {
+        $termId=DB::table('administration_terms')
+            ->where('status','current')
+            ->orderByDesc('term_id')
+            ->value('term_id');
+
+        return $termId
+            ? (int)$termId
+            : null;
     }
 }

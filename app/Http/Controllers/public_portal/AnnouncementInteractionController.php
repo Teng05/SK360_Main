@@ -307,6 +307,11 @@ class AnnouncementInteractionController extends Controller
             ],404);
         }
 
+        $this->ensureAccessibleAnnouncement(
+            $request,
+            (int)$feedback->announcement_id
+        );
+
         $verification=DB::table('feedback_verifications')
             ->where('feedback_id',$feedbackId)
             ->first();
@@ -374,7 +379,7 @@ class AnnouncementInteractionController extends Controller
         ]);
     }
 
-    public function resendFeedback(int $feedbackId): JsonResponse
+    public function resendFeedback(Request $request,int $feedbackId): JsonResponse
     {
         $feedback=DB::table('announcement_feedback')
             ->where('feedback_id',$feedbackId)
@@ -386,6 +391,11 @@ class AnnouncementInteractionController extends Controller
                 'message'=>'Feedback request not found or already verified.',
             ],404);
         }
+
+        $this->ensureAccessibleAnnouncement(
+            $request,
+            (int)$feedback->announcement_id
+        );
 
         $verification=DB::table('feedback_verifications')
             ->where('feedback_id',$feedbackId)
@@ -476,8 +486,14 @@ class AnnouncementInteractionController extends Controller
     protected function ensureAccessibleAnnouncement(
         Request $request,
         int $announcementId
-    ): void
-    {
+    ): void {
+        $currentTermId=$this->currentTermId();
+
+        abort_unless(
+            $currentTermId,
+            404
+        );
+
         $announcement=DB::table('announcements')
             ->where(
                 'announcement_id',
@@ -485,11 +501,17 @@ class AnnouncementInteractionController extends Controller
             )
             ->first([
                 'announcement_id',
+                'term_id',
                 'visibility',
             ]);
 
         abort_unless(
             $announcement,
+            404
+        );
+
+        abort_unless(
+            (int)$announcement->term_id===$currentTermId,
             404
         );
 
@@ -503,6 +525,18 @@ class AnnouncementInteractionController extends Controller
             $this->isOfficial($request),
             404
         );
+    }
+
+    protected function currentTermId(): ?int
+    {
+        $termId=DB::table('administration_terms')
+            ->where('status','current')
+            ->orderByDesc('term_id')
+            ->value('term_id');
+
+        return $termId
+            ? (int)$termId
+            : null;
     }
 
     protected function isOfficial(Request $request): bool

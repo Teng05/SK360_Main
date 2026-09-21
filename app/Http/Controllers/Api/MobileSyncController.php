@@ -42,7 +42,6 @@ class MobileSyncController extends Controller
                 ->get(['barangay_id', 'barangay_name']),
         ]);
     }
-
     public function login(Request $request): JsonResponse
     {
         $credentials = $request->validate([
@@ -63,6 +62,12 @@ class MobileSyncController extends Controller
 
         if ($user->status !== 'active' || ! $user->is_verified) {
             return response()->json(['message' => 'Account is not active or verified.'], 403);
+        }
+
+        if (! $this->hasCurrentOfficialAssignment($user)) {
+            return response()->json([
+                'message' => 'This account is not assigned to the current SK administration.',
+            ], 403);
         }
 
         $plainToken = Str::random(80);
@@ -232,22 +237,34 @@ class MobileSyncController extends Controller
             'message' => 'Logged out.',
         ]);
     }
-
     public function me(Request $request): JsonResponse
     {
+        $user = $request->user()->loadMissing('barangay');
+
+        if (! $this->hasCurrentOfficialAssignment($user)) {
+            return response()->json([
+                'message' => 'This account is not assigned to the current SK administration.',
+            ], 403);
+        }
+
         return response()->json([
-            'user' => $this->userPayload($request->user()->loadMissing('barangay')),
+            'user' => $this->userPayload($user),
         ]);
     }
-
     public function updateProfile(Request $request): JsonResponse
     {
+        $user = $request->user();
+
+        if (! $this->hasCurrentOfficialAssignment($user)) {
+            return response()->json([
+                'message' => 'This account is not assigned to the current SK administration.',
+            ], 403);
+        }
+
         $validated = $request->validate([
             'first_name' => ['required', 'string', 'max:50'],
             'last_name' => ['required', 'string', 'max:50'],
         ]);
-
-        $user = $request->user();
 
         $user->update([
             'first_name' => trim($validated['first_name']),
@@ -259,15 +276,20 @@ class MobileSyncController extends Controller
             'user' => $this->userPayload($user->fresh('barangay')),
         ]);
     }
-
     public function updatePassword(Request $request): JsonResponse
     {
+        $user = $request->user();
+
+        if (! $this->hasCurrentOfficialAssignment($user)) {
+            return response()->json([
+                'message' => 'This account is not assigned to the current SK administration.',
+            ], 403);
+        }
+
         $validated = $request->validate([
             'current_password' => ['required'],
             'password' => ['required', 'confirmed', 'min:8'],
         ]);
-
-        $user = $request->user();
 
         if (! Hash::check($validated['current_password'], $user->password)) {
             return response()->json(['message' => 'Current password is incorrect.'], 422);
@@ -281,17 +303,22 @@ class MobileSyncController extends Controller
             'message' => 'Password updated successfully.',
         ]);
     }
-
     public function requestPasswordChange(Request $request): JsonResponse
     {
+        $user = $request->user();
+
+        if (! $this->hasCurrentOfficialAssignment($user)) {
+            return response()->json([
+                'message' => 'This account is not assigned to the current SK administration.',
+            ], 403);
+        }
+
         $validated = $request->validate([
             'current_password' => ['required'],
             'password' => ['required', 'confirmed', 'min:8', 'regex:/[A-Z]/', 'regex:/[a-z]/', 'regex:/[0-9]/'],
         ], [
             'password.confirmed' => 'Passwords do not match.',
         ]);
-
-        $user = $request->user();
 
         if (! Hash::check($validated['current_password'], $user->password)) {
             return response()->json(['message' => 'Current password is incorrect.'], 422);
@@ -320,14 +347,19 @@ class MobileSyncController extends Controller
             'message' => 'Verification code sent to your registered email.',
         ]);
     }
-
     public function verifyPasswordChange(Request $request): JsonResponse
     {
+        $user = $request->user();
+
+        if (! $this->hasCurrentOfficialAssignment($user)) {
+            return response()->json([
+                'message' => 'This account is not assigned to the current SK administration.',
+            ], 403);
+        }
+
         $validated = $request->validate([
             'code' => ['required', 'digits:6'],
         ]);
-
-        $user = $request->user();
 
         $change = DB::table('mobile_password_changes')
             ->where('user_id', $user->user_id)
@@ -351,7 +383,6 @@ class MobileSyncController extends Controller
             'message' => 'Password updated successfully.',
         ]);
     }
-
     public function sync(Request $request): JsonResponse
     {
         $validated = $request->validate([
@@ -363,6 +394,13 @@ class MobileSyncController extends Controller
             : null;
 
         $user = $request->user()->loadMissing('barangay');
+        $currentTermId = $this->mobileCurrentTermId();
+
+        if (! $currentTermId || ! $this->hasCurrentOfficialAssignment($user, $currentTermId)) {
+            return response()->json([
+                'message' => 'This account is not assigned to the current SK administration.',
+            ], 403);
+        }
 
         return response()->json([
             'server_time' => now()->toISOString(),
@@ -376,7 +414,7 @@ class MobileSyncController extends Controller
             'rankings' => $this->mobileRankings(),
             'ranking_point_system' => $this->rankingPointSystem(),
             'latest_ranking_period' => $this->latestRankingPeriod(),
-            'submission_slots' => $this->tableRows('submission_slots', $since, 'slot_id'),
+            'submission_slots' => $this->currentSubmissionSlots($since),
             'report_submissions' => $this->reportSubmissions($user, $since),
             'accomplishment_reports' => $this->accomplishmentReports($user, $since),
             'budget_reports' => $this->budgetReports($user, $since),
@@ -384,13 +422,20 @@ class MobileSyncController extends Controller
             'archive_documents' => $this->archiveDocuments($user, $since),
         ]);
     }
-
     public function storeWallPost(Request $request): JsonResponse
     {
         $validated = $request->validate([
             'post_content' => ['required', 'string', 'max:5000'],
             'post_category' => ['nullable', 'in:update,announcement,event,accomplishment'],
         ]);
+
+        $termId = $this->mobileCurrentTermId();
+
+        if (! $termId || ! $this->hasCurrentOfficialAssignment($request->user(), $termId)) {
+            return response()->json([
+                'message' => 'There is no active administration assignment for this account.',
+            ], 403);
+        }
 
         $category = strtolower($validated['post_category'] ?? 'update');
 
@@ -408,6 +453,7 @@ class MobileSyncController extends Controller
         };
 
         $announcementId = DB::table('announcements')->insertGetId([
+            'term_id' => $termId,
             'user_id' => $request->user()->user_id,
             'title' => $title,
             'content' => $validated['post_content'],
@@ -431,14 +477,23 @@ class MobileSyncController extends Controller
         return response()->json([
             'message' => 'Post published.',
             'announcement' => DB::table('announcements')
+                ->where('term_id', $termId)
                 ->where('announcement_id', $announcementId)
                 ->first(),
         ], 201);
     }
-
     public function toggleWallLike(Request $request, int $announcementId): JsonResponse
     {
+        $termId = $this->mobileCurrentTermId();
+
+        if (! $termId || ! $this->hasCurrentOfficialAssignment($request->user(), $termId)) {
+            return response()->json([
+                'message' => 'This account is not assigned to the current SK administration.',
+            ], 403);
+        }
+
         $postExists = DB::table('announcements')
+            ->where('term_id', $termId)
             ->where('announcement_id', $announcementId)
             ->where('visibility', 'public')
             ->exists();
@@ -472,13 +527,20 @@ class MobileSyncController extends Controller
             'liked' => ! $existing,
         ]);
     }
-
     public function storeEvent(Request $request): JsonResponse
     {
         if (! $this->isPresident($request->user())) {
             return response()->json([
-                'message' => 'Only SK President can schedule calendar events.',
+                'message' => 'Only the current SK President can schedule calendar events.',
             ], 403);
+        }
+
+        $termId = $this->mobileCurrentTermId();
+
+        if (! $termId) {
+            return response()->json([
+                'message' => 'There is no active administration term.',
+            ], 422);
         }
 
         $validated = $request->validate([
@@ -492,6 +554,7 @@ class MobileSyncController extends Controller
         ]);
 
         $eventId = DB::table('events')->insertGetId([
+            'term_id' => $termId,
             'created_by' => $request->user()->user_id,
             'title' => $validated['title'],
             'description' => $validated['description'] ?? null,
@@ -508,17 +571,25 @@ class MobileSyncController extends Controller
         return response()->json([
             'message' => 'Event created.',
             'event' => DB::table('events')
+                ->where('term_id', $termId)
                 ->where('event_id', $eventId)
                 ->first(),
         ], 201);
     }
-
     public function storeMeeting(Request $request): JsonResponse
     {
         if (! $this->isPresident($request->user())) {
             return response()->json([
-                'message' => 'Only SK President can create meetings.',
+                'message' => 'Only the current SK President can create meetings.',
             ], 403);
+        }
+
+        $termId = $this->mobileCurrentTermId();
+
+        if (! $termId) {
+            return response()->json([
+                'message' => 'There is no active administration term.',
+            ], 422);
         }
 
         $validated = $request->validate([
@@ -529,6 +600,7 @@ class MobileSyncController extends Controller
         ]);
 
         $meetingId = DB::table('meetings')->insertGetId([
+            'term_id' => $termId,
             'title' => $validated['title'],
             'agenda' => $validated['agenda'] ?? null,
             'meeting_date' => $validated['meeting_date'],
@@ -542,6 +614,7 @@ class MobileSyncController extends Controller
         ], 'meeting_id');
 
         $meeting = DB::table('meetings')
+            ->where('term_id', $termId)
             ->where('meeting_id', $meetingId)
             ->first();
 
@@ -552,13 +625,18 @@ class MobileSyncController extends Controller
             'meeting' => $meeting,
         ], 201);
     }
-
     public function meetingJoinUrl(Request $request, Meeting $meeting): JsonResponse
     {
         if (! $this->isOfficial($request->user())) {
             return response()->json([
-                'message' => 'Only SK officials can join meetings.',
+                'message' => 'Only current SK officials can join meetings.',
             ], 403);
+        }
+
+        if (! $this->isCurrentMobileMeeting($meeting)) {
+            return response()->json([
+                'message' => 'Meeting not found in the current administration.',
+            ], 404);
         }
 
         return response()->json([
@@ -569,9 +647,10 @@ class MobileSyncController extends Controller
             ),
         ]);
     }
-
     public function mobileMeetingCall(Meeting $meeting): View
     {
+        abort_unless($this->isCurrentMobileMeeting($meeting), 404);
+
         return view('sk_pres.video-call', [
             'fullName' => 'Mobile Participant',
             'menuItems' => [],
@@ -586,18 +665,28 @@ class MobileSyncController extends Controller
             ),
         ]);
     }
-
     public function mobileMeetingToken(Meeting $meeting): JsonResponse
     {
+        if (! $this->isCurrentMobileMeeting($meeting)) {
+            return response()->json([
+                'message' => 'Meeting not found in the current administration.',
+            ], 404);
+        }
+
         return $this->buildAgoraTokenResponse($meeting);
     }
-
     public function meetingAgoraToken(Request $request, Meeting $meeting): JsonResponse
     {
         if (! $this->isOfficial($request->user())) {
             return response()->json([
-                'message' => 'Only SK officials can join meetings.',
+                'message' => 'Only current SK officials can join meetings.',
             ], 403);
+        }
+
+        if (! $this->isCurrentMobileMeeting($meeting)) {
+            return response()->json([
+                'message' => 'Meeting not found in the current administration.',
+            ], 404);
         }
 
         return $this->buildAgoraTokenResponse(
@@ -648,11 +737,17 @@ class MobileSyncController extends Controller
             'title' => $meeting->title,
         ]);
     }
-
     public function chatUsers(Request $request): JsonResponse
     {
         $keyword = trim((string) $request->query('search', ''));
         $user = $request->user();
+        $termId = $this->mobileCurrentTermId();
+
+        if (! $termId || ! $this->hasCurrentOfficialAssignment($user, $termId)) {
+            return response()->json([
+                'message' => 'This account is not assigned to the current SK administration.',
+            ], 403);
+        }
 
         $chatRoles = $user->role === 'sk_president'
             ? ['sk_chairman', 'sk_secretary']
@@ -670,7 +765,15 @@ class MobileSyncController extends Controller
             )
             ->where('u.user_id', '!=', $user->user_id)
             ->where('u.status', 'active')
-            ->whereIn('u.role', $chatRoles);
+            ->whereNull('u.archived_at')
+            ->whereIn('u.role', $chatRoles)
+            ->whereExists(function ($sub) use ($termId) {
+                $sub->select(DB::raw(1))
+                    ->from('official_terms as ot')
+                    ->whereColumn('ot.user_id', 'u.user_id')
+                    ->where('ot.term_id', $termId)
+                    ->where('ot.status', 'current');
+            });
 
         if ($keyword !== '') {
             $query->where(function ($query) use ($keyword) {
@@ -700,7 +803,6 @@ class MobileSyncController extends Controller
                 ->values(),
         ]);
     }
-
     public function storeCouncilMember(Request $request): JsonResponse
     {
         $user = $request->user();
@@ -717,6 +819,14 @@ class MobileSyncController extends Controller
             ], 500);
         }
 
+        $currentTerm = $this->mobileCurrentTerm();
+
+        if (! $currentTerm || ! $this->hasCurrentOfficialAssignment($user, (int) $currentTerm->term_id)) {
+            return response()->json([
+                'message' => 'This Chairman account is not assigned to the current administration.',
+            ], 403);
+        }
+
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['nullable', 'email', 'max:255'],
@@ -726,31 +836,40 @@ class MobileSyncController extends Controller
 
         $councilId = DB::table('sk_council')->insertGetId([
             'barangay_id' => $user->barangay_id,
+            'term_id' => $currentTerm->term_id,
             'name' => trim($validated['name']),
             'position' => 'SK Councilor',
             'email' => $validated['email'] ?? null,
             'phone' => $validated['phone'] ?? null,
-            'term' => filled($validated['term'] ?? null)
-                ? $validated['term']
-                : '2023-2026',
+            'term' => $currentTerm->start_year.'-'.$currentTerm->end_year,
+            'status' => 'current',
             'profile_img' => 'default.png',
             'created_at' => now(),
+            'completed_at' => null,
         ], 'council_id');
 
         return response()->json([
             'message' => 'SK council member added.',
             'council_member' => DB::table('sk_council')
+                ->where('term_id', $currentTerm->term_id)
                 ->where('council_id', $councilId)
                 ->first(),
         ], 201);
     }
-
     public function storeOfficialSubmission(Request $request, RankingPointsService $points): JsonResponse
     {
         $user = $request->user();
 
         if (! in_array($user->role, ['sk_chairman', 'sk_secretary'], true)) {
             return response()->json(['message' => 'Only SK Chairman or SK Secretary can submit reports.'], 403);
+        }
+
+        $termId = $this->mobileCurrentTermId();
+
+        if (! $termId || ! $this->hasCurrentOfficialAssignment($user, $termId)) {
+            return response()->json([
+                'message' => 'This account is not assigned to the current administration.',
+            ], 403);
         }
 
         $validated = $request->validate([
@@ -768,6 +887,7 @@ class MobileSyncController extends Controller
         $sourceType = $validated['submission_type'];
 
         $slot = DB::table('submission_slots')
+            ->where('term_id', $termId)
             ->where('slot_id', $validated['slot_id'])
             ->where('submission_type', $sourceType)
             ->whereIn('role', [$roleLabel, 'Both'])
@@ -784,7 +904,7 @@ class MobileSyncController extends Controller
             return response()->json(['message' => 'That submission slot is not active today.'], 422);
         }
 
-        $existing = $this->existingMobileSubmission($user, (int) $slot->slot_id, $sourceType);
+        $existing = $this->existingMobileSubmission($user, (int) $slot->slot_id, $sourceType, $termId);
         $isResubmission = (bool) $existing;
 
         if ($existing) {
@@ -850,8 +970,8 @@ class MobileSyncController extends Controller
         }
 
         $row = $sourceType === 'budget_report'
-            ? DB::table('budget_reports')->where('budget_report_id', $sourceId)->first()
-            : DB::table('accomplishment_reports')->where('report_id', $sourceId)->first();
+            ? DB::table('budget_reports')->where('term_id', $termId)->where('budget_report_id', $sourceId)->first()
+            : DB::table('accomplishment_reports')->where('term_id', $termId)->where('report_id', $sourceId)->first();
 
         $row = $this->attachMobileQualityReview($row, $sourceType, $sourceId);
 
@@ -862,16 +982,29 @@ class MobileSyncController extends Controller
             'submission' => $row,
         ], 201);
     }
-
     public function submissionSlots(Request $request): JsonResponse
     {
         if (! $this->isPresident($request->user())) {
             return response()->json([
-                'message' => 'Only SK President can manage submission slots.',
+                'message' => 'Only the current SK President can manage submission slots.',
             ], 403);
         }
 
+        $termId = $this->mobileCurrentTermId();
+
+        if (! $termId) {
+            return response()->json([
+                'slots' => [],
+                'summary' => [
+                    'total_slots' => 0,
+                    'open_slots' => 0,
+                    'closed_slots' => 0,
+                ],
+            ]);
+        }
+
         $slots = DB::table('submission_slots')
+            ->where('term_id', $termId)
             ->orderByDesc('created_at')
             ->get();
 
@@ -884,13 +1017,20 @@ class MobileSyncController extends Controller
             ],
         ]);
     }
-
     public function storeSubmissionSlot(Request $request, NotificationService $notifications): JsonResponse
     {
         if (! $this->isPresident($request->user())) {
             return response()->json([
-                'message' => 'Only SK President can create submission slots.',
+                'message' => 'Only the current SK President can create submission slots.',
             ], 403);
+        }
+
+        $termId = $this->mobileCurrentTermId();
+
+        if (! $termId) {
+            return response()->json([
+                'message' => 'There is no active administration term.',
+            ], 422);
         }
 
         $validated = $request->validate([
@@ -903,6 +1043,7 @@ class MobileSyncController extends Controller
         ]);
 
         $slotId = DB::table('submission_slots')->insertGetId([
+            'term_id' => $termId,
             'submission_type' => $validated['submission_type'],
             'title' => $validated['submission_title'],
             'description' => $validated['description'] ?? null,
@@ -924,26 +1065,35 @@ class MobileSyncController extends Controller
         return response()->json([
             'message' => 'Submission slot created.',
             'slot' => DB::table('submission_slots')
+                ->where('term_id', $termId)
                 ->where('slot_id', $slotId)
                 ->first(),
         ], 201);
     }
-
     public function deleteSubmissionSlot(Request $request, int $slotId): JsonResponse
     {
         if (! $this->isPresident($request->user())) {
             return response()->json([
-                'message' => 'Only SK President can delete submission slots.',
+                'message' => 'Only the current SK President can delete submission slots.',
             ], 403);
         }
 
+        $termId = $this->mobileCurrentTermId();
+
+        if (! $termId) {
+            return response()->json([
+                'message' => 'There is no active administration term.',
+            ], 422);
+        }
+
         $deleted = DB::table('submission_slots')
+            ->where('term_id', $termId)
             ->where('slot_id', $slotId)
             ->delete();
 
         if ($deleted === 0) {
             return response()->json([
-                'message' => 'Submission slot not found.',
+                'message' => 'Submission slot not found in the current administration.',
             ], 404);
         }
 
@@ -970,16 +1120,29 @@ class MobileSyncController extends Controller
             'years' => $this->consolidationYears(),
         ]);
     }
-
     public function markNotificationRead(Request $request, int $notificationId): JsonResponse
     {
-        $updated = DB::table('notifications')
+        $user = $request->user();
+        $currentTerm = $this->mobileCurrentTerm();
+
+        if (! $currentTerm || ! $this->hasCurrentOfficialAssignment($user, (int) $currentTerm->term_id)) {
+            return response()->json([
+                'message' => 'This account is not assigned to the current SK administration.',
+            ], 403);
+        }
+
+        $query = DB::table('notifications')
             ->where('notification_id', $notificationId)
-            ->where('user_id', $request->user()->user_id)
-            ->update([
-                'is_read' => true,
-                'read_at' => now(),
-            ]);
+            ->where('user_id', $user->user_id);
+
+        if (Schema::hasColumn('notifications', 'created_at') && ! empty($currentTerm->created_at)) {
+            $query->where('created_at', '>=', $currentTerm->created_at);
+        }
+
+        $updated = $query->update([
+            'is_read' => true,
+            'read_at' => now(),
+        ]);
 
         if ($updated === 0) {
             return response()->json([
@@ -1093,14 +1256,20 @@ class MobileSyncController extends Controller
 
         return null;
     }
-
     protected function announcements(User $user, ?Carbon $since): array
     {
         if (! Schema::hasTable('announcements')) {
             return [];
         }
 
+        $termId = $this->mobileCurrentTermId();
+
+        if (! $termId) {
+            return [];
+        }
+
         $query = DB::table('announcements')
+            ->where('term_id', $termId)
             ->where(function (Builder $query) use ($user) {
                 $query->where('visibility', 'public')
                     ->orWhere('user_id', $user->user_id);
@@ -1117,16 +1286,22 @@ class MobileSyncController extends Controller
             'announcement_id'
         );
     }
-
     protected function wallPosts(User $user, ?Carbon $since): array
     {
         if (! Schema::hasTable('announcements')) {
             return [];
         }
 
+        $termId = $this->mobileCurrentTermId();
+
+        if (! $termId) {
+            return [];
+        }
+
         $query = DB::table('announcements as a')
             ->leftJoin('users as u', 'a.user_id', '=', 'u.user_id')
             ->leftJoin('barangays as b', 'u.barangay_id', '=', 'b.barangay_id')
+            ->where('a.term_id', $termId)
             ->where('a.visibility', 'public')
             ->select(
                 'a.announcement_id',
@@ -1168,20 +1343,34 @@ class MobileSyncController extends Controller
 
         return $posts;
     }
-
     protected function events(User $user, ?Carbon $since): array
     {
         if (! Schema::hasTable('events')) {
             return [];
         }
 
+        $termId = $this->mobileCurrentTermId();
+
+        if (! $termId) {
+            return [];
+        }
+
         $query = DB::table('events')
+            ->where('term_id', $termId)
             ->where(function (Builder $query) use ($user) {
                 $query->where('visibility', 'public')
                     ->orWhere('created_by', $user->user_id);
 
                 if ($this->isOfficial($user)) {
                     $query->orWhere('visibility', 'officials_only');
+                }
+
+                if ($user->role === 'sk_chairman') {
+                    $query->orWhere('visibility', 'chairman_only');
+                }
+
+                if ($user->role === 'sk_secretary') {
+                    $query->orWhere('visibility', 'secretary_only');
                 }
             });
 
@@ -1192,14 +1381,20 @@ class MobileSyncController extends Controller
             'event_id'
         );
     }
-
     protected function meetings(User $user, ?Carbon $since): array
     {
         if (! Schema::hasTable('meetings')) {
             return [];
         }
 
-        $query = DB::table('meetings');
+        $termId = $this->mobileCurrentTermId();
+
+        if (! $termId) {
+            return [];
+        }
+
+        $query = DB::table('meetings')
+            ->where('term_id', $termId);
 
         if (! $this->isOfficial($user)) {
             $query->where('created_by', $user->user_id);
@@ -1219,15 +1414,24 @@ class MobileSyncController extends Controller
             return $meeting;
         }, $meetings);
     }
-
     protected function notifications(User $user, ?Carbon $since): array
     {
         if (! Schema::hasTable('notifications')) {
             return [];
         }
 
+        $currentTerm = $this->mobileCurrentTerm();
+
+        if (! $currentTerm) {
+            return [];
+        }
+
         $query = DB::table('notifications')
             ->where('user_id', $user->user_id);
+
+        if (Schema::hasColumn('notifications', 'created_at') && ! empty($currentTerm->created_at)) {
+            $query->where('created_at', '>=', $currentTerm->created_at);
+        }
 
         return $this->finish(
             $query,
@@ -1236,10 +1440,15 @@ class MobileSyncController extends Controller
             'notification_id'
         );
     }
-
     protected function reportSubmissions(User $user, ?Carbon $since): array
     {
         if (! Schema::hasTable('report_submissions')) {
+            return [];
+        }
+
+        $termId = $this->mobileCurrentTermId();
+
+        if (! $termId) {
             return [];
         }
 
@@ -1251,6 +1460,20 @@ class MobileSyncController extends Controller
                     $query->orWhereNotNull('user_id');
                 }
             });
+
+        if (Schema::hasColumn('report_submissions', 'term_id')) {
+            $query->where('term_id', $termId);
+        } elseif (
+            Schema::hasColumn('report_submissions', 'slot_id') &&
+            Schema::hasTable('submission_slots')
+        ) {
+            $query->whereExists(function ($sub) use ($termId) {
+                $sub->select(DB::raw(1))
+                    ->from('submission_slots as ss')
+                    ->whereColumn('ss.slot_id', 'report_submissions.slot_id')
+                    ->where('ss.term_id', $termId);
+            });
+        }
 
         $rows = $this->finish(
             $query,
@@ -1266,14 +1489,20 @@ class MobileSyncController extends Controller
             return $row;
         }, $rows);
     }
-
     protected function accomplishmentReports(User $user, ?Carbon $since): array
     {
         if (! Schema::hasTable('accomplishment_reports')) {
             return [];
         }
 
+        $termId = $this->mobileCurrentTermId();
+
+        if (! $termId) {
+            return [];
+        }
+
         $query = DB::table('accomplishment_reports')
+            ->where('term_id', $termId)
             ->where(function (Builder $query) use ($user) {
                 $query->where('user_id', $user->user_id);
 
@@ -1297,14 +1526,20 @@ class MobileSyncController extends Controller
             );
         }, $rows);
     }
-
     protected function budgetReports(User $user, ?Carbon $since): array
     {
         if (! Schema::hasTable('budget_reports')) {
             return [];
         }
 
+        $termId = $this->mobileCurrentTermId();
+
+        if (! $termId) {
+            return [];
+        }
+
         $query = DB::table('budget_reports')
+            ->where('term_id', $termId)
             ->where(function (Builder $query) use ($user) {
                 $query->where('user_id', $user->user_id);
 
@@ -1328,22 +1563,28 @@ class MobileSyncController extends Controller
             );
         }, $rows);
     }
-
     protected function archiveDocuments(User $user, ?Carbon $since): array
     {
         $documents = collect();
+        $completedTermIds = $this->completedMobileTermIds();
+
+        if (empty($completedTermIds)) {
+            return [];
+        }
+
+        $administrations = DB::table('administration_terms')
+            ->whereIn('term_id', $completedTermIds)
+            ->get(['term_id', 'start_year', 'end_year'])
+            ->keyBy('term_id');
 
         if (Schema::hasTable('accomplishment_reports')) {
             $query = DB::table('accomplishment_reports as ar')
-                ->leftJoin(
-                    'barangays as b',
-                    'ar.barangay_id',
-                    '=',
-                    'b.barangay_id'
-                )
+                ->leftJoin('barangays as b', 'ar.barangay_id', '=', 'b.barangay_id')
+                ->whereIn('ar.term_id', $completedTermIds)
                 ->select(
                     DB::raw("'accomplishment_report' as source_type"),
                     'ar.report_id as source_id',
+                    'ar.term_id',
                     'ar.title',
                     'ar.barangay_id',
                     'b.barangay_name',
@@ -1353,33 +1594,24 @@ class MobileSyncController extends Controller
                 );
 
             if (! $this->isPresident($user) && $user->barangay_id) {
-                $query->where(
-                    'ar.barangay_id',
-                    $user->barangay_id
-                );
+                $query->where('ar.barangay_id', $user->barangay_id);
             }
 
-            $this->applySince(
-                $query,
-                'accomplishment_reports',
-                $since
-            );
+            if ($since) {
+                $query->where('ar.created_at', '>', $since);
+            }
 
-            $documents =
-                $documents->merge($query->get());
+            $documents = $documents->merge($query->get());
         }
 
         if (Schema::hasTable('budget_reports')) {
             $query = DB::table('budget_reports as br')
-                ->leftJoin(
-                    'barangays as b',
-                    'br.barangay_id',
-                    '=',
-                    'b.barangay_id'
-                )
+                ->leftJoin('barangays as b', 'br.barangay_id', '=', 'b.barangay_id')
+                ->whereIn('br.term_id', $completedTermIds)
                 ->select(
                     DB::raw("'budget_report' as source_type"),
                     'br.budget_report_id as source_id',
+                    'br.term_id',
                     'br.title',
                     'br.barangay_id',
                     'b.barangay_name',
@@ -1389,67 +1621,63 @@ class MobileSyncController extends Controller
                 );
 
             if (! $this->isPresident($user) && $user->barangay_id) {
-                $query->where(
-                    'br.barangay_id',
-                    $user->barangay_id
-                );
+                $query->where('br.barangay_id', $user->barangay_id);
             }
 
-            $this->applySince(
-                $query,
-                'budget_reports',
-                $since
-            );
+            if ($since) {
+                $query->where('br.created_at', '>', $since);
+            }
 
-            $documents =
-                $documents->merge($query->get());
+            $documents = $documents->merge($query->get());
         }
 
         return $documents
             ->sortByDesc('created_at')
             ->take(500)
-            ->map(function ($row) {
-                $path =
-                    $row->uploaded_file_path
+            ->map(function ($row) use ($administrations) {
+                $path = $row->uploaded_file_path
                     ?? $row->generated_pdf_path
                     ?? null;
 
-                $row->file_url = $this->publicUrl($path);
+                $term = $administrations->get((int) $row->term_id);
 
-                $row->document_type =
-                    $row->source_type === 'budget_report'
-                        ? 'Budget'
-                        : 'Report';
+                $row->file_url = $this->publicUrl($path);
+                $row->document_type = $row->source_type === 'budget_report'
+                    ? 'Budget'
+                    : 'Report';
+                $row->administration = $term
+                    ? $term->start_year.'-'.$term->end_year
+                    : null;
 
                 return $row;
             })
             ->values()
             ->all();
     }
-
     protected function leadershipProfiles(User $user, ?Carbon $since): array
     {
-        $leaders = collect();
+        $currentTerm = $this->mobileCurrentTerm();
 
-        $userLeaders = DB::table('users')
-            ->whereIn(
-                'role',
-                ['sk_chairman', 'sk_secretary']
-            )
-            ->whereNotNull('barangay_id')
+        if (! $currentTerm) {
+            return [];
+        }
+
+        $leaders = collect();
+        $termLabel = $currentTerm->start_year.'-'.$currentTerm->end_year;
+
+        $userLeaders = DB::table('official_terms as ot')
+            ->join('users as u', 'ot.user_id', '=', 'u.user_id')
+            ->where('ot.term_id', $currentTerm->term_id)
+            ->where('ot.status', 'current')
+            ->whereIn('ot.role', ['sk_chairman', 'sk_secretary'])
+            ->whereNull('u.archived_at')
             ->select(
-                DB::raw('user_id as leadership_id'),
-                'user_id',
-                'barangay_id',
-                DB::raw("CONCAT(first_name, ' ', last_name) as full_name"),
-                DB::raw("
-                    CASE
-                        WHEN role = 'sk_chairman' THEN 'sk_chairman'
-                        WHEN role = 'sk_secretary' THEN 'sk_secretary'
-                        ELSE role
-                    END as position
-                "),
-                DB::raw("'2024-2026' as term"),
+                'ot.official_term_id as leadership_id',
+                'u.user_id',
+                'ot.barangay_id',
+                DB::raw("CONCAT(u.first_name, ' ', u.last_name) as full_name"),
+                'ot.role as position',
+                DB::raw("'".$termLabel."' as term"),
                 DB::raw("'current' as status")
             )
             ->get();
@@ -1458,22 +1686,22 @@ class MobileSyncController extends Controller
 
         if (Schema::hasTable('sk_council')) {
             $councilRows = DB::table('sk_council')
+                ->where('term_id', $currentTerm->term_id)
+                ->where('status', 'current')
                 ->select(
-                    DB::raw('NULL as leadership_id'),
+                    DB::raw('council_id as leadership_id'),
                     DB::raw('NULL as user_id'),
                     'barangay_id',
                     DB::raw('name as full_name'),
                     DB::raw("
                         CASE
-                            WHEN LOWER(position) LIKE '%chairman%' THEN 'sk_chairman'
-                            WHEN LOWER(position) LIKE '%secretary%' THEN 'sk_secretary'
                             WHEN LOWER(position) LIKE '%treasurer%' THEN 'sk_treasurer'
                             WHEN LOWER(position) LIKE '%councilor%' THEN 'sk_councilor'
                             WHEN LOWER(position) LIKE '%kagawad%' THEN 'sk_councilor'
                             ELSE LOWER(REPLACE(position, ' ', '_'))
                         END as position
                     "),
-                    DB::raw("COALESCE(term, '2024-2026') as term"),
+                    DB::raw("COALESCE(term, '".$termLabel."') as term"),
                     DB::raw("'current' as status")
                 )
                 ->get();
@@ -1481,8 +1709,12 @@ class MobileSyncController extends Controller
             $leaders = $leaders->merge($councilRows);
         }
 
-        if (Schema::hasTable('leadership_profiles')) {
+        if (
+            Schema::hasTable('leadership_profiles') &&
+            Schema::hasColumn('leadership_profiles', 'term_id')
+        ) {
             $profileRows = DB::table('leadership_profiles')
+                ->where('term_id', $currentTerm->term_id)
                 ->where('status', 'current')
                 ->select(
                     'leadership_id',
@@ -1490,15 +1722,7 @@ class MobileSyncController extends Controller
                     'barangay_id',
                     'full_name',
                     'position',
-                    DB::raw("
-                        CASE
-                            WHEN term_start IS NOT NULL AND term_end IS NOT NULL
-                                THEN CONCAT(YEAR(term_start), '-', YEAR(term_end))
-                            WHEN term_start IS NOT NULL
-                                THEN CONCAT(YEAR(term_start), '-present')
-                            ELSE '2024-2026'
-                        END as term
-                    "),
+                    DB::raw("'".$termLabel."' as term"),
                     'status'
                 )
                 ->get();
@@ -1507,26 +1731,87 @@ class MobileSyncController extends Controller
         }
 
         if (! $this->isPresident($user) && $user->barangay_id) {
-            $leaders = $leaders->where(
-                'barangay_id',
-                $user->barangay_id
-            );
+            $leaders = $leaders->where('barangay_id', $user->barangay_id);
         }
 
         return $leaders
-            ->filter(
-                fn ($leader) =>
-                    ! empty($leader->barangay_id)
-            )
-            ->unique(
-                fn ($leader) => strtolower(
-                    ($leader->full_name ?? '').'|'.
-                    ($leader->position ?? '').'|'.
-                    ($leader->barangay_id ?? '')
-                )
-            )
+            ->filter(fn ($leader) => ! empty($leader->barangay_id))
+            ->unique(fn ($leader) => strtolower(
+                ($leader->full_name ?? '').'|'.
+                ($leader->position ?? '').'|'.
+                ($leader->barangay_id ?? '')
+            ))
             ->values()
             ->all();
+    }
+
+    protected function mobileCurrentTerm(): ?object
+    {
+        return DB::table('administration_terms')
+            ->where('status', 'current')
+            ->orderByDesc('term_id')
+            ->first();
+    }
+
+    protected function mobileCurrentTermId(): ?int
+    {
+        $termId = DB::table('administration_terms')
+            ->where('status', 'current')
+            ->orderByDesc('term_id')
+            ->value('term_id');
+
+        return $termId ? (int) $termId : null;
+    }
+
+    protected function completedMobileTermIds(): array
+    {
+        return DB::table('administration_terms')
+            ->where('status', 'completed')
+            ->orderByDesc('term_id')
+            ->pluck('term_id')
+            ->map(fn ($termId) => (int) $termId)
+            ->values()
+            ->all();
+    }
+
+    protected function hasCurrentOfficialAssignment(User $user, ?int $termId = null): bool
+    {
+        $termId = $termId ?: $this->mobileCurrentTermId();
+
+        if (! $termId || ! in_array($user->role, self::OFFICIAL_ROLES, true)) {
+            return false;
+        }
+
+        return DB::table('official_terms')
+            ->where('user_id', $user->user_id)
+            ->where('term_id', $termId)
+            ->where('role', $user->role)
+            ->where('status', 'current')
+            ->exists();
+    }
+
+    protected function isCurrentMobileMeeting(Meeting $meeting): bool
+    {
+        $termId = $this->mobileCurrentTermId();
+
+        return $termId
+            && (int) ($meeting->term_id ?? 0) === $termId;
+    }
+
+    protected function currentSubmissionSlots(?Carbon $since): array
+    {
+        $termId = $this->mobileCurrentTermId();
+
+        if (! $termId || ! Schema::hasTable('submission_slots')) {
+            return [];
+        }
+
+        return $this->finish(
+            DB::table('submission_slots')->where('term_id', $termId),
+            'submission_slots',
+            $since,
+            'slot_id'
+        );
     }
 
     protected function tableRows(
@@ -1611,10 +1896,16 @@ class MobileSyncController extends Controller
             ltrim($path, '/')
         );
     }
-
     protected function saveMobileAccomplishmentSubmission(User $user, object $slot, array $validated): int
     {
+        $termId = (int) ($slot->term_id ?? 0);
+
+        if ($termId <= 0) {
+            throw new \RuntimeException('Submission slot is not connected to an administration term.');
+        }
+
         $existing = DB::table('accomplishment_reports')
+            ->where('term_id', $termId)
             ->where('barangay_id', $user->barangay_id)
             ->where('slot_id', $slot->slot_id)
             ->first();
@@ -1636,6 +1927,7 @@ class MobileSyncController extends Controller
         }
 
         $data = [
+            'term_id' => $termId,
             'user_id' => $user->user_id,
             'barangay_id' => $user->barangay_id,
             'slot_id' => $slot->slot_id,
@@ -1658,6 +1950,7 @@ class MobileSyncController extends Controller
             unset($data['created_at']);
 
             DB::table('accomplishment_reports')
+                ->where('term_id', $termId)
                 ->where('report_id', $existing->report_id)
                 ->update($data);
 
@@ -1666,10 +1959,16 @@ class MobileSyncController extends Controller
 
         return (int) DB::table('accomplishment_reports')->insertGetId($data, 'report_id');
     }
-
     protected function saveMobileBudgetSubmission(User $user, object $slot, array $validated): int
     {
+        $termId = (int) ($slot->term_id ?? 0);
+
+        if ($termId <= 0) {
+            throw new \RuntimeException('Submission slot is not connected to an administration term.');
+        }
+
         $existing = DB::table('budget_reports')
+            ->where('term_id', $termId)
             ->where('barangay_id', $user->barangay_id)
             ->where('slot_id', $slot->slot_id)
             ->first();
@@ -1688,6 +1987,7 @@ class MobileSyncController extends Controller
         $half = $slot->fiscal_half ?? ($existing->fiscal_half ?? null);
 
         $data = [
+            'term_id' => $termId,
             'user_id' => $user->user_id,
             'barangay_id' => $user->barangay_id,
             'slot_id' => $slot->slot_id,
@@ -1729,6 +2029,7 @@ class MobileSyncController extends Controller
             unset($data['created_at']);
 
             DB::table('budget_reports')
+                ->where('term_id', $termId)
                 ->where('budget_report_id', $existing->budget_report_id)
                 ->update($data);
 
@@ -1737,17 +2038,24 @@ class MobileSyncController extends Controller
 
         return (int) DB::table('budget_reports')->insertGetId($data, 'budget_report_id');
     }
-
-    protected function existingMobileSubmission(User $user, int $slotId, string $sourceType): ?object
+    protected function existingMobileSubmission(User $user, int $slotId, string $sourceType, ?int $termId = null): ?object
     {
+        $termId = $termId ?: $this->mobileCurrentTermId();
+
+        if (! $termId) {
+            return null;
+        }
+
         if ($sourceType === 'budget_report') {
             return DB::table('budget_reports')
+                ->where('term_id', $termId)
                 ->where('barangay_id', $user->barangay_id)
                 ->where('slot_id', $slotId)
                 ->first();
         }
 
         return DB::table('accomplishment_reports')
+            ->where('term_id', $termId)
             ->where('barangay_id', $user->barangay_id)
             ->where('slot_id', $slotId)
             ->first();
@@ -1873,7 +2181,6 @@ class MobileSyncController extends Controller
 
         return $meeting;
     }
-
     protected function isOfficial(User $user): bool
     {
         return in_array(
@@ -1884,12 +2191,12 @@ class MobileSyncController extends Controller
                 'sk_secretary',
             ],
             true
-        );
+        ) && $this->hasCurrentOfficialAssignment($user);
     }
-
     protected function isPresident(User $user): bool
     {
-        return $user->role === 'sk_president';
+        return $user->role === 'sk_president'
+            && $this->hasCurrentOfficialAssignment($user);
     }
 
     protected function consolidationFilters(Request $request): array
@@ -1956,12 +2263,18 @@ class MobileSyncController extends Controller
                     : 'Q'.ceil(now()->month / 3),
         ];
     }
-
     protected function consolidatedSubmissions(array $filters)
     {
+        $termId = $this->mobileCurrentTermId();
+
+        if (! $termId) {
+            return collect();
+        }
+
         $reports =
             Schema::hasTable('accomplishment_reports')
                 ? DB::table('accomplishment_reports')
+                    ->where('term_id', $termId)
                     ->where(
                         'reporting_year',
                         $filters['year']
@@ -2015,6 +2328,7 @@ class MobileSyncController extends Controller
         $budgets =
             Schema::hasTable('budget_reports')
                 ? DB::table('budget_reports')
+                    ->where('term_id', $termId)
                     ->where(
                         'fiscal_year',
                         $filters['year']
@@ -2285,9 +2599,14 @@ class MobileSyncController extends Controller
             .$budgetCount
             .')';
     }
-
     protected function consolidationYears(): array
     {
+        $termId = $this->mobileCurrentTermId();
+
+        if (! $termId) {
+            return [now()->year];
+        }
+
         $reportYears =
             Schema::hasTable(
                 'accomplishment_reports'
@@ -2295,6 +2614,7 @@ class MobileSyncController extends Controller
                 ? DB::table(
                     'accomplishment_reports'
                 )
+                    ->where('term_id', $termId)
                     ->select(
                         'reporting_year'
                     )
@@ -2315,6 +2635,7 @@ class MobileSyncController extends Controller
                 ? DB::table(
                     'budget_reports'
                 )
+                    ->where('term_id', $termId)
                     ->select(
                         'fiscal_year'
                     )

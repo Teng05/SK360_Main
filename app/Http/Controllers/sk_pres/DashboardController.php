@@ -226,11 +226,17 @@ class DashboardController extends Controller
     protected function availableYears()
     {
         $years = collect();
+        $currentTermId = $this->currentTermId();
+
+        if (!$currentTermId) {
+            return collect([now()->year]);
+        }
 
         if (Schema::hasTable('submission_slots')) {
             if (Schema::hasColumn('submission_slots', 'fiscal_year')) {
                 $years = $years->merge(
                     DB::table('submission_slots')
+                        ->where('term_id', $currentTermId)
                         ->whereNotNull('fiscal_year')
                         ->distinct()
                         ->pluck('fiscal_year')
@@ -240,6 +246,7 @@ class DashboardController extends Controller
             if (Schema::hasColumn('submission_slots', 'start_date')) {
                 $years = $years->merge(
                     DB::table('submission_slots')
+                        ->where('term_id', $currentTermId)
                         ->whereNotNull('start_date')
                         ->selectRaw('YEAR(start_date) as year')
                         ->distinct()
@@ -254,6 +261,7 @@ class DashboardController extends Controller
         ) {
             $years = $years->merge(
                 DB::table('accomplishment_reports')
+                    ->where('term_id', $currentTermId)
                     ->whereNotNull('reporting_year')
                     ->distinct()
                     ->pluck('reporting_year')
@@ -266,6 +274,7 @@ class DashboardController extends Controller
         ) {
             $years = $years->merge(
                 DB::table('budget_reports')
+                    ->where('term_id', $currentTermId)
                     ->whereNotNull('fiscal_year')
                     ->distinct()
                     ->pluck('fiscal_year')
@@ -292,6 +301,20 @@ class DashboardController extends Controller
             !Schema::hasTable('submission_slots') ||
             !Schema::hasTable('users')
         ) {
+            return [
+                'year' => $year,
+                'required' => 0,
+                'submitted' => 0,
+                'on_time' => 0,
+                'pending' => 0,
+                'submission_rate' => 0,
+                'on_time_rate' => 0,
+            ];
+        }
+
+        $currentTermId = $this->currentTermId();
+
+        if (!$currentTermId) {
             return [
                 'year' => $year,
                 'required' => 0,
@@ -331,6 +354,7 @@ class DashboardController extends Controller
             ->values();
 
         $slotsQuery = DB::table('submission_slots')
+            ->where('term_id', $currentTermId)
             ->whereIn('submission_type', [
                 'accomplishment_report',
                 'budget_report',
@@ -374,6 +398,7 @@ class DashboardController extends Controller
 
         if (Schema::hasTable('accomplishment_reports')) {
             $query = DB::table('accomplishment_reports')
+                ->where('term_id', $currentTermId)
                 ->whereIn('slot_id', $slotIds);
 
             if ($barangayId) {
@@ -399,6 +424,7 @@ class DashboardController extends Controller
 
         if (Schema::hasTable('budget_reports')) {
             $query = DB::table('budget_reports')
+                ->where('term_id', $currentTermId)
                 ->whereIn('slot_id', $slotIds);
 
             if ($barangayId) {
@@ -519,8 +545,19 @@ class DashboardController extends Controller
             ];
         }
 
+        $currentTermId = $this->currentTermId();
+
+        if (!$currentTermId) {
+            return [
+                'labels' => ['No annual budget data'],
+                'values' => [0],
+                'year' => $year ?: now()->year,
+            ];
+        }
+
         if (!$year) {
             $year = DB::table('budget_reports')
+                ->where('term_id', $currentTermId)
                 ->where('budget_category', 'annual_budget')
                 ->whereIn('status', ['submitted', 'recorded', 'archived'])
                 ->whereNotNull('fiscal_year')
@@ -531,6 +568,7 @@ class DashboardController extends Controller
 
         $latestIdsQuery = DB::table('budget_reports')
             ->selectRaw('MAX(budget_report_id) as budget_report_id')
+            ->where('term_id', $currentTermId)
             ->where('budget_category', 'annual_budget')
             ->where('fiscal_year', $year)
             ->whereIn('status', ['submitted', 'recorded', 'archived']);
@@ -553,6 +591,7 @@ class DashboardController extends Controller
 
         $rows = DB::table('budget_reports as br')
             ->join('barangays as b', 'b.barangay_id', '=', 'br.barangay_id')
+            ->where('br.term_id', $currentTermId)
             ->whereIn('br.budget_report_id', $latestIds)
             ->where('br.total_amount', '>', 0)
             ->orderBy('b.barangay_name')
@@ -596,8 +635,19 @@ class DashboardController extends Controller
             ];
         }
 
+        $currentTermId = $this->currentTermId();
+
+        if (!$currentTermId) {
+            return [
+                'labels' => ['No utilization data'],
+                'values' => [0],
+                'year' => $year ?: now()->year,
+            ];
+        }
+
         if (!$year) {
             $year = DB::table('budget_reports')
+                ->where('term_id', $currentTermId)
                 ->where('budget_category', 'annual_budget')
                 ->whereIn('status', ['submitted', 'recorded', 'archived'])
                 ->whereNotNull('fiscal_year')
@@ -607,12 +657,14 @@ class DashboardController extends Controller
         }
 
         $annualBudgetQuery = DB::table('budget_reports')
+            ->where('term_id', $currentTermId)
             ->where('budget_category', 'annual_budget')
             ->where('fiscal_year', $year)
             ->whereIn('status', ['submitted', 'recorded', 'archived'])
             ->where('total_amount', '>', 0);
 
         $annualCoaQuery = DB::table('budget_reports')
+            ->where('term_id', $currentTermId)
             ->where('budget_category', 'coa_report')
             ->where('budget_period_type', 'annual')
             ->where('fiscal_year', $year)
@@ -760,7 +812,14 @@ class DashboardController extends Controller
             return [];
         }
 
-        $query = DB::table($table);
+        $currentTermId = $this->currentTermId();
+
+        if (!$currentTermId) {
+            return [];
+        }
+
+        $query = DB::table($table)
+            ->where('term_id', $currentTermId);
 
         if ($barangayId) {
             $query->where('barangay_id', $barangayId);
@@ -800,12 +859,18 @@ class DashboardController extends Controller
         $start = $month->copy()->startOfMonth();
         $end = $month->copy()->endOfMonth();
         $total = 0;
+        $currentTermId = $this->currentTermId();
+
+        if (!$currentTermId) {
+            return 0;
+        }
 
         if (Schema::hasTable('accomplishment_reports')) {
             $dateColumn = $this->dateColumnFor('accomplishment_reports');
 
             if ($dateColumn) {
                 $total += DB::table('accomplishment_reports')
+                    ->where('term_id', $currentTermId)
                     ->whereBetween($dateColumn, [$start, $end])
                     ->count();
             }
@@ -816,6 +881,7 @@ class DashboardController extends Controller
 
             if ($dateColumn) {
                 $total += DB::table('budget_reports')
+                    ->where('term_id', $currentTermId)
                     ->whereBetween($dateColumn, [$start, $end])
                     ->count();
             }
@@ -830,6 +896,12 @@ class DashboardController extends Controller
             return 0;
         }
 
+        $currentTermId = $this->currentTermId();
+
+        if (!$currentTermId) {
+            return 0;
+        }
+
         $dateColumn = Schema::hasColumn('events', 'start_datetime')
             ? 'start_datetime'
             : $this->dateColumnFor('events');
@@ -839,6 +911,7 @@ class DashboardController extends Controller
         }
 
         return DB::table('events')
+            ->where('term_id', $currentTermId)
             ->whereBetween(
                 $dateColumn,
                 [
@@ -857,6 +930,11 @@ class DashboardController extends Controller
     protected function meetingCountForMonth(Carbon $month): int
     {
         $total = 0;
+        $currentTermId = $this->currentTermId();
+
+        if (!$currentTermId) {
+            return 0;
+        }
 
         if (Schema::hasTable('meetings')) {
             $dateColumn = Schema::hasColumn('meetings', 'meeting_date')
@@ -865,6 +943,7 @@ class DashboardController extends Controller
 
             if ($dateColumn) {
                 $total += DB::table('meetings')
+                    ->where('term_id', $currentTermId)
                     ->whereBetween(
                         $dateColumn,
                         [
@@ -886,6 +965,7 @@ class DashboardController extends Controller
 
             if ($dateColumn) {
                 $total += DB::table('events')
+                    ->where('term_id', $currentTermId)
                     ->where('event_type', 'meeting')
                     ->whereBetween(
                         $dateColumn,
@@ -899,6 +979,20 @@ class DashboardController extends Controller
         }
 
         return $total;
+    }
+
+    protected function currentTermId(): ?int
+    {
+        if (!Schema::hasTable('administration_terms')) {
+            return null;
+        }
+
+        $termId = DB::table('administration_terms')
+            ->where('status', 'current')
+            ->orderByDesc('term_id')
+            ->value('term_id');
+
+        return $termId ? (int) $termId : null;
     }
 
     protected function dateColumnFor(string $table): ?string

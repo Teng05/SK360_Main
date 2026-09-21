@@ -80,9 +80,11 @@ class ConsolidationController extends Controller
         Request $request,
         RankingPointsService $points,
         NotificationService $notifications
-    ): RedirectResponse
-    {
+    ): RedirectResponse {
         abort_unless(auth()->check() && auth()->user()->role === 'sk_president', 403);
+
+        $currentTermId = $this->currentTermId();
+        abort_unless($currentTermId, 404);
 
         $validated = $request->validate([
             'source_type' => ['required', 'in:accomplishment_report,budget_report'],
@@ -109,6 +111,7 @@ class ConsolidationController extends Controller
 
         $submission = DB::table($table)
             ->where($primaryKey, $sourceId)
+            ->where('term_id', $currentTermId)
             ->first();
 
         abort_unless($submission, 404);
@@ -245,17 +248,18 @@ class ConsolidationController extends Controller
 
     protected function filters(Request $request): array
     {
-        $year = (int) $request->query('year', now()->year);
+        $defaultYear = $this->currentTermStartYear();
+        $year = (int) $request->query('year', $defaultYear);
         $period = (string) $request->query('period', 'all');
         $month = (int) $request->query('month', now()->month);
         $quarter = (string) $request->query('quarter', 'Q'.ceil(now()->month / 3));
 
-        if (! in_array($period, ['all', 'monthly', 'quarterly', 'annual'], true)) {
+        if (!in_array($period, ['all', 'monthly', 'quarterly', 'annual'], true)) {
             $period = 'all';
         }
 
         return [
-            'year' => $year > 2000 && $year < 2100 ? $year : now()->year,
+            'year' => $year > 2000 && $year < 2100 ? $year : $defaultYear,
             'period' => $period,
             'month' => $month >= 1 && $month <= 12 ? $month : now()->month,
             'quarter' => in_array($quarter, ['Q1', 'Q2', 'Q3', 'Q4'], true)
@@ -266,7 +270,14 @@ class ConsolidationController extends Controller
 
     protected function submissions(array $filters): Collection
     {
+        $currentTermId = $this->currentTermId();
+
+        if (!$currentTermId) {
+            return collect();
+        }
+
         $reports = DB::table('accomplishment_reports')
+            ->where('term_id', $currentTermId)
             ->where('reporting_year', $filters['year'])
             ->when($filters['period'] === 'monthly', fn ($query) => $query
                 ->where('report_type', 'monthly')
@@ -282,6 +293,7 @@ class ConsolidationController extends Controller
         $hasBudgetPeriods = Schema::hasColumn('budget_reports', 'budget_period_type');
 
         $budgets = DB::table('budget_reports')
+            ->where('term_id', $currentTermId)
             ->where('fiscal_year', $filters['year'])
             ->when($hasBudgetPeriods && $filters['period'] === 'monthly', fn ($query) => $query
                 ->where('budget_period_type', 'monthly')
@@ -351,12 +363,19 @@ class ConsolidationController extends Controller
 
     protected function qualitySubmissions(array $filters): Collection
     {
+        $currentTermId = $this->currentTermId();
+
+        if (!$currentTermId) {
+            return collect();
+        }
+
         $reportQuery = DB::table('accomplishment_reports as ar')
             ->leftJoin('barangays as b', 'ar.barangay_id', '=', 'b.barangay_id')
             ->leftJoin('submission_quality_reviews as qr', function ($join) {
                 $join->on('qr.source_id', '=', 'ar.report_id')
                     ->where('qr.source_type', '=', 'accomplishment_report');
             })
+            ->where('ar.term_id', $currentTermId)
             ->where('ar.reporting_year', $filters['year'])
             ->when($filters['period'] === 'monthly', fn ($query) => $query
                 ->where('ar.report_type', 'monthly')
@@ -403,6 +422,7 @@ class ConsolidationController extends Controller
                 $join->on('qr.source_id', '=', 'br.budget_report_id')
                     ->where('qr.source_type', '=', 'budget_report');
             })
+            ->where('br.term_id', $currentTermId)
             ->where('br.fiscal_year', $filters['year'])
             ->when($hasBudgetPeriods && $filters['period'] === 'monthly', fn ($query) => $query
                 ->where('br.budget_period_type', 'monthly')
@@ -503,13 +523,22 @@ class ConsolidationController extends Controller
 
     protected function availableYears(): array
     {
+        $currentTermId = $this->currentTermId();
+        $defaultYear = $this->currentTermStartYear();
+
+        if (!$currentTermId) {
+            return [$defaultYear];
+        }
+
         $reportYears = DB::table('accomplishment_reports')
+            ->where('term_id', $currentTermId)
             ->select('reporting_year')
             ->distinct()
             ->pluck('reporting_year')
             ->map(fn ($year) => (int) $year);
 
         $budgetYears = DB::table('budget_reports')
+            ->where('term_id', $currentTermId)
             ->select('fiscal_year')
             ->distinct()
             ->pluck('fiscal_year')
@@ -523,7 +552,35 @@ class ConsolidationController extends Controller
             ->values()
             ->all();
 
-        return $years ?: [now()->year];
+        return $years ?: [$defaultYear];
+    }
+
+    protected function currentTermStartYear(): int
+    {
+        if (!Schema::hasTable('administration_terms')) {
+            return now()->year;
+        }
+
+        $startYear = DB::table('administration_terms')
+            ->where('status', 'current')
+            ->orderByDesc('term_id')
+            ->value('start_year');
+
+        return $startYear ? (int) $startYear : now()->year;
+    }
+
+    protected function currentTermId(): ?int
+    {
+        if (!Schema::hasTable('administration_terms')) {
+            return null;
+        }
+
+        $termId = DB::table('administration_terms')
+            ->where('status', 'current')
+            ->orderByDesc('term_id')
+            ->value('term_id');
+
+        return $termId ? (int) $termId : null;
     }
 
     protected function months(): array
