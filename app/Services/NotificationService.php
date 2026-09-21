@@ -19,11 +19,6 @@ class NotificationService
         User $actor
     ): void
     {
-        /*
-         * Public visitors do not have accounts.
-         * Database notifications are therefore only
-         * sent to authenticated SK officials.
-         */
         $roles=[
             'sk_chairman',
             'sk_secretary',
@@ -39,6 +34,8 @@ class NotificationService
                     $actor->first_name.
                     ' posted: '.
                     $announcement->title,
+                'announcement_id'=>
+                    (int)($announcement->announcement_id ?? 0),
             ]
         );
     }
@@ -242,12 +239,6 @@ class NotificationService
                 'sk_secretary',
             ],
 
-            /*
-             * Public events can be viewed anonymously
-             * through the Public Portal.
-             * Only authenticated officials receive
-             * database notifications.
-             */
             default=>[
                 'sk_chairman',
                 'sk_secretary',
@@ -497,7 +488,11 @@ class NotificationService
 
                 'announcement'=>
                     route(
-                        'sk_chairman.announcements'
+                        'sk_chairman.announcements',
+                        [
+                            'focus_id'=>
+                                (int)($payload['announcement_id'] ?? 0),
+                        ]
                     ),
 
                 'event'=>
@@ -509,7 +504,8 @@ class NotificationService
                     route(
                         'sk_chairman.budget',
                         [
-                            'focus_slot'=>(int)($payload['slot_id'] ?? 0),
+                            'focus_slot'=>
+                                (int)($payload['slot_id'] ?? 0),
                         ]
                     ),
 
@@ -517,7 +513,8 @@ class NotificationService
                     route(
                         'sk_chairman.reports',
                         [
-                            'focus_slot'=>(int)($payload['slot_id'] ?? 0),
+                            'focus_slot'=>
+                                (int)($payload['slot_id'] ?? 0),
                         ]
                     ),
 
@@ -525,7 +522,8 @@ class NotificationService
                     route(
                         'sk_chairman.budget',
                         [
-                            'focus_id'=>(int)($payload['source_id'] ?? 0),
+                            'focus_id'=>
+                                (int)($payload['source_id'] ?? 0),
                         ]
                     ),
 
@@ -533,7 +531,8 @@ class NotificationService
                     route(
                         'sk_chairman.reports',
                         [
-                            'focus_id'=>(int)($payload['source_id'] ?? 0),
+                            'focus_id'=>
+                                (int)($payload['source_id'] ?? 0),
                         ]
                     ),
 
@@ -547,7 +546,11 @@ class NotificationService
 
                 'announcement'=>
                     route(
-                        'sk_secretary.announcements'
+                        'sk_secretary.announcements',
+                        [
+                            'focus_id'=>
+                                (int)($payload['announcement_id'] ?? 0),
+                        ]
                     ),
 
                 'event'=>
@@ -559,7 +562,8 @@ class NotificationService
                     route(
                         'sk_secretary.budget',
                         [
-                            'focus_slot'=>(int)($payload['slot_id'] ?? 0),
+                            'focus_slot'=>
+                                (int)($payload['slot_id'] ?? 0),
                         ]
                     ),
 
@@ -567,7 +571,8 @@ class NotificationService
                     route(
                         'sk_secretary.reports',
                         [
-                            'focus_slot'=>(int)($payload['slot_id'] ?? 0),
+                            'focus_slot'=>
+                                (int)($payload['slot_id'] ?? 0),
                         ]
                     ),
 
@@ -575,7 +580,8 @@ class NotificationService
                     route(
                         'sk_secretary.budget',
                         [
-                            'focus_id'=>(int)($payload['source_id'] ?? 0),
+                            'focus_id'=>
+                                (int)($payload['source_id'] ?? 0),
                         ]
                     ),
 
@@ -583,7 +589,8 @@ class NotificationService
                     route(
                         'sk_secretary.reports',
                         [
-                            'focus_id'=>(int)($payload['source_id'] ?? 0),
+                            'focus_id'=>
+                                (int)($payload['source_id'] ?? 0),
                         ]
                     ),
 
