@@ -17,11 +17,14 @@ Route::prefix('mobile')->group(function(){
         Route::get('/sync',[MobileSyncController::class,'sync'])->name('mobile.sync');
 
         Route::post('/wall/posts',[MobileSyncController::class,'storeWallPost'])->name('mobile.wall.posts.store');
+        Route::patch('/wall/posts/{announcementId}',[MobileSyncController::class,'updateAnnouncement'])->name('mobile.wall.posts.update');
         Route::post('/wall/posts/{announcementId}/like',[MobileSyncController::class,'toggleWallLike'])->name('mobile.wall.posts.like');
 
         Route::post('/events',[MobileSyncController::class,'storeEvent'])->name('mobile.events.store');
+        Route::patch('/events/{eventId}',[MobileSyncController::class,'updateEvent'])->name('mobile.events.update');
 
         Route::post('/meetings',[MobileSyncController::class,'storeMeeting'])->name('mobile.meetings.store');
+        Route::patch('/meetings/{meeting}',[MobileSyncController::class,'updateMeeting'])->name('mobile.meetings.update');
         Route::patch('/meetings/{meeting}/end',[MobileSyncController::class,'endMeeting'])->name('mobile.meetings.end');
         Route::get('/meetings/{meeting}/join-url',[MobileSyncController::class,'meetingJoinUrl'])->name('mobile.meetings.join-url');
         Route::post('/meetings/{meeting}/agora-token',[MobileSyncController::class,'meetingAgoraToken'])->name('mobile.meetings.agora-token');

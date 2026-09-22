@@ -372,6 +372,7 @@ class MobileSyncController extends Controller
         $validated = $request->validate([
             'post_content' => ['required', 'string', 'max:5000'],
             'post_category' => ['nullable', 'string', 'max:50'],
+            'visibility' => ['nullable', 'in:public,officials_only'],
         ]);
 
         $category = strtolower($validated['post_category'] ?? 'update');
@@ -391,7 +392,7 @@ class MobileSyncController extends Controller
             'user_id' => $request->user()->user_id,
             'title' => $title,
             'content' => $validated['post_content'],
-            'visibility' => 'public',
+            'visibility' => $validated['visibility'] ?? 'public',
             'created_at' => now(),
             'updated_at' => now(),
         ], 'announcement_id');
@@ -424,6 +425,47 @@ class MobileSyncController extends Controller
                 ->where('announcement_id', $announcementId)
                 ->first(),
         ], 201);
+    }
+
+    public function updateAnnouncement(Request $request, int $announcementId): JsonResponse
+    {
+        if (! $this->isPresident($request->user())) {
+            return response()->json(['message' => 'Only SK President can manage announcements.'], 403);
+        }
+
+        $validated = $request->validate([
+            'post_content' => ['required', 'string', 'max:5000'],
+            'visibility' => ['required', 'in:public,officials_only'],
+        ]);
+
+        $announcement = DB::table('announcements')
+            ->where('announcement_id', $announcementId)
+            ->first();
+
+        if (! $announcement) {
+            return response()->json(['message' => 'Announcement not found.'], 404);
+        }
+
+        if (in_array(strtolower((string) $announcement->title), [
+            'community update', 'event update', 'accomplishment',
+        ], true)) {
+            return response()->json(['message' => 'This post is not an announcement.'], 422);
+        }
+
+        DB::table('announcements')
+            ->where('announcement_id', $announcementId)
+            ->update([
+                'content' => $validated['post_content'],
+                'visibility' => $validated['visibility'],
+                'updated_at' => now(),
+            ]);
+
+        return response()->json([
+            'message' => 'Announcement updated.',
+            'announcement' => DB::table('announcements')
+                ->where('announcement_id', $announcementId)
+                ->first(),
+        ]);
     }
 
     public function toggleWallLike(Request $request, int $announcementId): JsonResponse
@@ -474,7 +516,7 @@ class MobileSyncController extends Controller
             'event_type' => ['nullable', 'string', 'max:50'],
             'start_datetime' => ['required', 'date'],
             'end_datetime' => ['nullable', 'date', 'after_or_equal:start_datetime'],
-            'visibility' => ['nullable', 'in:public,officials_only'],
+            'visibility' => ['nullable', 'in:public,officials_only,chairman_only,secretary_only'],
         ]);
 
         $eventId = DB::table('events')->insertGetId([
@@ -497,6 +539,48 @@ class MobileSyncController extends Controller
                 ->where('event_id', $eventId)
                 ->first(),
         ], 201);
+    }
+
+    public function updateEvent(Request $request, int $eventId): JsonResponse
+    {
+        if (! $this->isPresident($request->user())) {
+            return response()->json(['message' => 'Only SK President can manage calendar events.'], 403);
+        }
+
+        $validated = $request->validate([
+            'title' => ['required', 'string', 'max:255'],
+            'description' => ['nullable', 'string', 'max:5000'],
+            'event_type' => ['required', 'string', 'max:50'],
+            'start_datetime' => ['required', 'date'],
+            'end_datetime' => ['required', 'date', 'after_or_equal:start_datetime'],
+            'visibility' => ['required', 'in:public,officials_only,chairman_only,secretary_only'],
+        ]);
+
+        $event = DB::table('events')
+            ->where('event_id', $eventId)
+            ->first();
+
+        if (! $event) {
+            return response()->json(['message' => 'Event not found.'], 404);
+        }
+
+        DB::table('events')
+            ->where('event_id', $eventId)
+            ->update([
+                'title' => $validated['title'],
+                'description' => $validated['description'] ?? null,
+                'event_type' => $validated['event_type'],
+                'start_datetime' => Carbon::parse($validated['start_datetime']),
+                'end_datetime' => Carbon::parse($validated['end_datetime']),
+                'visibility' => $validated['visibility'],
+            ]);
+
+        return response()->json([
+            'message' => 'Event updated.',
+            'event' => DB::table('events')
+                ->where('event_id', $eventId)
+                ->first(),
+        ]);
     }
 
     public function storeMeeting(Request $request): JsonResponse
@@ -535,6 +619,36 @@ class MobileSyncController extends Controller
             'message' => 'Meeting scheduled successfully.',
             'meeting' => $meeting,
         ], 201);
+    }
+
+    public function updateMeeting(Request $request, Meeting $meeting): JsonResponse
+    {
+        if (! $this->isPresident($request->user())) {
+            return response()->json(['message' => 'Only SK President can manage meetings.'], 403);
+        }
+
+        if ($meeting->status !== 'scheduled') {
+            return response()->json(['message' => 'Only scheduled meetings can be edited.'], 422);
+        }
+
+        $validated = $request->validate([
+            'title' => ['required', 'string', 'max:255'],
+            'agenda' => ['nullable', 'string', 'max:5000'],
+            'meeting_date' => ['required', 'date'],
+            'meeting_time' => ['required', 'date_format:H:i'],
+        ]);
+
+        $meeting->title = $validated['title'];
+        $meeting->agenda = $validated['agenda'] ?? null;
+        $meeting->meeting_date = $validated['meeting_date'];
+        $meeting->meeting_time = $validated['meeting_time'].':00';
+        $meeting->updated_at = now();
+        $meeting->save();
+
+        return response()->json([
+            'message' => 'Meeting updated.',
+            'meeting' => $meeting->fresh(),
+        ]);
     }
 
     public function endMeeting(Request $request, Meeting $meeting): JsonResponse
@@ -1183,6 +1297,12 @@ class MobileSyncController extends Controller
 
                 if ($this->isOfficial($user)) {
                     $query->orWhere('visibility', 'officials_only');
+                }
+                if ($user->role === 'sk_chairman') {
+                    $query->orWhere('visibility', 'chairman_only');
+                }
+                if ($user->role === 'sk_secretary') {
+                    $query->orWhere('visibility', 'secretary_only');
                 }
             });
 
