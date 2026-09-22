@@ -1549,6 +1549,9 @@ class MobileSyncController extends Controller
     protected function leadershipProfiles(User $user, ?Carbon $since): array
     {
         $leaders = collect();
+        $userProfilePicture = Schema::hasColumn('users', 'profile_pic')
+            ? 'profile_pic'
+            : DB::raw('NULL as profile_pic');
 
         $userLeaders = DB::table('users')
             ->whereIn('role', ['sk_chairman', 'sk_secretary'])
@@ -1556,7 +1559,7 @@ class MobileSyncController extends Controller
             ->select(
                 DB::raw('user_id as leadership_id'),
                 'user_id',
-                'profile_pic',
+                $userProfilePicture,
                 'barangay_id',
                 DB::raw("CONCAT(first_name, ' ', last_name) as full_name"),
                 DB::raw("
@@ -1599,6 +1602,9 @@ class MobileSyncController extends Controller
         }
 
         if (Schema::hasTable('leadership_profiles')) {
+            $joinedProfilePicture = Schema::hasColumn('users', 'profile_pic')
+                ? 'u.profile_pic'
+                : DB::raw('NULL as profile_pic');
             $profileRows = DB::table('leadership_profiles')
                 ->leftJoin('users as u', 'leadership_profiles.user_id', '=', 'u.user_id')
                 ->where('leadership_profiles.status', 'current')
@@ -1608,7 +1614,7 @@ class MobileSyncController extends Controller
                     'leadership_profiles.barangay_id',
                     'leadership_profiles.full_name',
                     'leadership_profiles.position',
-                    'u.profile_pic',
+                    $joinedProfilePicture,
                     DB::raw("
                         CASE
                             WHEN leadership_profiles.term_start IS NOT NULL AND leadership_profiles.term_end IS NOT NULL
