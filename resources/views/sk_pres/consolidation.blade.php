@@ -115,10 +115,6 @@
                     </div>
 
                     <div class="flex flex-wrap gap-3">
-                        <a href="{{ $downloadRoute }}" class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-xl text-sm font-medium">
-                            &#128196; Generate Report
-                        </a>
-
                         <a href="{{ $downloadRoute }}" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-xl text-sm font-medium">
                             &#11015; Download Consolidated PDF
                         </a>
