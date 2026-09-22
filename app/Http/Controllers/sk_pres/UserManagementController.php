@@ -1524,6 +1524,7 @@ class UserManagementController extends Controller
                 'u.user_id',
                 'u.first_name',
                 'u.last_name',
+                'u.profile_pic',
                 'u.email',
                 'u.phone_number',
                 'u.barangay_id',

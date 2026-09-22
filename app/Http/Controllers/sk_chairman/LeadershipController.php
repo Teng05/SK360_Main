@@ -52,6 +52,9 @@ class LeadershipController extends Controller
             'name'=>trim(($secretaryModel->first_name ?? '').' '.($secretaryModel->last_name ?? '')),
             'first_name'=>$secretaryModel->first_name,
             'last_name'=>$secretaryModel->last_name,
+            'profile_pic_url'=>$secretaryModel->profile_pic
+                ? asset(str_starts_with($secretaryModel->profile_pic, 'uploads/') ? $secretaryModel->profile_pic : 'uploads/profile_pics/'.$secretaryModel->profile_pic)
+                : null,
             'position'=>'SK Secretary',
             'email'=>$secretaryModel->email,
             'phone'=>$secretaryModel->phone_number,
@@ -111,6 +114,9 @@ class LeadershipController extends Controller
             'position'=>'SK Chairman',
             'email'=>$user->email,
             'phone'=>$user->phone_number,
+            'profile_pic_url'=>$user->profile_pic
+                ? asset(str_starts_with($user->profile_pic, 'uploads/') ? $user->profile_pic : 'uploads/profile_pics/'.$user->profile_pic)
+                : null,
             'term'=>$this->officialTermLabel($user),
             'status'=>$user->status,
             'is_verified'=>(int)$user->is_verified,

@@ -35,45 +35,52 @@
     <div class="flex-1 flex flex-col">
         @include('shared.topbar', ['legacyAccountMenu' => false])
 
-        <div class="p-8 overflow-y-auto">
-            <h1 class="text-3xl font-bold text-gray-800">Announcements</h1>
-            <p class="text-gray-500 mb-8">Official communications and updates for SK federation</p>
+        <main class="flex-1 overflow-y-auto bg-slate-100 p-5 md:p-8">
+            <div class="mb-7 flex flex-wrap items-end justify-between gap-4">
+                <div>
+                    <p class="mb-1 text-xs font-bold uppercase tracking-[0.18em] text-red-600">SK Federation</p>
+                    <h1 class="text-3xl font-extrabold tracking-tight text-slate-900">Announcements</h1>
+                    <p class="mt-1 text-sm text-slate-500">Official communications and updates for SK federation</p>
+                </div>
+                <div class="rounded-full border border-red-100 bg-white px-4 py-2 text-sm font-semibold text-slate-600 shadow-sm">
+                    {{ $announcements->count() }} {{ \Illuminate\Support\Str::plural('announcement', $announcements->count()) }}
+                </div>
+            </div>
 
-            <div class="max-w-4xl space-y-6">
+            <div class="grid w-full grid-cols-1 gap-5 xl:grid-cols-2">
                 @forelse ($announcements as $row)
-                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition relative">
-                        <div class="absolute top-4 right-6 flex gap-2">
-                            <span class="px-3 py-1 rounded-full text-[10px] font-bold uppercase {{ $row->priority_badge }}">
-                                {{ $row->priority }}
-                            </span>
-                            <span class="bg-gray-100 text-gray-500 px-3 py-1 rounded-full text-[10px] font-bold uppercase">
-                                {{ $row->visibility_label }}
-                            </span>
-                        </div>
-
-                        <div class="flex items-start gap-4">
-                            <div class="text-red-500 text-xl mt-1">&#128226;</div>
-                            <div class="flex-1">
-                                <h2 class="text-xl font-bold text-gray-800">{{ $row->title }}</h2>
-                                <p class="text-xs text-gray-400 font-medium mb-4">
-                                    By {{ trim($row->author_name) ?: 'SK Federation President' }} &bull; {{ \Carbon\Carbon::parse($row->created_at)->format('Y-m-d') }}
-                                </p>
-
-                                <p class="text-gray-600 text-sm leading-relaxed mb-4">
-                                    {!! nl2br(e($row->content)) !!}
-                                </p>
-
-                                <div class="flex items-center text-gray-400 text-[10px] font-bold">
-                                    <span>{{ $row->views }} views</span>
+                    <article class="relative rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md md:p-6">
+                        <div class="mb-4 flex items-start justify-between gap-3">
+                            <div class="flex min-w-0 items-center gap-3">
+                                <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-red-50 text-xl text-red-600">&#128226;</span>
+                                <div class="min-w-0">
+                                    <h2 class="truncate text-lg font-bold text-slate-900">{{ $row->title }}</h2>
+                                    <p class="mt-0.5 text-xs text-slate-500">
+                                        By {{ trim($row->author_name) ?: 'SK Federation President' }} &bull; {{ \Carbon\Carbon::parse($row->created_at)->format('M d, Y') }}
+                                    </p>
                                 </div>
                             </div>
+                            <div class="flex shrink-0 flex-wrap justify-end gap-2">
+                            <span class="rounded-full px-3 py-1 text-[10px] font-bold uppercase {{ $row->priority_badge }}">
+                                {{ $row->priority }}
+                            </span>
+                            <span class="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-bold uppercase text-slate-500">
+                                {{ $row->visibility_label }}
+                            </span>
+                            </div>
                         </div>
-                    </div>
+
+                        <p class="border-t border-slate-100 pt-4 text-sm leading-6 text-slate-700">
+                            {!! nl2br(e($row->content)) !!}
+                        </p>
+                    </article>
                 @empty
-                    <p class="text-gray-400 italic">No announcements found.</p>
+                    <div class="col-span-full rounded-2xl border border-dashed border-slate-300 bg-white px-6 py-14 text-center text-sm text-slate-500">
+                        No announcements found.
+                    </div>
                 @endforelse
             </div>
-        </div>
+        </main>
     </div>
 </div>
 @endsection
@@ -108,4 +115,3 @@
     });
 </script>
 @endpush
-

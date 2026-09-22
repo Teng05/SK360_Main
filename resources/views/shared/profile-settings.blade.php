@@ -63,7 +63,7 @@
                     <div class="flex items-center gap-6">
                         <div class="w-24 h-24 bg-red-600 rounded-2xl flex items-center justify-center text-white text-4xl font-bold border-4 border-white shadow-md overflow-hidden">
                             @if ($hasProfilePicColumn && !empty($user->profile_pic ?? null))
-                                <img src="{{ asset('uploads/profile_pics/' . $user->profile_pic) }}" class="w-full h-full object-cover" alt="Profile picture">
+                                <img src="{{ asset(str_starts_with($user->profile_pic, 'uploads/') ? $user->profile_pic : 'uploads/profile_pics/' . $user->profile_pic) }}" class="w-full h-full object-cover" alt="Profile picture">
                             @else
                                 {{ strtoupper(substr($user->first_name ?? 'U', 0, 1)) }}
                             @endif
@@ -74,6 +74,16 @@
                             <div class="mt-2 inline-flex items-center gap-1.5 px-3 py-1 bg-green-100 text-green-700 rounded-full text-[10px] font-black">
                                 <span class="w-1.5 h-1.5 bg-green-500 rounded-full"></span> VERIFIED
                             </div>
+                            @if ($hasProfilePicColumn)
+                                <form action="{{ $updateRoute }}" method="POST" enctype="multipart/form-data" class="mt-3 flex flex-wrap items-center gap-2">
+                                    @csrf
+                                    <input type="hidden" name="first_name" value="{{ $user->first_name }}">
+                                    <input type="hidden" name="last_name" value="{{ $user->last_name }}">
+                                    <input type="file" name="profile_pic" accept="image/jpeg,image/png,image/webp" required class="max-w-56 text-xs">
+                                    <button class="rounded-lg bg-red-600 px-3 py-2 text-xs font-bold text-white hover:bg-red-700">Upload photo</button>
+                                </form>
+                                <p class="mt-1 text-[10px] text-gray-400">JPG, PNG, or WebP; up to 5 MB.</p>
+                            @endif
                         </div>
                     </div>
                 </div>
@@ -247,4 +257,3 @@ if (dropdownBtn && profileMenu) {
 </script>
 </body>
 </html>
-

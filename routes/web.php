@@ -96,6 +96,11 @@ Route::middleware('auth')->group(function(){
     Route::post('/wall/posts/{announcement}/like',[WallPostController::class,'toggleLike'])->name('wall.posts.like');
 });
 
+// Short-lived signed links used by the mobile app to view generated documents.
+Route::get('/mobile-documents/{sourceType}/{sourceId}', [SkPresidentArchiveController::class, 'mobileView'])
+    ->middleware('signed')
+    ->name('mobile.document.view');
+
 
 
 /*

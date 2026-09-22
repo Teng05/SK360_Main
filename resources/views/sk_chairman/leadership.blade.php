@@ -1082,9 +1082,13 @@
                                 $searchStatus
                             ) }}">
 
-                            <div class="w-16 h-16 rounded-2xl {{ $avatarStyle }} flex items-center justify-center font-black text-xl border-4 border-white shadow-sm">
-                                {{ strtoupper(substr($member['name'] ?? 'U',0,2)) }}
-                            </div>
+                            @if(!empty($member['profile_pic_url']))
+                                <img src="{{ $member['profile_pic_url'] }}" alt="{{ $member['name'] }}" class="h-16 w-16 rounded-2xl border-4 border-white object-cover shadow-sm">
+                            @else
+                                <div class="w-16 h-16 rounded-2xl {{ $avatarStyle }} flex items-center justify-center font-black text-xl border-4 border-white shadow-sm">
+                                    {{ strtoupper(substr($member['name'] ?? 'U',0,2)) }}
+                                </div>
+                            @endif
 
                             <div class="flex-1">
 

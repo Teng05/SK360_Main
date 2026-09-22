@@ -40,7 +40,6 @@
                     Waiting for other participants to join...
                 </div>
                 <div id="local-player" class="video-pane flex min-h-[180px] items-center justify-center rounded-[20px] text-sm text-slate-400">
-                    Joining local preview...
                 </div>
             </div>
 
@@ -89,11 +88,14 @@
     const toggleMicBtn = document.getElementById('toggleMicBtn');
     const toggleCamBtn = document.getElementById('toggleCamBtn');
     const leaveBtn = document.getElementById('leaveBtn');
+    const localPlayer = document.getElementById('local-player');
+    const localName = @json($fullName);
 
     let client;
     let localTracks = [];
     let remoteUsers = new Map();
     let activeSpeakerUid = null;
+    let isLeaving = false;
 
     const showStatus = (message) => {
         statusText.textContent = message;
@@ -116,6 +118,16 @@
         return participantNames[key] || `User ${key}`;
     };
 
+    const addVideoNameTag = (player, name, caption = '') => {
+        player.querySelector('[data-video-name]')?.remove();
+        player.classList.add('relative');
+        const tag = document.createElement('div');
+        tag.dataset.videoName = 'true';
+        tag.className = 'pointer-events-none absolute bottom-3 left-3 z-10 rounded-lg bg-black/60 px-3 py-1.5 text-xs font-medium text-white';
+        tag.textContent = caption ? `${name} · ${caption}` : name;
+        player.appendChild(tag);
+    };
+
     const ensureRemoteCard = (user) => {
         const id = `remote-${user.uid}`;
         let player = document.getElementById(id);
@@ -129,6 +141,36 @@
 
         remoteEmpty.classList.add('hidden');
         return player;
+    };
+
+    const showCameraOff = (user) => {
+        const player = ensureRemoteCard(user);
+        const placeholder = document.createElement('div');
+        placeholder.className = 'flex h-full min-h-[320px] flex-col items-center justify-center gap-3 text-slate-300';
+        const avatar = document.createElement('div');
+        avatar.className = 'flex h-16 w-16 items-center justify-center rounded-full bg-white/10 text-xl font-bold';
+        avatar.textContent = participantNameFor(user.uid).slice(0, 1).toUpperCase();
+        const label = document.createElement('span');
+        label.textContent = `${participantNameFor(user.uid)} · Camera off`;
+        placeholder.append(avatar, label);
+        player.replaceChildren(placeholder);
+        player.style.display = '';
+    };
+
+    const showLocalCameraOff = () => {
+        const placeholder = document.createElement('div');
+        placeholder.className = 'flex h-full min-h-[180px] flex-col items-center justify-center gap-3 text-slate-300';
+        const avatar = document.createElement('div');
+        avatar.className = 'flex h-16 w-16 items-center justify-center rounded-full bg-white/10 text-xl font-bold';
+        avatar.textContent = localName.trim().charAt(0).toUpperCase() || 'Y';
+        const name = document.createElement('span');
+        name.className = 'text-sm font-semibold';
+        name.textContent = localName;
+        const label = document.createElement('span');
+        label.className = 'text-xs text-slate-400';
+        label.textContent = 'You';
+        placeholder.append(avatar, name, label);
+        localPlayer.replaceChildren(placeholder);
     };
 
     const reorderRemoteGrid = () => {
@@ -166,10 +208,14 @@
         remoteUsers.forEach((user) => {
             const entry = document.createElement('div');
             entry.className = 'rounded-2xl border border-white/10 px-3 py-3';
-            entry.innerHTML = `
-                <p class="text-sm font-semibold">${participantNameFor(user.uid)}</p>
-                <p class="mt-1 text-[11px] text-slate-400">Connected</p>
-            `;
+            const status = user.hasAudio ? 'Connected' : 'Muted';
+            const name = document.createElement('p');
+            name.className = 'text-sm font-semibold';
+            name.textContent = participantNameFor(user.uid);
+            const state = document.createElement('p');
+            state.className = 'mt-1 text-[11px] text-slate-400';
+            state.textContent = status;
+            entry.append(name, state);
             participantList.appendChild(entry);
         });
         refreshParticipantCount();
@@ -193,6 +239,12 @@
             if (!tokenResponse.ok) throw new Error(tokenPayload.message || 'Failed to fetch token.');
             client = AgoraRTC.createClient({ mode: 'rtc', codec: 'vp8' });
 
+            client.on('user-joined', (user) => {
+                remoteUsers.set(String(user.uid), user);
+                showCameraOff(user);
+                syncParticipantList();
+            });
+
             client.on('user-published', async (user, mediaType) => {
                 remoteUsers.set(String(user.uid), user);
                 syncParticipantList();
@@ -200,15 +252,27 @@
 
                 if (mediaType === 'video') {
                     const player = ensureRemoteCard(user);
+                    player.innerHTML = '';
                     user.videoTrack.play(player.id);
+                    addVideoNameTag(player, participantNameFor(user.uid));
                     reorderRemoteGrid();
                 }
                 if (mediaType === 'audio') user.audioTrack.play();
             });
 
-            client.on('user-unpublished', (user) => {
-                const player = document.getElementById(`remote-${user.uid}`);
-                if (player) player.style.display = 'none';
+            client.on('user-unpublished', (user, mediaType) => {
+                remoteUsers.set(String(user.uid), user);
+                if (mediaType === 'video') showCameraOff(user);
+                syncParticipantList();
+                reorderRemoteGrid();
+            });
+
+            client.on('user-left', (user) => {
+                remoteUsers.delete(String(user.uid));
+                document.getElementById(`remote-${user.uid}`)?.remove();
+                if (remoteUsers.size === 0) remoteEmpty.classList.remove('hidden');
+                syncParticipantList();
+                reorderRemoteGrid();
             });
 
             client.on('volume-indicator', (volumes) => {
@@ -219,19 +283,11 @@
                 reorderRemoteGrid();
             });
 
-            client.on('user-unpublished', (user) => {
-                remoteUsers.delete(String(user.uid));
-                const player = document.getElementById(`remote-${user.uid}`);
-                if (player) player.remove();
-                if (remoteUsers.size === 0) remoteEmpty.classList.remove('hidden');
-                syncParticipantList();
-                reorderRemoteGrid();
-            });
-
             await client.join(tokenPayload.appId, tokenPayload.channel, tokenPayload.token, tokenPayload.uid);
             
             localTracks = await AgoraRTC.createMicrophoneAndCameraTracks();
-            localTracks[1].play('local-player');
+            localTracks[1].play(localPlayer);
+            addVideoNameTag(localPlayer, localName, 'You');
             await client.publish(localTracks);
             await client.enableAudioVolumeIndicator();
             reorderRemoteGrid();
@@ -256,12 +312,32 @@
         if (!localTracks[1]) return;
         const shouldDisable = localTracks[1].enabled;
         await localTracks[1].setEnabled(!shouldDisable);
+        if (shouldDisable) {
+            showLocalCameraOff();
+        } else {
+            localPlayer.replaceChildren();
+            localTracks[1].play(localPlayer);
+            addVideoNameTag(localPlayer, localName, 'You');
+        }
         toggleCamBtn.textContent = shouldDisable ? 'Turn On Camera' : 'Turn Off Camera';
     });
 
     leaveBtn.addEventListener('click', async () => {
-        for (const track of localTracks) { track.stop(); track.close(); }
-        if (client) await client.leave();
+        if (isLeaving) return;
+        isLeaving = true;
+        leaveBtn.disabled = true;
+        leaveBtn.textContent = 'Leaving...';
+
+        for (const track of localTracks) {
+            try { track.stop(); track.close(); } catch (_) {}
+        }
+
+        if (client) {
+            await Promise.race([
+                client.leave().catch(() => {}),
+                new Promise((resolve) => setTimeout(resolve, 500)),
+            ]);
+        }
         window.location.href = @json($backRoute ?? route('sk_pres.meetings'));
     });
 

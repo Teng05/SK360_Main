@@ -245,14 +245,22 @@ class MobileSyncController extends Controller
         $validated = $request->validate([
             'first_name' => ['required', 'string', 'max:50'],
             'last_name' => ['required', 'string', 'max:50'],
+            'profile_pic' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
         ]);
 
         $user = $request->user();
-
         $user->update([
             'first_name' => trim($validated['first_name']),
             'last_name' => trim($validated['last_name']),
         ]);
+
+        if ($request->hasFile('profile_pic') && Schema::hasColumn('users', 'profile_pic')) {
+            $directory = public_path('uploads/profile_pics');
+            File::ensureDirectoryExists($directory);
+            $filename = $user->user_id.'-'.Str::random(20).'.'.$request->file('profile_pic')->extension();
+            $request->file('profile_pic')->move($directory, $filename);
+            $user->update(['profile_pic' => 'uploads/profile_pics/'.$filename]);
+        }
 
         return response()->json([
             'message' => 'Profile updated successfully.',
@@ -335,6 +343,7 @@ class MobileSyncController extends Controller
         return response()->json(['message' => 'Password updated successfully.']);
     }
 
+    // Sends the records currently shared between web and mobile.
     public function sync(Request $request): JsonResponse
     {
         $validated = $request->validate([
@@ -350,6 +359,7 @@ class MobileSyncController extends Controller
             'barangays' => $this->tableRows('barangays', $since, 'barangay_id'),
             'announcements' => $this->announcements($user, $since),
             'wall_posts' => $this->wallPosts($user, $since),
+            'feedback' => $this->feedback($user),
             'events' => $this->events($user, $since),
             'meetings' => $this->meetings($user, $since),
             'notifications' => $this->notifications($user, $since),
@@ -370,9 +380,9 @@ class MobileSyncController extends Controller
     public function storeWallPost(Request $request): JsonResponse
     {
         $validated = $request->validate([
+            'title' => ['nullable', 'string', 'max:255'],
             'post_content' => ['required', 'string', 'max:5000'],
             'post_category' => ['nullable', 'string', 'max:50'],
-            'visibility' => ['nullable', 'in:public,officials_only'],
         ]);
 
         $category = strtolower($validated['post_category'] ?? 'update');
@@ -381,21 +391,25 @@ class MobileSyncController extends Controller
             return response()->json(['message' => 'Only SK President can create announcements.'], 403);
         }
 
-        $title = match ($category) {
+        $title = $validated['title'] ?? match ($category) {
             'announcement' => 'Announcement',
             'event' => 'Event Update',
             'accomplishment' => 'Accomplishment',
             default => 'Community Update',
         };
 
-        $announcementId = DB::table('announcements')->insertGetId([
+        $announcementData = [
             'user_id' => $request->user()->user_id,
             'title' => $title,
             'content' => $validated['post_content'],
-            'visibility' => $validated['visibility'] ?? 'public',
+            'visibility' => 'public',
             'created_at' => now(),
             'updated_at' => now(),
-        ], 'announcement_id');
+        ];
+        if (Schema::hasColumn('announcements', 'status')) {
+            $announcementData['status'] = $validated['status'] ?? 'published';
+        }
+        $announcementId = DB::table('announcements')->insertGetId($announcementData, 'announcement_id');
 
         $user = $request->user();
 
@@ -425,47 +439,6 @@ class MobileSyncController extends Controller
                 ->where('announcement_id', $announcementId)
                 ->first(),
         ], 201);
-    }
-
-    public function updateAnnouncement(Request $request, int $announcementId): JsonResponse
-    {
-        if (! $this->isPresident($request->user())) {
-            return response()->json(['message' => 'Only SK President can manage announcements.'], 403);
-        }
-
-        $validated = $request->validate([
-            'post_content' => ['required', 'string', 'max:5000'],
-            'visibility' => ['required', 'in:public,officials_only'],
-        ]);
-
-        $announcement = DB::table('announcements')
-            ->where('announcement_id', $announcementId)
-            ->first();
-
-        if (! $announcement) {
-            return response()->json(['message' => 'Announcement not found.'], 404);
-        }
-
-        if (in_array(strtolower((string) $announcement->title), [
-            'community update', 'event update', 'accomplishment',
-        ], true)) {
-            return response()->json(['message' => 'This post is not an announcement.'], 422);
-        }
-
-        DB::table('announcements')
-            ->where('announcement_id', $announcementId)
-            ->update([
-                'content' => $validated['post_content'],
-                'visibility' => $validated['visibility'],
-                'updated_at' => now(),
-            ]);
-
-        return response()->json([
-            'message' => 'Announcement updated.',
-            'announcement' => DB::table('announcements')
-                ->where('announcement_id', $announcementId)
-                ->first(),
-        ]);
     }
 
     public function toggleWallLike(Request $request, int $announcementId): JsonResponse
@@ -519,16 +492,29 @@ class MobileSyncController extends Controller
             'visibility' => ['nullable', 'in:public,officials_only,chairman_only,secretary_only'],
         ]);
 
+        $start = Carbon::parse($validated['start_datetime']);
+        $end = isset($validated['end_datetime'])
+            ? Carbon::parse($validated['end_datetime'])
+            : $start->copy()->addHour();
+
+        $conflict = DB::table('events')
+            ->where('start_datetime', '<', $end)
+            ->where('end_datetime', '>', $start)
+            ->exists();
+        if ($conflict) {
+            return response()->json([
+                'message' => 'This schedule overlaps an existing event.',
+            ], 422);
+        }
+
         $eventId = DB::table('events')->insertGetId([
             'created_by' => $request->user()->user_id,
             'title' => $validated['title'],
             'description' => $validated['description'] ?? null,
             'location' => $validated['location'] ?? null,
             'event_type' => $validated['event_type'] ?? 'event',
-            'start_datetime' => Carbon::parse($validated['start_datetime']),
-            'end_datetime' => isset($validated['end_datetime'])
-                ? Carbon::parse($validated['end_datetime'])
-                : Carbon::parse($validated['start_datetime'])->copy()->addHour(),
+            'start_datetime' => $start,
+            'end_datetime' => $end,
             'visibility' => $validated['visibility'] ?? 'public',
             'created_at' => now(),
         ], 'event_id');
@@ -539,48 +525,6 @@ class MobileSyncController extends Controller
                 ->where('event_id', $eventId)
                 ->first(),
         ], 201);
-    }
-
-    public function updateEvent(Request $request, int $eventId): JsonResponse
-    {
-        if (! $this->isPresident($request->user())) {
-            return response()->json(['message' => 'Only SK President can manage calendar events.'], 403);
-        }
-
-        $validated = $request->validate([
-            'title' => ['required', 'string', 'max:255'],
-            'description' => ['nullable', 'string', 'max:5000'],
-            'event_type' => ['required', 'string', 'max:50'],
-            'start_datetime' => ['required', 'date'],
-            'end_datetime' => ['required', 'date', 'after_or_equal:start_datetime'],
-            'visibility' => ['required', 'in:public,officials_only,chairman_only,secretary_only'],
-        ]);
-
-        $event = DB::table('events')
-            ->where('event_id', $eventId)
-            ->first();
-
-        if (! $event) {
-            return response()->json(['message' => 'Event not found.'], 404);
-        }
-
-        DB::table('events')
-            ->where('event_id', $eventId)
-            ->update([
-                'title' => $validated['title'],
-                'description' => $validated['description'] ?? null,
-                'event_type' => $validated['event_type'],
-                'start_datetime' => Carbon::parse($validated['start_datetime']),
-                'end_datetime' => Carbon::parse($validated['end_datetime']),
-                'visibility' => $validated['visibility'],
-            ]);
-
-        return response()->json([
-            'message' => 'Event updated.',
-            'event' => DB::table('events')
-                ->where('event_id', $eventId)
-                ->first(),
-        ]);
     }
 
     public function storeMeeting(Request $request): JsonResponse
@@ -621,36 +565,6 @@ class MobileSyncController extends Controller
         ], 201);
     }
 
-    public function updateMeeting(Request $request, Meeting $meeting): JsonResponse
-    {
-        if (! $this->isPresident($request->user())) {
-            return response()->json(['message' => 'Only SK President can manage meetings.'], 403);
-        }
-
-        if ($meeting->status !== 'scheduled') {
-            return response()->json(['message' => 'Only scheduled meetings can be edited.'], 422);
-        }
-
-        $validated = $request->validate([
-            'title' => ['required', 'string', 'max:255'],
-            'agenda' => ['nullable', 'string', 'max:5000'],
-            'meeting_date' => ['required', 'date'],
-            'meeting_time' => ['required', 'date_format:H:i'],
-        ]);
-
-        $meeting->title = $validated['title'];
-        $meeting->agenda = $validated['agenda'] ?? null;
-        $meeting->meeting_date = $validated['meeting_date'];
-        $meeting->meeting_time = $validated['meeting_time'].':00';
-        $meeting->updated_at = now();
-        $meeting->save();
-
-        return response()->json([
-            'message' => 'Meeting updated.',
-            'meeting' => $meeting->fresh(),
-        ]);
-    }
-
     public function endMeeting(Request $request, Meeting $meeting): JsonResponse
     {
         if (! $this->isPresident($request->user())) {
@@ -674,6 +588,10 @@ class MobileSyncController extends Controller
     {
         if (! $this->isOfficial($request->user())) {
             return response()->json(['message' => 'Only SK officials can join meetings.'], 403);
+        }
+
+        if ($this->meetingUnavailable($meeting)) {
+            return response()->json(['message' => 'This meeting is no longer available.'], 422);
         }
 
         return response()->json([
@@ -711,6 +629,10 @@ class MobileSyncController extends Controller
     {
         if (! $this->isOfficial($request->user())) {
             return response()->json(['message' => 'Only SK officials can join meetings.'], 403);
+        }
+
+        if ($this->meetingUnavailable($meeting)) {
+            return response()->json(['message' => 'This meeting is no longer available.'], 422);
         }
 
         return $this->buildAgoraTokenResponse(
@@ -759,6 +681,12 @@ class MobileSyncController extends Controller
         ]);
     }
 
+    protected function meetingUnavailable(Meeting $meeting): bool
+    {
+        return $meeting->status === 'completed'
+            || ($meeting->scheduled_at && $meeting->scheduled_at->isPast());
+    }
+
     public function chatUsers(Request $request): JsonResponse
     {
         $keyword = trim((string) $request->query('search', ''));
@@ -776,6 +704,7 @@ class MobileSyncController extends Controller
                 'u.last_name',
                 'u.email',
                 'u.role',
+                'u.profile_pic',
                 'b.barangay_name'
             )
             ->where('u.user_id', '!=', $user->user_id)
@@ -806,6 +735,11 @@ class MobileSyncController extends Controller
                     'email' => $row->email,
                     'role' => $row->role,
                     'barangay' => $row->barangay_name,
+                    'profile_pic_url' => $row->profile_pic
+                        ? $this->publicUrl(Str::startsWith($row->profile_pic, 'uploads/')
+                            ? $row->profile_pic
+                            : 'uploads/profile_pics/'.$row->profile_pic)
+                        : null,
                 ])
                 ->values(),
         ]);
@@ -1091,6 +1025,71 @@ class MobileSyncController extends Controller
         ]);
     }
 
+    // Allows officials to hide or restore public feedback.
+    public function updateFeedback(Request $request, int $feedbackId): JsonResponse
+    {
+        if (! $this->isOfficial($request->user())) {
+            return response()->json(['message' => 'Only SK officials can manage feedback.'], 403);
+        }
+
+        $validated = $request->validate([
+            'status' => ['required', 'in:posted,hidden'],
+        ]);
+
+        if (! Schema::hasTable('announcement_feedback')) {
+            return response()->json(['message' => 'Feedback is not available.'], 404);
+        }
+
+        $updated = DB::table('announcement_feedback')
+            ->where('feedback_id', $feedbackId)
+            ->update(['status' => $validated['status']]);
+
+        if ($updated === 0) {
+            return response()->json(['message' => 'Feedback not found.'], 404);
+        }
+
+        return response()->json(['message' => 'Feedback status updated.']);
+    }
+
+    // Keep email addresses out of mobile feedback responses for privacy.
+    protected function feedback(User $user): array
+    {
+        if (! $this->isOfficial($user) || ! Schema::hasTable('announcement_feedback')) {
+            return [];
+        }
+
+        return DB::table('announcement_feedback as f')
+            ->leftJoin('announcements as a', 'a.announcement_id', '=', 'f.announcement_id')
+            ->select(
+                'f.feedback_id',
+                'f.announcement_id',
+                'f.name',
+                'f.comment',
+                'f.status',
+                'f.verified_at',
+                'f.created_at',
+                'a.title as announcement_title'
+            )
+            ->whereIn('f.status', ['posted', 'hidden'])
+            ->orderByDesc('f.created_at')
+            ->limit(500)
+            ->get()
+            ->map(function ($row) {
+                return [
+                    'feedback_id' => $row->feedback_id,
+                    'announcement_id' => $row->announcement_id,
+                    'announcement_title' => $row->announcement_title ?: 'Announcement',
+                    'name' => trim((string) $row->name) ?: 'Anonymous',
+                    'comment' => $row->comment,
+                    'status' => $row->status,
+                    'verified_at' => $row->verified_at,
+                    'created_at' => $row->created_at,
+                ];
+            })
+            ->values()
+            ->all();
+    }
+
     public function markNotificationRead(Request $request, int $notificationId): JsonResponse
     {
         $updated = DB::table('notifications')
@@ -1123,7 +1122,11 @@ class MobileSyncController extends Controller
             'is_verified' => (bool) $user->is_verified,
             'barangay_id' => $user->barangay_id,
             'barangay_name' => $user->barangay?->barangay_name,
-            'profile_pic_url' => $this->publicUrl($user->profile_pic ?? null),
+            'profile_pic_url' => $user->profile_pic
+                ? $this->publicUrl(Str::startsWith($user->profile_pic, 'uploads/')
+                    ? $user->profile_pic
+                    : 'uploads/profile_pics/'.$user->profile_pic)
+                : null,
         ];
     }
 
@@ -1219,8 +1222,16 @@ class MobileSyncController extends Controller
 
         $query = DB::table('announcements')
             ->where(function (Builder $query) use ($user) {
-                $query->where('visibility', 'public')
-                    ->orWhere('user_id', $user->user_id);
+                if (Schema::hasColumn('announcements', 'status')) {
+                    $query->where(function (Builder $statusQuery) use ($user) {
+                        $statusQuery->where('status', 'published')
+                            ->orWhere('user_id', $user->user_id);
+                    });
+                }
+                $query->where(function (Builder $visibilityQuery) use ($user) {
+                    $visibilityQuery->where('visibility', 'public')
+                        ->orWhere('user_id', $user->user_id);
+                });
 
                 if ($this->isOfficial($user)) {
                     $query->orWhere('visibility', 'officials_only');
@@ -1244,7 +1255,16 @@ class MobileSyncController extends Controller
         $query = DB::table('announcements as a')
             ->leftJoin('users as u', 'a.user_id', '=', 'u.user_id')
             ->leftJoin('barangays as b', 'u.barangay_id', '=', 'b.barangay_id')
-            ->where('a.visibility', 'public')
+            ->where(function (Builder $visibilityQuery) use ($user) {
+                $visibilityQuery->where('a.visibility', 'public');
+
+                if ($this->isOfficial($user)) {
+                    $visibilityQuery->orWhere('a.visibility', 'officials_only');
+                }
+            })
+            ->when(Schema::hasColumn('announcements', 'status'), function (Builder $query) {
+                $query->where('a.status', 'published');
+            })
             ->select(
                 'a.announcement_id',
                 'a.user_id',
@@ -1413,6 +1433,7 @@ class MobileSyncController extends Controller
         return array_map(function ($row) {
             $row->uploaded_file_url = $this->publicUrl($row->uploaded_file_path ?? null);
             $row->generated_pdf_url = $this->publicUrl($row->generated_pdf_path ?? null);
+            $row->mobile_view_url = $this->mobileDocumentViewUrl('budget_report', (int) $row->budget_report_id);
 
             return $row;
         }, $rows);
@@ -1535,6 +1556,7 @@ class MobileSyncController extends Controller
             ->select(
                 DB::raw('user_id as leadership_id'),
                 'user_id',
+                'profile_pic',
                 'barangay_id',
                 DB::raw("CONCAT(first_name, ' ', last_name) as full_name"),
                 DB::raw("
@@ -1578,23 +1600,25 @@ class MobileSyncController extends Controller
 
         if (Schema::hasTable('leadership_profiles')) {
             $profileRows = DB::table('leadership_profiles')
-                ->where('status', 'current')
+                ->leftJoin('users as u', 'leadership_profiles.user_id', '=', 'u.user_id')
+                ->where('leadership_profiles.status', 'current')
                 ->select(
-                    'leadership_id',
-                    'user_id',
-                    'barangay_id',
-                    'full_name',
-                    'position',
+                    'leadership_profiles.leadership_id',
+                    'leadership_profiles.user_id',
+                    'leadership_profiles.barangay_id',
+                    'leadership_profiles.full_name',
+                    'leadership_profiles.position',
+                    'u.profile_pic',
                     DB::raw("
                         CASE
-                            WHEN term_start IS NOT NULL AND term_end IS NOT NULL
-                                THEN CONCAT(YEAR(term_start), '-', YEAR(term_end))
-                            WHEN term_start IS NOT NULL
-                                THEN CONCAT(YEAR(term_start), '-present')
+                            WHEN leadership_profiles.term_start IS NOT NULL AND leadership_profiles.term_end IS NOT NULL
+                                THEN CONCAT(YEAR(leadership_profiles.term_start), '-', YEAR(leadership_profiles.term_end))
+                            WHEN leadership_profiles.term_start IS NOT NULL
+                                THEN CONCAT(YEAR(leadership_profiles.term_start), '-present')
                             ELSE '2024-2026'
                         END as term
                     "),
-                    'status'
+                    'leadership_profiles.status'
                 )
                 ->get();
 
@@ -1613,6 +1637,16 @@ class MobileSyncController extends Controller
                 ($leader->barangay_id ?? '')
             ))
             ->values()
+            ->map(function ($leader) {
+                $path = $leader->profile_pic ?? null;
+                $leader->profile_pic_url = $path
+                    ? $this->publicUrl(Str::startsWith($path, 'uploads/')
+                        ? $path
+                        : 'uploads/profile_pics/'.$path)
+                    : null;
+
+                return $leader;
+            })
             ->all();
     }
 
@@ -1679,6 +1713,15 @@ class MobileSyncController extends Controller
         // Build the link from the current API request so a phone does not
         // receive a useless 127.0.0.1 URL from the server's APP_URL.
         return rtrim(request()->getSchemeAndHttpHost(), '/').'/'.ltrim($path, '/');
+    }
+
+    protected function mobileDocumentViewUrl(string $sourceType, int $sourceId): string
+    {
+        return URL::temporarySignedRoute(
+            'mobile.document.view',
+            now()->addMinutes(30),
+            ['sourceType' => $sourceType, 'sourceId' => $sourceId],
+        );
     }
 
     protected function saveMobileAccomplishmentSubmission(User $user, object $slot, array $validated): int

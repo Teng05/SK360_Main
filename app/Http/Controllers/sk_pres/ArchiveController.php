@@ -218,6 +218,31 @@ class ArchiveController extends Controller
         return redirect()->route('sk_pres.archive')->with('archive_error', 'This archive document is not available for viewing.');
     }
 
+    public function mobileView(string $sourceType, int $sourceId)
+    {
+        $document = $this->downloadableDocument($sourceType, $sourceId);
+
+        abort_unless($document, 404);
+
+        $filePath = $this->publicFilePath($document->uploaded_file_path ?? null)
+            ?: $this->publicFilePath($document->generated_pdf_path ?? null);
+        if ($filePath) {
+            return response()->file($filePath);
+        }
+
+        if ($sourceType === 'budget_report' && ! empty($document->template_data)) {
+            $data = json_decode($document->template_data, true) ?: [];
+            $paper = ($data['report_type'] ?? 'quarterly') === 'monthly' ? 'portrait' : 'landscape';
+
+            return Pdf::loadView('shared.budget-template-download', [
+                'data' => $data,
+                'barangayName' => $document->barangay_name ?? 'Barangay',
+            ])->setPaper('a4', $paper)->stream('budget-template-'.($document->budget_report_id ?? time()).'.pdf');
+        }
+
+        abort(404);
+    }
+
     public function bulkDownload(Request $request)
     {
         abort_unless(auth()->check() && auth()->user()->role === 'sk_president', 403);
