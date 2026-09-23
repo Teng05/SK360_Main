@@ -1551,7 +1551,7 @@ class MobileSyncController extends Controller
         return array_map(function ($row) {
             $row->uploaded_file_url = $this->publicUrl($row->uploaded_file_path ?? null);
             $row->generated_pdf_url = $this->publicUrl($row->generated_pdf_path ?? null);
-            $row->mobile_view_url = $this->mobileDocumentViewUrl('budget_report', (int) $row->budget_report_id);
+            $row->mobile_view_url = $this->mobileDocumentViewUrl('accomplishment_report', (int) $row->report_id);
 
             return $row;
         }, $rows);
