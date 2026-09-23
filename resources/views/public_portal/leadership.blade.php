@@ -365,8 +365,16 @@
 
                         <div class="bg-white border border-gray-100 rounded-2xl shadow-sm p-5 flex items-center gap-4">
 
-                            <div class="w-12 h-12 bg-gray-100 text-gray-600 rounded-full shrink-0 flex items-center justify-center font-black">
-                                {{ strtoupper(substr(trim($councilor->name),0,1)) }}
+                            <div class="w-12 h-12 bg-gray-100 text-gray-600 rounded-full shrink-0 flex items-center justify-center font-black overflow-hidden">
+                                @if(!empty($councilor->profile_img) && $councilor->profile_img !== 'default.png')
+                                    <img
+                                        src="{{ asset(str_starts_with($councilor->profile_img,'uploads/') ? $councilor->profile_img : 'uploads/council_profiles/'.$councilor->profile_img) }}"
+                                        alt="{{ $councilor->name }}"
+                                        class="w-full h-full object-cover"
+                                    >
+                                @else
+                                    {{ strtoupper(substr(trim($councilor->name),0,1)) }}
+                                @endif
                             </div>
 
                             <div class="min-w-0">

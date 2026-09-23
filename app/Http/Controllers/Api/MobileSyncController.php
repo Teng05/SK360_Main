@@ -880,17 +880,39 @@ class MobileSyncController extends Controller
             'email' => ['nullable', 'email', 'max:255'],
             'phone' => ['nullable', 'string', 'max:20'],
             'term' => ['nullable', 'string', 'max:50'],
+            'profile_img' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
         ]);
+
+        $profileImage = 'default.png';
+        if ($request->hasFile('profile_img')) {
+            $directory = public_path('uploads/council_profiles');
+            File::ensureDirectoryExists($directory);
+            $profileImage = 'uploads/council_profiles/'.Str::random(32).'.'.$request->file('profile_img')->extension();
+            $request->file('profile_img')->move(public_path('uploads/council_profiles'), basename($profileImage));
+        }
+
+        $currentTerm = DB::table('administration_terms')
+            ->where('status', 'current')
+            ->orderByDesc('term_id')
+            ->first();
+        if (! $currentTerm) {
+            return response()->json(['message' => 'There is no active administration term.'], 422);
+        }
 
         $councilId = DB::table('sk_council')->insertGetId([
             'barangay_id' => $user->barangay_id,
+            'term_id' => $currentTerm->term_id,
             'name' => trim($validated['name']),
             'position' => 'SK Councilor',
             'email' => $validated['email'] ?? null,
             'phone' => $validated['phone'] ?? null,
-            'term' => filled($validated['term'] ?? null) ? $validated['term'] : '2023-2026',
-            'profile_img' => 'default.png',
+            'term' => filled($validated['term'] ?? null)
+                ? $validated['term']
+                : $currentTerm->start_year.'-'.$currentTerm->end_year,
+            'status' => 'current',
+            'profile_img' => $profileImage,
             'created_at' => now(),
+            'completed_at' => null,
         ], 'council_id');
 
         return response()->json([
@@ -899,6 +921,56 @@ class MobileSyncController extends Controller
                 ->where('council_id', $councilId)
                 ->first(),
         ], 201);
+    }
+
+    public function updateCouncilMember(Request $request, int $councilId): JsonResponse
+    {
+        $user = $request->user();
+        if ($user->role !== 'sk_chairman') {
+            return response()->json(['message' => 'Only SK Chairman can edit SK council members.'], 403);
+        }
+
+        $member = DB::table('sk_council')
+            ->where('council_id', $councilId)
+            ->where('barangay_id', $user->barangay_id)
+            ->where('status', 'current')
+            ->where(function ($query) {
+                $query->whereRaw('LOWER(position) LIKE ?', ['%councilor%'])
+                    ->orWhereRaw('LOWER(position) LIKE ?', ['%kagawad%']);
+            })
+            ->first();
+        if (! $member) {
+            return response()->json(['message' => 'SK council member not found.'], 404);
+        }
+
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'email' => ['nullable', 'email', 'max:255'],
+            'phone' => ['nullable', 'string', 'max:20'],
+            'term' => ['nullable', 'string', 'max:50'],
+            'profile_img' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
+        ]);
+
+        $changes = [
+            'name' => trim($validated['name']),
+            'email' => $validated['email'] ?? null,
+            'phone' => $validated['phone'] ?? null,
+            'term' => filled($validated['term'] ?? null) ? $validated['term'] : $member->term,
+        ];
+        if ($request->hasFile('profile_img')) {
+            $directory = public_path('uploads/council_profiles');
+            File::ensureDirectoryExists($directory);
+            $path = 'uploads/council_profiles/'.Str::random(32).'.'.$request->file('profile_img')->extension();
+            $request->file('profile_img')->move($directory, basename($path));
+            $changes['profile_img'] = $path;
+        }
+
+        DB::table('sk_council')->where('council_id', $councilId)->update($changes);
+
+        return response()->json([
+            'message' => 'SK council member updated.',
+            'council_member' => DB::table('sk_council')->where('council_id', $councilId)->first(),
+        ]);
     }
 
     public function storeOfficialSubmission(Request $request, RankingPointsService $points): JsonResponse
@@ -1696,11 +1768,15 @@ class MobileSyncController extends Controller
 
         if (Schema::hasTable('sk_council')) {
             $councilRows = DB::table('sk_council')
+                ->where('status', 'current')
                 ->select(
-                    DB::raw('NULL as leadership_id'),
+                    DB::raw('council_id as leadership_id'),
                     DB::raw('NULL as user_id'),
+                    'profile_img as profile_pic',
                     'barangay_id',
                     DB::raw('name as full_name'),
+                    'email',
+                    'phone',
                     DB::raw("
                         CASE
                             WHEN LOWER(position) LIKE '%chairman%' THEN 'sk_chairman'
@@ -1712,7 +1788,7 @@ class MobileSyncController extends Controller
                         END as position
                     "),
                     DB::raw("COALESCE(term, '2024-2026') as term"),
-                    DB::raw("'current' as status")
+                    'status'
                 )
                 ->get();
 
@@ -1763,10 +1839,12 @@ class MobileSyncController extends Controller
             ->values()
             ->map(function ($leader) {
                 $path = $leader->profile_pic ?? null;
-                $leader->profile_pic_url = $path
+                $leader->profile_pic_url = $path && $path !== 'default.png'
                     ? $this->publicUrl(Str::startsWith($path, 'uploads/')
                         ? $path
-                        : 'uploads/profile_pics/'.$path)
+                        : (($leader->user_id ?? null) !== null
+                            ? 'uploads/profile_pics/'.$path
+                            : 'uploads/council_profiles/'.$path))
                     : null;
 
                 return $leader;
