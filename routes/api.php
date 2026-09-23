@@ -13,6 +13,8 @@ Route::prefix('mobile')->group(function(){
         Route::post('/logout',[MobileSyncController::class,'logout'])->name('mobile.logout');
         Route::get('/me',[MobileSyncController::class,'me'])->name('mobile.me');
         Route::post('/profile',[MobileSyncController::class,'updateProfile'])->name('mobile.profile.update');
+        Route::post('/profile/contact/request',[MobileSyncController::class,'requestContactChange'])->middleware('throttle:5,10')->name('mobile.profile.contact.request');
+        Route::post('/profile/contact/verify',[MobileSyncController::class,'verifyContactChange'])->middleware('throttle:10,10')->name('mobile.profile.contact.verify');
         Route::post('/profile/password',[MobileSyncController::class,'updatePassword'])->name('mobile.profile.password');
         Route::get('/sync',[MobileSyncController::class,'sync'])->name('mobile.sync');
 
@@ -32,6 +34,8 @@ Route::prefix('mobile')->group(function(){
         Route::get('/chat/users',[MobileSyncController::class,'chatUsers'])->name('mobile.chat.users');
 
         Route::post('/leadership/council',[MobileSyncController::class,'storeCouncilMember'])->name('mobile.leadership.council.store');
+        Route::post('/leadership/council/{councilId}',[MobileSyncController::class,'updateCouncilMember'])->name('mobile.leadership.council.update');
+        Route::post('/leadership/secretary',[MobileSyncController::class,'storeSecretaryAccount'])->middleware('throttle:3,10')->name('mobile.leadership.secretary.store');
 
         Route::post('/official-submissions',[MobileSyncController::class,'storeOfficialSubmission'])->name('mobile.official-submissions.store');
 
