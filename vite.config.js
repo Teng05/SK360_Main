@@ -10,6 +10,7 @@ export default defineConfig({
                 'resources/css/app.css',
                 'resources/css/login.css',
                 'resources/css/register.css',
+                'resources/css/verify.css',
                 'resources/css/index.css',
                 'resources/js/app.js',
             ],
