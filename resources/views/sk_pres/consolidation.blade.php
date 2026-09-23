@@ -220,8 +220,30 @@
                                     <td colspan="6" class="px-4 py-10 text-center text-gray-400">No barangay submissions yet.</td>
                                 </tr>
                             @endforelse
+
+                            <tr id="submissionNoResults" class="hidden">
+                                <td colspan="6" class="px-4 py-10 text-center text-gray-400">No barangay matched your search.</td>
+                            </tr>
                         </tbody>
                     </table>
+                </div>
+
+                <div id="submissionPagination" class="mt-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                    <p id="submissionPaginationInfo" class="text-xs text-gray-500"></p>
+
+                    <div class="flex items-center gap-2">
+                        <button id="submissionPrevPage" type="button"
+                                class="border border-gray-200 bg-white hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed text-gray-600 px-3 py-2 rounded-lg text-xs font-semibold">
+                            Previous
+                        </button>
+
+                        <div id="submissionPageButtons" class="flex items-center gap-1"></div>
+
+                        <button id="submissionNextPage" type="button"
+                                class="border border-gray-200 bg-white hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed text-gray-600 px-3 py-2 rounded-lg text-xs font-semibold">
+                            Next
+                        </button>
+                    </div>
                 </div>
             </section>
 
@@ -316,7 +338,7 @@
                                         Quality Documentation Approved
                                     </p>
 
-                                    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-2 mt-3 text-xs">
+                                    <div class="grid grid-cols-1 md:grid-cols-3 gap-2 mt-3 text-xs">
                                         <span class="{{ $item->complete_contents ? 'text-green-700' : 'text-gray-400' }}">
                                             {{ $item->complete_contents ? '✓' : '—' }} Complete Contents
                                         </span>
@@ -327,14 +349,6 @@
 
                                         <span class="{{ $item->correct_period ? 'text-green-700' : 'text-gray-400' }}">
                                             {{ $item->correct_period ? '✓' : '—' }} Correct Period
-                                        </span>
-
-                                        <span class="{{ $item->readable_organized ? 'text-green-700' : 'text-gray-400' }}">
-                                            {{ $item->readable_organized ? '✓' : '—' }} Readable / Organized
-                                        </span>
-
-                                        <span class="{{ $item->supporting_documents ? 'text-green-700' : 'text-gray-400' }}">
-                                            {{ $item->supporting_documents ? '✓' : '—' }} Supporting Documents
                                         </span>
                                     </div>
 
@@ -351,7 +365,7 @@
                                     <input type="hidden" name="source_type" value="{{ $item->source_type }}">
                                     <input type="hidden" name="source_id" value="{{ $item->source_id }}">
 
-                                    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-3">
+                                    <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
                                         <label class="flex items-start gap-2 border rounded-xl p-3 cursor-pointer hover:bg-gray-50">
                                             <input type="hidden" name="complete_contents" value="0">
                                             <input type="checkbox" name="complete_contents" value="1"
@@ -382,28 +396,6 @@
                                             <span>
                                                 <span class="block text-xs font-bold text-gray-700">Correct Period</span>
                                                 <span class="text-[10px] text-gray-400">Reporting period and details are correct.</span>
-                                            </span>
-                                        </label>
-
-                                        <label class="flex items-start gap-2 border rounded-xl p-3 cursor-pointer hover:bg-gray-50">
-                                            <input type="hidden" name="readable_organized" value="0">
-                                            <input type="checkbox" name="readable_organized" value="1"
-                                                   class="mt-1"
-                                                   {{ $item->readable_organized ? 'checked' : '' }}>
-                                            <span>
-                                                <span class="block text-xs font-bold text-gray-700">Readable / Organized</span>
-                                                <span class="text-[10px] text-gray-400">Document is readable and organized.</span>
-                                            </span>
-                                        </label>
-
-                                        <label class="flex items-start gap-2 border rounded-xl p-3 cursor-pointer hover:bg-gray-50">
-                                            <input type="hidden" name="supporting_documents" value="0">
-                                            <input type="checkbox" name="supporting_documents" value="1"
-                                                   class="mt-1"
-                                                   {{ $item->supporting_documents ? 'checked' : '' }}>
-                                            <span>
-                                                <span class="block text-xs font-bold text-gray-700">Supporting Documents</span>
-                                                <span class="text-[10px] text-gray-400">Check when applicable and complete.</span>
                                             </span>
                                         </label>
                                     </div>
@@ -461,6 +453,15 @@
     const periodFilter = document.getElementById('periodFilter');
     const monthFilterWrap = document.getElementById('monthFilterWrap');
     const quarterFilterWrap = document.getElementById('quarterFilterWrap');
+    const submissionRows = Array.from(document.querySelectorAll('#submissionRows tr[data-barangay]'));
+    const submissionNoResults = document.getElementById('submissionNoResults');
+    const submissionPagination = document.getElementById('submissionPagination');
+    const submissionPaginationInfo = document.getElementById('submissionPaginationInfo');
+    const submissionPageButtons = document.getElementById('submissionPageButtons');
+    const submissionPrevPage = document.getElementById('submissionPrevPage');
+    const submissionNextPage = document.getElementById('submissionNextPage');
+    const submissionPerPage = 10;
+    let submissionCurrentPage = 1;
 
     notifBtn.addEventListener('click', function (e) {
         e.stopPropagation();
@@ -492,13 +493,89 @@
     periodFilter.addEventListener('change', syncPeriodControls);
     syncPeriodControls();
 
-    searchInput.addEventListener('input', function () {
-        const keyword = this.value.toLowerCase().trim();
+    function filteredSubmissionRows() {
+        const keyword = searchInput.value.toLowerCase().trim();
 
-        document.querySelectorAll('#submissionRows tr[data-barangay]').forEach((row) => {
-            row.style.display = row.dataset.barangay.includes(keyword) ? '' : 'none';
+        return submissionRows.filter((row) => {
+            return row.dataset.barangay.includes(keyword);
         });
+    }
+
+    function renderSubmissionPagination() {
+        const filteredRows = filteredSubmissionRows();
+        const totalRows = filteredRows.length;
+        const totalPages = Math.max(1, Math.ceil(totalRows / submissionPerPage));
+
+        if (submissionCurrentPage > totalPages) {
+            submissionCurrentPage = totalPages;
+        }
+
+        const startIndex = (submissionCurrentPage - 1) * submissionPerPage;
+        const endIndex = Math.min(startIndex + submissionPerPage, totalRows);
+
+        submissionRows.forEach((row) => {
+            row.classList.add('hidden');
+        });
+
+        filteredRows.slice(startIndex, endIndex).forEach((row) => {
+            row.classList.remove('hidden');
+        });
+
+        submissionNoResults.classList.toggle('hidden', totalRows !== 0);
+        submissionPagination.classList.toggle('hidden', submissionRows.length === 0);
+
+        submissionPaginationInfo.textContent = totalRows > 0
+            ? `Showing ${startIndex + 1}-${endIndex} of ${totalRows} barangays`
+            : 'No barangays to display';
+
+        submissionPrevPage.disabled = submissionCurrentPage <= 1;
+        submissionNextPage.disabled = submissionCurrentPage >= totalPages || totalRows === 0;
+
+        submissionPageButtons.innerHTML = '';
+
+        if (totalRows === 0) {
+            return;
+        }
+
+        for (let page = 1; page <= totalPages; page++) {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.textContent = page;
+            button.className = page === submissionCurrentPage
+                ? 'w-8 h-8 rounded-lg bg-red-500 text-white text-xs font-bold'
+                : 'w-8 h-8 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 text-gray-600 text-xs font-semibold';
+
+            button.addEventListener('click', function () {
+                submissionCurrentPage = page;
+                renderSubmissionPagination();
+            });
+
+            submissionPageButtons.appendChild(button);
+        }
+    }
+
+    submissionPrevPage.addEventListener('click', function () {
+        if (submissionCurrentPage > 1) {
+            submissionCurrentPage--;
+            renderSubmissionPagination();
+        }
     });
+
+    submissionNextPage.addEventListener('click', function () {
+        const totalPages = Math.max(1, Math.ceil(filteredSubmissionRows().length / submissionPerPage));
+
+        if (submissionCurrentPage < totalPages) {
+            submissionCurrentPage++;
+            renderSubmissionPagination();
+        }
+    });
+
+    searchInput.addEventListener('input', function () {
+        submissionCurrentPage = 1;
+        renderSubmissionPagination();
+    });
+
+    renderSubmissionPagination();
 
     document.addEventListener('DOMContentLoaded', function () {
         const focusedSubmission = document.querySelector('[data-focus-target="1"]');

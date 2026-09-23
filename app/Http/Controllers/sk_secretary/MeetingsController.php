@@ -7,8 +7,8 @@ namespace App\Http\Controllers\sk_secretary;
 use App\Http\Controllers\Controller;
 use App\Models\Meeting;
 use App\Models\User;
-use App\Services\RankingPointsService;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 use TaylanUnutmaz\AgoraTokenBuilder\RtcTokenBuilder;
@@ -20,10 +20,6 @@ class MeetingsController extends Controller
         [$fullName,$menuItems]=$this->pageContext();
 
         $currentTermId=$this->currentTermId();
-
-        $this->completeElapsedMeetings(
-            $currentTermId
-        );
 
         $meetings=$currentTermId
             ? Meeting::query()
@@ -60,8 +56,6 @@ class MeetingsController extends Controller
                     $meeting->status==='scheduled'
                     &&
                     $meeting->scheduled_at->isPast()
-                    &&
-                    $meeting->ends_at->isFuture()
             )
             ->sortBy(
                 fn(Meeting $meeting)=>
@@ -90,7 +84,7 @@ class MeetingsController extends Controller
         ]);
     }
 
-    public function call(Meeting $meeting): View
+    public function call(Meeting $meeting): View|RedirectResponse
     {
         [$fullName,$menuItems]=$this->pageContext();
 
@@ -98,15 +92,32 @@ class MeetingsController extends Controller
             $meeting
         );
 
+        $meeting=$this->decorateMeeting($meeting);
+        $callError=$this->callUnavailableMessage($meeting);
+
+        if($callError){
+            return redirect()
+                ->route('sk_secretary.meetings')
+                ->with('warning',$callError);
+        }
+
         return view('sk_pres.video-call',[
             'fullName'=>$fullName,
             'menuItems'=>$menuItems,
             'currentUrl'=>route('sk_secretary.meetings'),
-            'meeting'=>$this->decorateMeeting($meeting),
+            'meeting'=>$meeting,
             'channelName'=>$this->channelName($meeting),
             'backRoute'=>route('sk_secretary.meetings'),
             'tokenRoute'=>route(
                 'sk_secretary.meetings.agora.token',
+                $meeting->meeting_id
+            ),
+            'joinAttendanceRoute'=>route(
+                'meetings.call-attendance.join',
+                $meeting->meeting_id
+            ),
+            'leaveAttendanceRoute'=>route(
+                'meetings.call-attendance.leave',
                 $meeting->meeting_id
             ),
             'participantNames'=>$this->participantNames(),
@@ -125,6 +136,15 @@ class MeetingsController extends Controller
         $this->ensureCurrentTermMeeting(
             $meeting
         );
+
+        $meeting=$this->decorateMeeting($meeting);
+        $callError=$this->callUnavailableMessage($meeting);
+
+        if($callError){
+            return response()->json([
+                'message'=>$callError,
+            ],422);
+        }
 
         $appId=config(
             'services.agora.app_id'
@@ -145,9 +165,9 @@ class MeetingsController extends Controller
             ],500);
         }
 
-        $uid=(int)request(
-            'uid',
-            auth()->user()->user_id ?? 0
+        $uid=(int)(
+            auth()->user()->user_id
+            ?? 0
         );
 
         if($uid<=0){
@@ -180,10 +200,6 @@ class MeetingsController extends Controller
                     'Failed to generate Agora RTC token.',
             ],500);
         }
-
-        $this->scoreMeetingAttendance(
-            $meeting
-        );
 
         return response()->json([
             'appId'=>$appId,
@@ -281,11 +297,6 @@ class MeetingsController extends Controller
         $meeting->scheduled_at=
             $scheduledAt;
 
-        $meeting->ends_at=
-            $scheduledAt
-                ->copy()
-                ->addHour();
-
         $meeting->display_datetime=
             $scheduledAt->format(
                 'Y-m-d h:i A'
@@ -304,54 +315,31 @@ class MeetingsController extends Controller
                 default=>
                     $meeting->scheduled_at->isFuture()
                         ? 'Upcoming'
-                        : 'Ready',
+                        : 'Ongoing',
             };
 
         return $meeting;
     }
 
-    protected function completeElapsedMeetings(?int $termId): void
+    protected function callUnavailableMessage(Meeting $meeting): ?string
     {
-        if(!$termId){
-            return;
+        if($meeting->status==='cancelled'){
+            return 'This meeting has been cancelled.';
         }
 
-        Meeting::query()
-            ->where('term_id',$termId)
-            ->where('status','scheduled')
-            ->get()
-            ->each(function(Meeting $meeting){
-                $scheduledAt=
-                    $meeting->scheduled_at;
-
-                if(
-                    $scheduledAt
-                        ->copy()
-                        ->addHour()
-                        ->isPast()
-                ){
-                    $meeting->status='completed';
-                    $meeting->updated_at=now();
-                    $meeting->save();
-                }
-            });
-    }
-
-    protected function scoreMeetingAttendance(Meeting $meeting): void
-    {
-        $user=auth()->user();
-
-        if(empty($user->barangay_id)){
-            return;
+        if($meeting->status==='completed'){
+            return 'This meeting has already ended.';
         }
 
-        app(RankingPointsService::class)->award(
-            (int)$user->barangay_id,
-            RankingPointsService::MEETING_ATTENDANCE,
-            'meeting',
-            $meeting->meeting_id,
-            (int)$user->user_id
-        );
+        if($meeting->status!=='scheduled'){
+            return 'This meeting is not available.';
+        }
+
+        if($meeting->scheduled_at->isFuture()){
+            return 'The meeting has not started yet.';
+        }
+
+        return null;
     }
 
     protected function ensureCurrentTermMeeting(Meeting $meeting): void

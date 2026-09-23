@@ -4,7 +4,6 @@ namespace App\Http\Controllers\sk_secretary;
 
 use App\Http\Controllers\Controller;
 use App\Services\NotificationService;
-use App\Services\RankingPointsService;
 use App\Services\SubmissionSlotService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
@@ -385,13 +384,6 @@ class BudgetController extends Controller
             );
         }
 
-        if(!$isResubmission){
-            $this->scoreSubmission(
-                $slot,
-                $budgetReportId,
-                'budget_report'
-            );
-        }
 
         $this->notifyPresidentOfBudgetSubmission(
             $budgetReportId,
@@ -838,13 +830,6 @@ class BudgetController extends Controller
             );
         }
 
-        if(!$isResubmission){
-            $this->scoreSubmission(
-                $slot,
-                $budgetReportId,
-                'budget_report'
-            );
-        }
 
         $this->notifyPresidentOfBudgetSubmission(
             $budgetReportId,
@@ -1174,35 +1159,6 @@ class BudgetController extends Controller
         ];
     }
 
-    protected function scoreSubmission(
-        object $slot,
-        int $sourceId,
-        string $sourceType
-    ): void {
-        $user=auth()->user();
-
-        $points=app(
-            RankingPointsService::class
-        );
-
-        $isOnTime=now()->lessThanOrEqualTo(
-            Carbon::parse(
-                $slot->end_date
-            )->endOfDay()
-        );
-
-        $submissionAction=$isOnTime
-            ? RankingPointsService::ON_TIME_REPORT_SUBMISSION
-            : RankingPointsService::LATE_SUBMISSION;
-
-        $points->award(
-            (int)$user->barangay_id,
-            $submissionAction,
-            $sourceType,
-            $sourceId,
-            (int)$user->user_id
-        );
-    }
 
     protected function saveBudgetSubmission(
         array $data,

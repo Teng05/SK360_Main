@@ -93,8 +93,6 @@ class ConsolidationController extends Controller
             'complete_contents' => ['nullable', 'boolean'],
             'correct_document' => ['nullable', 'boolean'],
             'correct_period' => ['nullable', 'boolean'],
-            'readable_organized' => ['nullable', 'boolean'],
-            'supporting_documents' => ['nullable', 'boolean'],
             'remarks' => ['nullable', 'required_if:status,needs_revision', 'string', 'max:2000'],
         ]);
 
@@ -119,17 +117,15 @@ class ConsolidationController extends Controller
         $completeContents = $request->boolean('complete_contents');
         $correctDocument = $request->boolean('correct_document');
         $correctPeriod = $request->boolean('correct_period');
-        $readableOrganized = $request->boolean('readable_organized');
-        $supportingDocuments = $request->boolean('supporting_documents');
 
         if (
             $validated['status'] === 'approved' &&
-            (!$completeContents || !$correctDocument || !$correctPeriod || !$readableOrganized)
+            (!$completeContents || !$correctDocument || !$correctPeriod)
         ) {
             return back()
                 ->withInput()
                 ->withErrors([
-                    'quality_review' => 'Complete Contents, Correct Document, Correct Period, and Readable / Organized must be checked before approving Quality Documentation.',
+                    'quality_review' => 'Complete Contents, Correct Document, and Correct Period must be checked before approving Quality Documentation.',
                 ]);
         }
 
@@ -178,8 +174,8 @@ class ConsolidationController extends Controller
             'complete_contents' => $completeContents,
             'correct_document' => $correctDocument,
             'correct_period' => $correctPeriod,
-            'readable_organized' => $readableOrganized,
-            'supporting_documents' => $supportingDocuments,
+            'readable_organized' => 0,
+            'supporting_documents' => 0,
             'remarks' => $validated['remarks'] ?? null,
             'reviewed_at' => now(),
             'updated_at' => now(),
@@ -211,20 +207,35 @@ class ConsolidationController extends Controller
                 $validated['status'] === 'approved' &&
                 (!$existingReview || $existingReview->status !== 'approved')
             ) {
-                $submittedAt = $submission->submitted_at
-                    ?? $submission->created_at
-                    ?? now();
+                $slot = !empty($submission->slot_id)
+                    ? DB::table('submission_slots')
+                        ->where('term_id', $submission->term_id)
+                        ->where('slot_id', $submission->slot_id)
+                        ->first()
+                    : null;
 
-                $period = Carbon::parse($submittedAt)->format('F Y');
-
-                $points->award(
-                    (int) $submission->barangay_id,
-                    RankingPointsService::QUALITY_DOCUMENTATION,
+                $action = $this->approvedRankingAction(
                     $sourceType,
-                    $sourceId,
-                    (int) auth()->user()->user_id,
-                    $period
+                    $submission,
+                    $slot
                 );
+
+                $period = $this->approvedRankingPeriod(
+                    $sourceType,
+                    $submission,
+                    $slot
+                );
+
+                if ($action && $period) {
+                    $points->award(
+                        (int) $submission->barangay_id,
+                        $action,
+                        $sourceType,
+                        $sourceId,
+                        (int) auth()->user()->user_id,
+                        $period
+                    );
+                }
             }
         });
 
@@ -246,9 +257,89 @@ class ConsolidationController extends Controller
         return back()->with('quality_status', $message);
     }
 
+    protected function approvedRankingAction(
+        string $sourceType,
+        object $submission,
+        ?object $slot
+    ): ?string {
+        if ($sourceType === 'accomplishment_report') {
+            return match ($slot?->accomplishment_category) {
+                'youth_development_program' => RankingPointsService::YOUTH_DEVELOPMENT_PROGRAM_APPROVED,
+                'kk_assembly' => RankingPointsService::KK_ASSEMBLY_APPROVED,
+                default => null,
+            };
+        }
+
+        $budgetCategory = $submission->budget_category
+            ?? $slot?->budget_category;
+
+        if ($budgetCategory === 'annual_budget') {
+            return RankingPointsService::ANNUAL_BUDGET_APPROVED;
+        }
+
+        if ($budgetCategory !== 'coa_report') {
+            return null;
+        }
+
+        $periodType = $submission->budget_period_type
+            ?? $slot?->budget_period_type;
+
+        return match ($periodType) {
+            'monthly' => RankingPointsService::COA_MONTHLY_APPROVED,
+            'quarterly' => RankingPointsService::COA_QUARTERLY_APPROVED,
+            'semi_annual' => RankingPointsService::COA_SEMI_ANNUAL_APPROVED,
+            'annual' => RankingPointsService::COA_ANNUAL_APPROVED,
+            default => null,
+        };
+    }
+
+    protected function approvedRankingPeriod(
+        string $sourceType,
+        object $submission,
+        ?object $slot
+    ): ?string {
+        if ($sourceType === 'budget_report') {
+            $budgetCategory = $submission->budget_category
+                ?? $slot?->budget_category;
+
+            $periodType = $submission->budget_period_type
+                ?? $slot?->budget_period_type;
+
+            if ($budgetCategory === 'coa_report' && $periodType === 'monthly') {
+                $year = (int) (
+                    $submission->fiscal_year
+                    ?? $slot?->fiscal_year
+                    ?? 0
+                );
+
+                $month = (int) (
+                    $submission->fiscal_month
+                    ?? $slot?->fiscal_month
+                    ?? 0
+                );
+
+                if ($year > 0 && $month >= 1 && $month <= 12) {
+                    return Carbon::create($year, $month, 1)->format('F Y');
+                }
+            }
+        }
+
+        if ($slot && !empty($slot->end_date)) {
+            return Carbon::parse($slot->end_date)->format('F Y');
+        }
+
+        $submittedAt = $submission->created_at
+            ?? $submission->submitted_at
+            ?? null;
+
+        return $submittedAt
+            ? Carbon::parse($submittedAt)->format('F Y')
+            : null;
+    }
+
     protected function filters(Request $request): array
     {
-        $defaultYear = $this->currentTermStartYear();
+        $defaultYear = $this->defaultFilterYear();
         $year = (int) $request->query('year', $defaultYear);
         $period = (string) $request->query('period', 'all');
         $month = (int) $request->query('month', now()->month);
@@ -408,8 +499,6 @@ class ConsolidationController extends Controller
             'qr.complete_contents',
             'qr.correct_document',
             'qr.correct_period',
-            'qr.readable_organized',
-            'qr.supporting_documents',
             'qr.remarks as quality_remarks',
             'qr.reviewed_at'
         )->get();
@@ -455,8 +544,6 @@ class ConsolidationController extends Controller
             'qr.complete_contents',
             'qr.correct_document',
             'qr.correct_period',
-            'qr.readable_organized',
-            'qr.supporting_documents',
             'qr.remarks as quality_remarks',
             'qr.reviewed_at'
         )->get();
@@ -521,10 +608,37 @@ class ConsolidationController extends Controller
         return $count.' submitted (R: '.$reportCount.', B: '.$budgetCount.')';
     }
 
+    protected function defaultFilterYear(): int
+    {
+        $currentTermId = $this->currentTermId();
+
+        if (!$currentTermId) {
+            return $this->currentTermStartYear();
+        }
+
+        $reportYear = DB::table('accomplishment_reports')
+            ->where('term_id', $currentTermId)
+            ->max('reporting_year');
+
+        $budgetYear = DB::table('budget_reports')
+            ->where('term_id', $currentTermId)
+            ->max('fiscal_year');
+
+        $years = collect([$reportYear, $budgetYear])
+            ->filter()
+            ->map(fn ($year) => (int) $year)
+            ->sortDesc()
+            ->values();
+
+        return $years->isNotEmpty()
+            ? (int) $years->first()
+            : $this->currentTermStartYear();
+    }
+
     protected function availableYears(): array
     {
         $currentTermId = $this->currentTermId();
-        $defaultYear = $this->currentTermStartYear();
+        $defaultYear = $this->defaultFilterYear();
 
         if (!$currentTermId) {
             return [$defaultYear];

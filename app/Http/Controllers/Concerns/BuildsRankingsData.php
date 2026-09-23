@@ -202,6 +202,10 @@ trait BuildsRankingsData
                 )*100
             );
 
+            $row->submission_score=(int)$row->timely_submission_points;
+            $row->document_score=(int)$row->completeness_points;
+            $row->meeting_score=(int)$row->participation_points;
+
             $row->previous_rank=
                 $previousRanks[
                     (int)$row->barangay_id
@@ -215,7 +219,9 @@ trait BuildsRankingsData
             };
 
             return $row;
-        });
+        })
+            ->take(10)
+            ->values();
     }
 
     protected function topRankings(Collection $leaderboard): Collection
@@ -270,6 +276,10 @@ trait BuildsRankingsData
                     'type'=>$rule['type'],
                 ];
             })
+            ->sortByDesc(
+                fn($rule)=>
+                    (int)$rule['points']
+            )
             ->values()
             ->all();
     }

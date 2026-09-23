@@ -10,7 +10,7 @@
     >
 
     <title>
-        Annual Budget | SK360 Public Portal
+        Annual Budget & LYDP | SK360 Public Portal
     </title>
 
     <script src="https://cdn.tailwindcss.com"></script>
@@ -18,9 +18,9 @@
 
 <body class="bg-gray-50 text-gray-800">
 
-<header class="bg-red-600 text-white shadow">
+<header class="sticky top-0 z-40 bg-red-600 text-white shadow">
 
-    <div class="max-w-6xl mx-auto px-6 py-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+    <div class="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
 
         <a
             href="{{ route('public.home') }}"
@@ -47,44 +47,12 @@
 
         </a>
 
-        <nav class="flex flex-wrap items-center gap-4 text-xs font-bold">
-
-            <a
-                href="{{ route('public.home') }}"
-                class="hover:text-yellow-300 transition"
-            >
-                Home
-            </a>
-
-            <a
-                href="{{ route('public.announcements') }}"
-                class="hover:text-yellow-300 transition"
-            >
-                Announcements
-            </a>
-
-            <a
-                href="{{ route('public.calendar') }}"
-                class="hover:text-yellow-300 transition"
-            >
-                Calendar
-            </a>
-
-            <a
-                href="{{ route('public.leadership') }}"
-                class="hover:text-yellow-300 transition"
-            >
-                Leadership
-            </a>
-
-            <a
-                href="{{ route('public.budgets') }}"
-                class="text-yellow-300"
-            >
-                Annual Budget
-            </a>
-
-        </nav>
+        <a
+            href="{{ route('public.home') }}"
+            class="text-xs font-bold hover:text-yellow-300 transition"
+        >
+            ← Public Portal
+        </a>
 
     </div>
 
@@ -95,18 +63,18 @@
     {{-- HERO --}}
     <section class="bg-gradient-to-br from-red-600 to-red-700 text-white">
 
-        <div class="max-w-6xl mx-auto px-6 py-14 text-center">
+        <div class="max-w-4xl mx-auto px-6 py-12">
 
-            <p class="text-xs font-black uppercase tracking-[0.2em] text-red-100 mb-3">
-                Budget Transparency
+            <p class="text-xs font-black uppercase tracking-[0.2em] text-red-100">
+                Public Transparency
             </p>
 
-            <h2 class="text-4xl md:text-5xl font-black mb-4">
-                Barangay Annual Budgets
+            <h2 class="text-4xl font-black mt-2">
+                Annual Budget & LYDP
             </h2>
 
-            <p class="max-w-2xl mx-auto text-red-100 leading-relaxed">
-                View Annual Budget records submitted by Sangguniang Kabataan barangays through the SK360 system.
+            <p class="text-red-100 text-sm mt-3 max-w-2xl leading-relaxed">
+                View published Annual Budget records and the Local Youth Development Plan available through the SK360 Public Information Portal.
             </p>
 
         </div>
@@ -114,6 +82,64 @@
     </section>
 
     <section class="max-w-6xl mx-auto px-6 py-10">
+
+        {{-- LYDP --}}
+        @php
+            $lydpRelativePath='uploads/public_documents/lydp.pdf';
+            $lydpAvailable=file_exists(public_path($lydpRelativePath));
+        @endphp
+
+        <div class="bg-white rounded-3xl border border-gray-100 shadow-sm p-6 mb-8">
+
+            <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-5">
+
+                <div class="flex items-start gap-4">
+
+                    <div class="w-12 h-12 rounded-2xl bg-red-50 text-red-600 flex items-center justify-center text-xl shrink-0">
+                        📘
+                    </div>
+
+                    <div>
+
+                        <p class="text-xs font-black uppercase tracking-widest text-red-600">
+                            Youth Development Plan
+                        </p>
+
+                        <h3 class="text-2xl font-black text-gray-800 mt-1">
+                            Local Youth Development Plan (LYDP)
+                        </h3>
+
+                        <p class="text-sm text-gray-500 mt-2 max-w-2xl leading-relaxed">
+                            View the published LYDP document for public reference and transparency.
+                        </p>
+
+                    </div>
+
+                </div>
+
+                @if($lydpAvailable)
+
+                    <a
+                        href="{{ asset($lydpRelativePath) }}"
+                        target="_blank"
+                        rel="noopener"
+                        class="shrink-0 inline-flex items-center justify-center gap-2 rounded-xl bg-red-600 px-5 py-3 text-xs font-black uppercase text-white hover:bg-red-700 transition"
+                    >
+                        <span>📄</span>
+                        View LYDP PDF
+                    </a>
+
+                @else
+
+                    <span class="shrink-0 inline-flex items-center justify-center rounded-xl bg-gray-100 px-5 py-3 text-xs font-black uppercase text-gray-500">
+                        LYDP Not Available
+                    </span>
+
+                @endif
+
+            </div>
+
+        </div>
 
         {{-- FILTERS --}}
         <div class="bg-white rounded-3xl border border-gray-100 shadow-sm p-6 mb-8">
@@ -480,55 +506,10 @@
 
 </main>
 
-<footer class="border-t border-gray-200 bg-white mt-10">
+<footer class="bg-gray-900 text-gray-400">
 
-    <div class="max-w-6xl mx-auto px-6 py-8">
-
-        <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-
-            <div class="flex items-center gap-3">
-
-                <img
-                    src="{{ asset('images/logo.png') }}"
-                    class="w-8 h-8 rounded-full object-cover"
-                    alt="SK360 Logo"
-                >
-
-                <div>
-
-                    <p class="font-black text-gray-700">
-                        SK 360°
-                    </p>
-
-                    <p class="text-[10px] uppercase tracking-widest text-gray-400">
-                        Public Information Portal
-                    </p>
-
-                </div>
-
-            </div>
-
-            <p class="max-w-xl text-xs text-gray-400 md:text-right">
-                Annual Budget information displayed on this page is based on records submitted by authorized SK officials through the SK360 system.
-            </p>
-
-        </div>
-
-        <div class="border-t border-gray-100 mt-6 pt-5 flex flex-col md:flex-row gap-3 md:items-center md:justify-between text-[10px] text-gray-400">
-
-            <p>
-                © {{ date('Y') }} SK 360°. All rights reserved.
-            </p>
-
-            <a
-                href="{{ route('public.home') }}"
-                class="font-bold hover:text-red-600 transition"
-            >
-                Back to Public Portal
-            </a>
-
-        </div>
-
+    <div class="max-w-6xl mx-auto px-6 py-6 text-center text-xs">
+        &copy; {{ date('Y') }} SK360 • Sangguniang Kabataan Federation of Lipa City
     </div>
 
 </footer>

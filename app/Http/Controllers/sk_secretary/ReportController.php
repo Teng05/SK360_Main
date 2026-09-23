@@ -4,7 +4,6 @@ namespace App\Http\Controllers\sk_secretary;
 
 use App\Http\Controllers\Controller;
 use App\Services\NotificationService;
-use App\Services\RankingPointsService;
 use App\Services\SubmissionSlotService;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
@@ -269,14 +268,6 @@ class ReportController extends Controller
             $this->deleteReportFile($existingReport->uploaded_file_path);
         }
 
-        if(!$isResubmission){
-            $this->scoreSubmission(
-                $slot,
-                $reportId,
-                'accomplishment_report'
-            );
-        }
-
         $this->notifyPresidentOfReportSubmission(
             $reportId,
             $termId,
@@ -298,28 +289,6 @@ class ReportController extends Controller
                 'report_success',
                 'Your report has been submitted successfully.'
             );
-    }
-
-    protected function scoreSubmission(object $slot,int $sourceId,string $sourceType): void
-    {
-        $user=auth()->user();
-        $points=app(RankingPointsService::class);
-
-        $isOnTime=now()->lessThanOrEqualTo(
-            Carbon::parse($slot->end_date)->endOfDay()
-        );
-
-        $submissionAction=$isOnTime
-            ? RankingPointsService::ON_TIME_REPORT_SUBMISSION
-            : RankingPointsService::LATE_SUBMISSION;
-
-        $points->award(
-            (int)$user->barangay_id,
-            $submissionAction,
-            $sourceType,
-            $sourceId,
-            (int)$user->user_id
-        );
     }
 
     protected function saveReportSubmission(array $data,int $slotId,int $termId): int

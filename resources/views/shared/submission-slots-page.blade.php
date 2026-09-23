@@ -22,7 +22,6 @@
             <div class="bg-yellow-400 text-red-600 p-1 rounded-full text-sm">
                 👤
             </div>
-
             <div>
                 <p class="font-semibold text-xs">
                     {{ $fullName }}
@@ -46,7 +45,6 @@
                     <span class="{{ $isActive ? 'bg-yellow-400 text-red-600' : 'bg-red-400' }} p-1 rounded text-sm">
                         {!! $item['icon'] !!}
                     </span>
-
                     <span class="{{ $isActive ? 'text-yellow-300 font-semibold' : '' }}">
                         {{ $item['label'] }}
                     </span>
@@ -83,7 +81,6 @@
                         <div class="px-4 py-3 font-semibold border-b text-gray-800">
                             Notifications
                         </div>
-
                         <div class="max-h-64 overflow-y-auto">
                             <div class="px-4 py-3 hover:bg-gray-100 text-sm text-gray-700">
                                 No notifications yet
@@ -127,7 +124,6 @@
                             action="{{ route('logout') }}"
                         >
                             @csrf
-
                             <button
                                 type="submit"
                                 class="w-full text-left flex items-center gap-3 px-5 py-3 text-red-500 hover:bg-gray-100 transition"
@@ -182,16 +178,10 @@
                     <h1 class="text-3xl font-black text-gray-800 uppercase tracking-tighter">
                         {{ $pageTitle }}
                     </h1>
-
                     <p class="text-gray-500 font-medium italic">
                         {{ $pageDescription }}
                     </p>
                 </div>
-
-                @php
-                    $focusId = (int) request()->query('focus_id', 0);
-                    $focusSlot = (int) request()->query('focus_slot', 0);
-                @endphp
 
                 {{-- ACTIVE SLOTS --}}
                 <div class="bg-white rounded-3xl shadow-sm border border-gray-100 p-6 mb-8">
@@ -200,7 +190,6 @@
                             <h2 class="text-lg font-black text-gray-800 uppercase tracking-tight">
                                 {{ $slotSectionTitle }}
                             </h2>
-
                             <p class="text-xs text-gray-400">
                                 Only active slots created by the SK President can accept submissions.
                             </p>
@@ -231,39 +220,9 @@
                                 $canResubmit = $hasSubmission
                                     && $qualityStatus === 'needs_revision'
                                     && !empty($allowResubmission);
-
-                                $slotSubmissionId = ($submissionType ?? '') === 'budget'
-                                    ? (int) ($slotSubmission->budget_report_id ?? 0)
-                                    : (int) ($slotSubmission->report_id ?? 0);
-
-                                $isFocusedSlot = $focusSlot > 0
-                                    && (int) $slot->slot_id === $focusSlot;
-
-                                $isFocusedSubmissionSlot = $focusId > 0
-                                    && $slotSubmissionId === $focusId;
-
-                                $isFocusedCard =
-                                    $isFocusedSlot ||
-                                    $isFocusedSubmissionSlot;
                             @endphp
 
-                            <div
-                                id="submission-slot-{{ $slot->slot_id }}"
-                                data-focus-slot-card="{{ $isFocusedCard ? '1' : '0' }}"
-                                class="rounded-2xl border p-5 transition-all duration-500 {{ $isFocusedCard ? 'border-yellow-400 bg-yellow-50 ring-4 ring-yellow-200 shadow-lg' : 'border-red-100 bg-red-50/30' }}"
-                            >
-                                @if ($isFocusedCard)
-                                    <div class="mb-4 flex items-center gap-2 rounded-xl border border-yellow-200 bg-yellow-100 px-4 py-3 text-xs font-bold text-yellow-800">
-                                        <span>🔔</span>
-
-                                        <span>
-                                            {{ $isFocusedSubmissionSlot
-                                                ? 'This is the submission from the notification you opened.'
-                                                : 'This is the submission slot from the notification you opened.' }}
-                                        </span>
-                                    </div>
-                                @endif
-
+                            <div class="rounded-2xl border border-red-100 bg-red-50/30 p-5">
                                 <div class="flex items-start justify-between gap-4">
                                     <div>
                                         <p class="text-[10px] font-black uppercase tracking-widest text-red-400">
@@ -289,6 +248,21 @@
                                         </span>
                                     </div>
                                 </div>
+
+                                {{-- ACCOMPLISHMENT METADATA --}}
+                                @if (($submissionType ?? '') === 'report')
+                                    <div class="mt-4 flex flex-wrap gap-2">
+                                        <span class="rounded-full bg-blue-50 px-3 py-1 text-[10px] font-black uppercase text-blue-600">
+                                            {{ $slot->accomplishment_category_label ?? 'Accomplishment Report' }}
+                                        </span>
+
+                                        @if (($slot->accomplishment_category ?? null) === 'youth_development_program' && !empty($slot->ydp_program_type_label))
+                                            <span class="rounded-full bg-green-50 px-3 py-1 text-[10px] font-black uppercase text-green-600">
+                                                {{ $slot->ydp_program_type_label }}
+                                            </span>
+                                        @endif
+                                    </div>
+                                @endif
 
                                 {{-- BUDGET METADATA --}}
                                 @if (($submissionType ?? '') === 'budget')
@@ -334,15 +308,12 @@
                                     </div>
                                 </div>
 
+                                {{-- QUALITY REVIEW STATUS --}}
                                 @if ($hasSubmission)
                                     <div class="mt-4 rounded-xl border px-4 py-3 {{ $qualityStatus === 'approved' ? 'border-green-200 bg-green-50' : ($qualityStatus === 'needs_revision' ? 'border-red-200 bg-red-50' : 'border-amber-200 bg-amber-50') }}">
                                         <div class="flex items-center justify-between gap-3">
                                             <p class="text-[10px] font-black uppercase {{ $qualityStatus === 'approved' ? 'text-green-700' : ($qualityStatus === 'needs_revision' ? 'text-red-700' : 'text-amber-700') }}">
-                                                {{ $qualityStatus === 'approved'
-                                                    ? 'Approved'
-                                                    : ($qualityStatus === 'needs_revision'
-                                                        ? 'Needs Revision'
-                                                        : 'Pending Review') }}
+                                                {{ $qualityStatus === 'approved' ? 'Approved' : ($qualityStatus === 'needs_revision' ? 'Needs Revision' : 'Pending Review') }}
                                             </p>
 
                                             @if ($qualityStatus === 'approved')
@@ -357,7 +328,6 @@
                                                 <span class="font-black">
                                                     President Remarks:
                                                 </span>
-
                                                 {{ $qualityRemarks }}
                                             </p>
                                         @elseif ($qualityStatus === 'pending')
@@ -382,6 +352,7 @@
                                         >
                                             Opens {{ \Carbon\Carbon::parse($slot->start_date)->format('M d, Y') }}
                                         </button>
+
                                     @elseif ($hasSubmission && $qualityStatus === 'approved')
                                         <button
                                             type="button"
@@ -390,6 +361,7 @@
                                         >
                                             Approved / Locked
                                         </button>
+
                                     @elseif ($hasSubmission && $qualityStatus === 'pending')
                                         <button
                                             type="button"
@@ -398,26 +370,37 @@
                                         >
                                             Pending Review
                                         </button>
+
                                     @elseif ($canResubmit)
                                         <button
                                             type="button"
                                             class="rounded-xl bg-red-600 hover:bg-red-700 px-4 py-3 text-xs font-black uppercase text-white"
-                                            onclick="openSlotSubmission(
-                                                {{ $slot->slot_id }},
-                                                @js($slot->title),
-                                                @js($slot->budget_category ?? null),
-                                                @js($slot->fiscal_year ?? null),
-                                                @js($slot->budget_period_type ?? null),
-                                                @js($slot->fiscal_month ?? null),
-                                                @js($slot->fiscal_quarter ?? null),
-                                                @js($slot->fiscal_half ?? null),
-                                                @js($slot->template_available ?? false)
-                                            )"
+                                            @if (($submissionType ?? '') === 'report')
+                                                onclick="openAccomplishmentSlotSubmission(
+                                                    {{ $slot->slot_id }},
+                                                    @js($slot->title),
+                                                    @js($slot->accomplishment_category_label ?? 'Accomplishment Report'),
+                                                    @js($slot->ydp_program_type_label ?? null)
+                                                )"
+                                            @else
+                                                onclick="openSlotSubmission(
+                                                    {{ $slot->slot_id }},
+                                                    @js($slot->title),
+                                                    @js($slot->budget_category ?? null),
+                                                    @js($slot->fiscal_year ?? null),
+                                                    @js($slot->budget_period_type ?? null),
+                                                    @js($slot->fiscal_month ?? null),
+                                                    @js($slot->fiscal_quarter ?? null),
+                                                    @js($slot->fiscal_half ?? null),
+                                                    @js($slot->template_available ?? false)
+                                                )"
+                                            @endif
                                         >
                                             {{ ($submissionType ?? '') === 'report'
                                                 ? 'Resubmit Report File'
                                                 : 'Resubmit Budget File' }}
                                         </button>
+
                                     @elseif ($hasSubmission)
                                         <button
                                             type="button"
@@ -426,27 +409,38 @@
                                         >
                                             Submitted
                                         </button>
+
                                     @else
                                         <button
                                             type="button"
                                             class="rounded-xl bg-red-600 hover:bg-red-700 px-4 py-3 text-xs font-black uppercase text-white"
-                                            onclick="openSlotSubmission(
-                                                {{ $slot->slot_id }},
-                                                @js($slot->title),
-                                                @js($slot->budget_category ?? null),
-                                                @js($slot->fiscal_year ?? null),
-                                                @js($slot->budget_period_type ?? null),
-                                                @js($slot->fiscal_month ?? null),
-                                                @js($slot->fiscal_quarter ?? null),
-                                                @js($slot->fiscal_half ?? null),
-                                                @js($slot->template_available ?? false)
-                                            )"
+                                            @if (($submissionType ?? '') === 'report')
+                                                onclick="openAccomplishmentSlotSubmission(
+                                                    {{ $slot->slot_id }},
+                                                    @js($slot->title),
+                                                    @js($slot->accomplishment_category_label ?? 'Accomplishment Report'),
+                                                    @js($slot->ydp_program_type_label ?? null)
+                                                )"
+                                            @else
+                                                onclick="openSlotSubmission(
+                                                    {{ $slot->slot_id }},
+                                                    @js($slot->title),
+                                                    @js($slot->budget_category ?? null),
+                                                    @js($slot->fiscal_year ?? null),
+                                                    @js($slot->budget_period_type ?? null),
+                                                    @js($slot->fiscal_month ?? null),
+                                                    @js($slot->fiscal_quarter ?? null),
+                                                    @js($slot->fiscal_half ?? null),
+                                                    @js($slot->template_available ?? false)
+                                                )"
+                                            @endif
                                         >
                                             {{ $slotActionLabel }}
                                         </button>
                                     @endif
                                 </div>
                             </div>
+
                         @empty
                             <div class="xl:col-span-2 rounded-2xl border border-dashed border-gray-200 bg-gray-50 px-6 py-12 text-center text-sm text-gray-400">
                                 {{ $slotEmptyMessage }}
@@ -491,36 +485,14 @@
 
                             <tbody class="text-sm text-gray-600">
                                 @forelse ($submissions as $submission)
-                                    @php
-                                        $submissionId = ($submissionType ?? '') === 'budget'
-                                            ? (int) ($submission->budget_report_id ?? 0)
-                                            : (int) ($submission->report_id ?? 0);
-
-                                        $isFocusedSubmission = $focusId > 0
-                                            && $submissionId === $focusId;
-                                    @endphp
-
-                                    <tr
-                                        id="submission-{{ $submissionId }}"
-                                        data-focus-submission="{{ $isFocusedSubmission ? '1' : '0' }}"
-                                        class="transition border-b {{ $isFocusedSubmission ? 'border-yellow-300 bg-yellow-50 ring-2 ring-inset ring-yellow-200' : 'border-gray-50 hover:bg-gray-50' }}"
-                                    >
+                                    <tr class="hover:bg-gray-50 transition border-b border-gray-50">
                                         <td class="px-8 py-5">
                                             <div class="font-bold text-gray-800 uppercase tracking-tighter">
                                                 {{ $submission->title ?? $submission->report_title }}
                                             </div>
 
-                                            @if ($isFocusedSubmission)
-                                                <div class="mt-2 inline-flex items-center gap-1 rounded-full bg-yellow-100 px-2 py-1 text-[9px] font-black uppercase text-yellow-700">
-                                                    <span>🔔</span>
-                                                    Opened from notification
-                                                </div>
-                                            @endif
-
                                             <div class="text-[10px] text-gray-400 font-bold uppercase mt-1">
-                                                {{ $submission->period_label
-                                                    ?? optional($submission->submitted_at)->format('F Y')
-                                                    ?? 'Submission' }}
+                                                {{ $submission->period_label ?? optional($submission->submitted_at)->format('F Y') ?? 'Submission' }}
                                             </div>
                                         </td>
 
@@ -542,31 +514,41 @@
 
                                                 $submissionQualityLabel =
                                                     $submission->quality_status_label
-                                                    ?? ($submissionQualityStatus === 'approved'
-                                                        ? 'Approved'
-                                                        : ($submissionQualityStatus === 'needs_revision'
-                                                            ? 'Needs Revision'
-                                                            : 'Pending Review'));
+                                                    ?? (
+                                                        $submissionQualityStatus === 'approved'
+                                                            ? 'Approved'
+                                                            : (
+                                                                $submissionQualityStatus === 'needs_revision'
+                                                                    ? 'Needs Revision'
+                                                                    : 'Pending Review'
+                                                            )
+                                                    );
 
                                                 $submissionQualityBadge =
                                                     $submission->quality_status_badge
-                                                    ?? ($submissionQualityStatus === 'approved'
-                                                        ? 'bg-green-100 text-green-700'
-                                                        : ($submissionQualityStatus === 'needs_revision'
-                                                            ? 'bg-red-100 text-red-700'
-                                                            : 'bg-amber-100 text-amber-700'));
+                                                    ?? (
+                                                        $submissionQualityStatus === 'approved'
+                                                            ? 'bg-green-100 text-green-700'
+                                                            : (
+                                                                $submissionQualityStatus === 'needs_revision'
+                                                                    ? 'bg-red-100 text-red-700'
+                                                                    : 'bg-amber-100 text-amber-700'
+                                                            )
+                                                    );
                                             @endphp
 
                                             <span class="{{ $submissionQualityBadge }} px-3 py-1 rounded-full text-[9px] font-black uppercase">
                                                 {{ $submissionQualityLabel }}
                                             </span>
 
-                                            @if ($submissionQualityStatus === 'needs_revision' && !empty($submission->quality_remarks))
+                                            @if (
+                                                $submissionQualityStatus === 'needs_revision'
+                                                && !empty($submission->quality_remarks)
+                                            )
                                                 <p class="mt-2 max-w-xs text-[10px] leading-relaxed text-red-600">
                                                     <span class="font-black">
                                                         Remarks:
                                                     </span>
-
                                                     {{ $submission->quality_remarks }}
                                                 </p>
                                             @endif
@@ -615,6 +597,7 @@
                                             @endif
                                         </td>
                                     </tr>
+
                                 @empty
                                     <tr>
                                         <td
@@ -679,6 +662,51 @@
                 id="slotIdField"
                 value="{{ old('slot_id') }}"
             >
+
+            {{-- ========================================================= --}}
+            {{-- ACCOMPLISHMENT DETAILS --}}
+            {{-- ========================================================= --}}
+            @if (($submissionType ?? '') === 'report')
+                <div
+                    id="slotAccomplishmentDetails"
+                    class="rounded-2xl border border-blue-100 bg-blue-50/50 p-4"
+                >
+                    <p class="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-3">
+                        Submission Details
+                    </p>
+
+                    <div class="space-y-3 text-xs">
+                        <div class="flex items-center justify-between gap-4">
+                            <span class="font-bold text-gray-400 uppercase">
+                                Category
+                            </span>
+
+                            <span
+                                id="modalAccomplishmentCategory"
+                                class="font-black text-gray-700 text-right"
+                            >
+                                --
+                            </span>
+                        </div>
+
+                        <div
+                            id="modalYdpProgramRow"
+                            class="hidden flex items-center justify-between gap-4"
+                        >
+                            <span class="font-bold text-gray-400 uppercase">
+                                Program Type
+                            </span>
+
+                            <span
+                                id="modalYdpProgramType"
+                                class="font-black text-gray-700 text-right"
+                            >
+                                --
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            @endif
 
             {{-- ========================================================= --}}
             {{-- BUDGET DETAILS --}}
@@ -914,6 +942,46 @@
 {{-- ========================================================= --}}
 @push('scripts')
 <script>
+    function openAccomplishmentSlotSubmission(
+        slotId,
+        title,
+        categoryLabel,
+        programTypeLabel = null
+    ) {
+        openSlotSubmission(slotId, title);
+
+        const category =
+            document.getElementById('modalAccomplishmentCategory');
+
+        const programRow =
+            document.getElementById('modalYdpProgramRow');
+
+        const programType =
+            document.getElementById('modalYdpProgramType');
+
+        if (category) {
+            category.textContent =
+                categoryLabel || 'Accomplishment Report';
+        }
+
+        if (programRow && programType) {
+            const hasProgramType =
+                programTypeLabel !== null
+                &&
+                programTypeLabel !== '';
+
+            programRow.classList.toggle(
+                'hidden',
+                !hasProgramType
+            );
+
+            programType.textContent =
+                hasProgramType
+                    ? programTypeLabel
+                    : '--';
+        }
+    }
+
     const notifBtn =
         document.getElementById('notifBtn');
 
@@ -926,40 +994,13 @@
     const userDropdown =
         document.getElementById('userDropdown');
 
-    document.addEventListener(
-        'DOMContentLoaded',
-        function () {
-            const focusedSlot =
-                document.querySelector('[data-focus-slot-card="1"]');
-
-            const focusedSubmission =
-                document.querySelector('[data-focus-submission="1"]');
-
-            const target =
-                focusedSlot || focusedSubmission;
-
-            if (!target) {
-                return;
-            }
-
-            setTimeout(
-                function () {
-                    target.scrollIntoView({
-                        behavior: 'smooth',
-                        block: 'center'
-                    });
-                },
-                250
-            );
-        }
-    );
-
     notifBtn.addEventListener(
         'click',
         function (e) {
             e.stopPropagation();
 
             notifDropdown.classList.toggle('hidden');
+
             userDropdown.classList.add('hidden');
         }
     );
@@ -970,6 +1011,7 @@
             e.stopPropagation();
 
             userDropdown.classList.toggle('hidden');
+
             notifDropdown.classList.add('hidden');
         }
     );

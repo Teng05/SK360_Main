@@ -77,53 +77,61 @@
 
 @push('scripts')
 <script>
-    const tokenUrl = @json($tokenRoute ?? route('sk_pres.meetings.agora.token', $meeting->meeting_id));
-    const meetingChannel = @json($channelName);
-    const participantNames = @json($participantNames ?? []);
-    const statusBar = document.getElementById('statusBar');
-    const statusText = document.getElementById('statusText');
-    const connectionStatus = document.getElementById('connectionStatus');
-    const remoteGrid = document.getElementById('remote-grid');
-    const remoteEmpty = document.getElementById('remote-empty');
-    const participantList = document.getElementById('participantList');
-    const participantCount = document.getElementById('participantCount');
-    const toggleMicBtn = document.getElementById('toggleMicBtn');
-    const toggleCamBtn = document.getElementById('toggleCamBtn');
-    const leaveBtn = document.getElementById('leaveBtn');
+    const tokenUrl=@json($tokenRoute ?? route('sk_pres.meetings.agora.token',$meeting->meeting_id));
+    const joinAttendanceUrl=@json($joinAttendanceRoute ?? route('meetings.call-attendance.join',$meeting->meeting_id));
+    const leaveAttendanceUrl=@json($leaveAttendanceRoute ?? route('meetings.call-attendance.leave',$meeting->meeting_id));
+    const backUrl=@json($backRoute ?? route('sk_pres.meetings'));
+    const meetingChannel=@json($channelName);
+    const participantNames=@json($participantNames ?? []);
+    const csrfToken=@json(csrf_token());
+    const statusBar=document.getElementById('statusBar');
+    const statusText=document.getElementById('statusText');
+    const connectionStatus=document.getElementById('connectionStatus');
+    const remoteGrid=document.getElementById('remote-grid');
+    const remoteEmpty=document.getElementById('remote-empty');
+    const participantList=document.getElementById('participantList');
+    const participantCount=document.getElementById('participantCount');
+    const toggleMicBtn=document.getElementById('toggleMicBtn');
+    const toggleCamBtn=document.getElementById('toggleCamBtn');
+    const leaveBtn=document.getElementById('leaveBtn');
 
     let client;
-    let localTracks = [];
-    let remoteUsers = new Map();
+    let localTracks=[];
+    let participantSyncTimer=null;
+    let joinedCall=false;
 
-    const showStatus = (message) => {
-        statusText.textContent = message;
+    const showStatus=(message)=>{
+        statusText.textContent=message;
         statusBar.classList.remove('hidden');
-        setTimeout(() => statusBar.classList.add('hidden'), 5000);
+        setTimeout(()=>statusBar.classList.add('hidden'),5000);
     };
 
-    const setConnectionStatus = (message, classes) => {
-        connectionStatus.textContent = message;
-        connectionStatus.className = `rounded-xl px-3 py-2 text-xs ${classes}`;
+    const setConnectionStatus=(message,classes)=>{
+        connectionStatus.textContent=message;
+        connectionStatus.className=`rounded-xl px-3 py-2 text-xs ${classes}`;
     };
 
-    const refreshParticipantCount = () => {
-        participantCount.textContent = `${remoteUsers.size + 1} online`;
+    const currentRemoteUsers=()=>{
+        return client ? client.remoteUsers : [];
     };
 
-    const participantNameFor = (uid) => {
-        const key = String(uid);
+    const refreshParticipantCount=()=>{
+        participantCount.textContent=`${currentRemoteUsers().length+1} online`;
+    };
 
+    const participantNameFor=(uid)=>{
+        const key=String(uid);
         return participantNames[key] || `User ${key}`;
     };
 
-    const ensureRemoteCard = (user) => {
-        const id = `remote-${user.uid}`;
-        let player = document.getElementById(id);
+    const ensureRemoteCard=(user)=>{
+        const id=`remote-${user.uid}`;
+        let player=document.getElementById(id);
 
-        if (!player) {
-            player = document.createElement('div');
-            player.id = id;
-            player.className = 'video-pane h-full min-h-[320px] rounded-[24px] overflow-hidden';
+        if(!player){
+            player=document.createElement('div');
+            player.id=id;
+            player.className='video-pane h-full min-h-[320px] rounded-[24px] overflow-hidden';
             remoteGrid.appendChild(player);
         }
 
@@ -131,100 +139,191 @@
         return player;
     };
 
-    const syncParticipantList = () => {
-        participantList.innerHTML = `
+    const removeRemoteCard=(uid)=>{
+        const player=document.getElementById(`remote-${uid}`);
+        if(player) player.remove();
+        if(remoteGrid.querySelectorAll('[id^="remote-"]').length===0) remoteEmpty.classList.remove('hidden');
+    };
+
+    const syncParticipantList=()=>{
+        participantList.innerHTML=`
             <div class="rounded-2xl border border-white/10 px-3 py-3">
                 <p class="text-sm font-semibold">{{ $fullName }}</p>
                 <p class="mt-1 text-[11px] text-slate-400">You</p>
             </div>
         `;
 
-        remoteUsers.forEach((user) => {
-            const entry = document.createElement('div');
-            entry.className = 'rounded-2xl border border-white/10 px-3 py-3';
-            entry.innerHTML = `
+        currentRemoteUsers().forEach((user)=>{
+            const entry=document.createElement('div');
+            entry.className='rounded-2xl border border-white/10 px-3 py-3';
+            entry.innerHTML=`
                 <p class="text-sm font-semibold">${participantNameFor(user.uid)}</p>
                 <p class="mt-1 text-[11px] text-slate-400">Connected</p>
             `;
             participantList.appendChild(entry);
         });
+
         refreshParticipantCount();
     };
 
-    const joinMeeting = async () => {
-        try {
-            setConnectionStatus('Fetching token', 'bg-yellow-500/20 text-yellow-300');
-
-            const tokenResponse = await fetch(tokenUrl, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': @json(csrf_token()),
-                    'Accept': 'application/json',
+    const recordCallJoin=async()=>{
+        try{
+            const response=await fetch(joinAttendanceUrl,{
+                method:'POST',
+                headers:{
+                    'Content-Type':'application/json',
+                    'X-CSRF-TOKEN':csrfToken,
+                    'Accept':'application/json',
                 },
-                body: JSON.stringify({ channel: meetingChannel }),
+                body:JSON.stringify({}),
             });
 
-            const tokenPayload = await tokenResponse.json();
-            if (!tokenResponse.ok) throw new Error(tokenPayload.message || 'Failed to fetch token.');
-            client = AgoraRTC.createClient({ mode: 'rtc', codec: 'vp8' });
+            const data=await response.json().catch(()=>({}));
 
-            client.on('user-published', async (user, mediaType) => {
-                remoteUsers.set(String(user.uid), user);
+            if(!response.ok){
+                showStatus(data.message || 'Connected to the call, but attendance could not be recorded.');
+            }
+        }catch(error){
+            console.error(error);
+            showStatus('Connected to the call, but attendance could not be recorded.');
+        }
+    };
+
+    const recordCallLeave=async()=>{
+        if(!joinedCall) return;
+
+        try{
+            await fetch(leaveAttendanceUrl,{
+                method:'POST',
+                headers:{
+                    'Content-Type':'application/json',
+                    'X-CSRF-TOKEN':csrfToken,
+                    'Accept':'application/json',
+                },
+                body:JSON.stringify({}),
+                keepalive:true,
+            });
+        }catch(error){
+            console.error(error);
+        }
+    };
+
+    const joinMeeting=async()=>{
+        try{
+            setConnectionStatus('Fetching token','bg-yellow-500/20 text-yellow-300');
+
+            const tokenResponse=await fetch(tokenUrl,{
+                method:'POST',
+                headers:{
+                    'Content-Type':'application/json',
+                    'X-CSRF-TOKEN':csrfToken,
+                    'Accept':'application/json',
+                },
+                body:JSON.stringify({channel:meetingChannel}),
+            });
+
+            const tokenPayload=await tokenResponse.json();
+            if(!tokenResponse.ok) throw new Error(tokenPayload.message || 'Failed to fetch token.');
+
+            client=AgoraRTC.createClient({mode:'rtc',codec:'vp8'});
+
+            client.on('user-joined',()=>{
                 syncParticipantList();
-                await client.subscribe(user, mediaType);
+            });
 
-                if (mediaType === 'video') {
-                    const player = ensureRemoteCard(user);
+            client.on('user-published',async(user,mediaType)=>{
+                syncParticipantList();
+                await client.subscribe(user,mediaType);
+
+                if(mediaType==='video'){
+                    const player=ensureRemoteCard(user);
                     user.videoTrack.play(player.id);
                 }
-                if (mediaType === 'audio') user.audioTrack.play();
+
+                if(mediaType==='audio') user.audioTrack.play();
             });
 
-            client.on('user-unpublished', (user) => {
-                remoteUsers.delete(String(user.uid));
-                const player = document.getElementById(`remote-${user.uid}`);
-                if (player) player.remove();
-                if (remoteUsers.size === 0) remoteEmpty.classList.remove('hidden');
+            client.on('user-unpublished',(user,mediaType)=>{
+                if(mediaType==='video') removeRemoteCard(user.uid);
                 syncParticipantList();
             });
 
-            await client.join(tokenPayload.appId, tokenPayload.channel, tokenPayload.token, tokenPayload.uid);
-            
-            localTracks = await AgoraRTC.createMicrophoneAndCameraTracks();
+            client.on('user-left',(user)=>{
+                removeRemoteCard(user.uid);
+                syncParticipantList();
+            });
+
+            await client.join(tokenPayload.appId,tokenPayload.channel,tokenPayload.token,tokenPayload.uid);
+            joinedCall=true;
+
+            syncParticipantList();
+
+            if(participantSyncTimer) clearInterval(participantSyncTimer);
+            participantSyncTimer=setInterval(syncParticipantList,1000);
+
+            await recordCallJoin();
+
+            localTracks=await AgoraRTC.createMicrophoneAndCameraTracks();
             localTracks[1].play('local-player');
             await client.publish(localTracks);
 
-            setConnectionStatus('Connected', 'bg-green-500/20 text-green-300');
+            setConnectionStatus('Connected','bg-green-500/20 text-green-300');
             syncParticipantList();
-        } catch (error) {
+        }catch(error){
             console.error(error);
-            setConnectionStatus('Join failed', 'bg-red-500/20 text-red-300');
+            setConnectionStatus('Join failed','bg-red-500/20 text-red-300');
             showStatus(`Call failed: ${error.message}`);
         }
     };
-    // Existing Mic/Cam/Leave Handlers
-    toggleMicBtn.addEventListener('click', async () => {
-        if (!localTracks[0]) return;
-        const shouldMute = localTracks[0].enabled;
+
+    toggleMicBtn.addEventListener('click',async()=>{
+        if(!localTracks[0]) return;
+        const shouldMute=localTracks[0].enabled;
         await localTracks[0].setEnabled(!shouldMute);
-        toggleMicBtn.textContent = shouldMute ? 'Unmute Mic' : 'Mute Mic';
+        toggleMicBtn.textContent=shouldMute ? 'Unmute Mic' : 'Mute Mic';
     });
 
-    toggleCamBtn.addEventListener('click', async () => {
-        if (!localTracks[1]) return;
-        const shouldDisable = localTracks[1].enabled;
+    toggleCamBtn.addEventListener('click',async()=>{
+        if(!localTracks[1]) return;
+        const shouldDisable=localTracks[1].enabled;
         await localTracks[1].setEnabled(!shouldDisable);
-        toggleCamBtn.textContent = shouldDisable ? 'Turn On Camera' : 'Turn Off Camera';
+        toggleCamBtn.textContent=shouldDisable ? 'Turn On Camera' : 'Turn Off Camera';
     });
 
-    leaveBtn.addEventListener('click', async () => {
-        for (const track of localTracks) { track.stop(); track.close(); }
-        if (client) await client.leave();
-        window.location.href = @json($backRoute ?? route('sk_pres.meetings'));
+    leaveBtn.addEventListener('click',async()=>{
+        leaveBtn.disabled=true;
+        await recordCallLeave();
+
+        for(const track of localTracks){
+            track.stop();
+            track.close();
+        }
+
+        if(participantSyncTimer){
+            clearInterval(participantSyncTimer);
+            participantSyncTimer=null;
+        }
+
+        if(client) await client.leave();
+        joinedCall=false;
+        window.location.href=backUrl;
+    });
+
+    window.addEventListener('pagehide',()=>{
+        if(!joinedCall) return;
+
+        fetch(leaveAttendanceUrl,{
+            method:'POST',
+            headers:{
+                'Content-Type':'application/json',
+                'X-CSRF-TOKEN':csrfToken,
+                'Accept':'application/json',
+            },
+            body:JSON.stringify({}),
+            keepalive:true,
+        });
     });
 
     joinMeeting();
 </script>
 @endpush
-

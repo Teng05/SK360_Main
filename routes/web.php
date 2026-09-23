@@ -55,6 +55,7 @@ use Illuminate\Support\Facades\Route;
 | PUBLIC ROUTES
 |--------------------------------------------------------------------------
 */
+
 Route::get('/', function(){
     if(auth()->check()){
         return redirect()->to(match(auth()->user()->role){
@@ -75,6 +76,14 @@ Route::get('/mobile/meetings/{meeting}/call', [MobileApiController::class, 'mobi
 Route::post('/mobile/meetings/{meeting}/agora-token', [MobileApiController::class, 'mobileMeetingToken'])
     ->middleware('signed')
     ->name('mobile.meetings.agora.token');
+
+Route::post('/mobile/meetings/{meeting}/call-attendance/join', [MobileApiController::class, 'mobileMeetingAttendanceJoin'])
+    ->middleware('signed')
+    ->name('mobile.meetings.call-attendance.join');
+
+Route::post('/mobile/meetings/{meeting}/call-attendance/leave', [MobileApiController::class, 'mobileMeetingAttendanceLeave'])
+    ->middleware('signed')
+    ->name('mobile.meetings.call-attendance.leave');
 
 Route::controller(AuthController::class)->group(function () {
     Route::get('/login', 'showLogin')->name('login');
@@ -97,6 +106,8 @@ Route::middleware('auth')->group(function(){
     Route::post('/notifications/{notification}/read',[NotificationController::class,'markRead'])->name('notifications.read');
     Route::post('/wall/posts',[WallPostController::class,'store'])->name('wall.posts.store');
     Route::post('/wall/posts/{announcement}/like',[WallPostController::class,'toggleLike'])->name('wall.posts.like');
+    Route::post('/meetings/{meeting}/call-attendance/join',[MeetingsController::class,'joinCallAttendance'])->name('meetings.call-attendance.join');
+    Route::post('/meetings/{meeting}/call-attendance/leave',[MeetingsController::class,'leaveCallAttendance'])->name('meetings.call-attendance.leave');
 });
 
 
@@ -105,6 +116,7 @@ Route::middleware('auth')->group(function(){
 | SK PRESIDENT
 |--------------------------------------------------------------------------
 */
+
 Route::middleware('auth')->prefix('sk_pres')->name('sk_pres.')->group(function(){
 
     Route::get('/home',[HomeController::class,'index'])->name('home');
@@ -117,8 +129,10 @@ Route::middleware('auth')->prefix('sk_pres')->name('sk_pres.')->group(function()
     Route::get('/module',[ModuleController::class,'index'])->name('module');
     Route::get('/module/live',[ModuleController::class,'live'])->name('module.live');
     Route::post('/module/live',[ModuleController::class,'storeLive'])->name('module.live.store');
+    Route::patch('/module/live/{slotId}/close',[ModuleController::class,'closeLive'])->name('module.live.close');
     Route::delete('/module/live/{slotId}',[ModuleController::class,'destroyLive'])->name('module.live.destroy');
     Route::post('/module',[ModuleController::class,'store'])->name('module.store');
+    Route::patch('/module/{slotId}/close',[ModuleController::class,'close'])->name('module.close');
     Route::post('/module/{slotId}/delete',[ModuleController::class,'destroy'])->name('module.destroy');
 
     Route::get('/announcements',[AnnouncementController::class,'index'])->name('announcements');
@@ -134,6 +148,8 @@ Route::middleware('auth')->prefix('sk_pres')->name('sk_pres.')->group(function()
 
     Route::get('/meetings',[MeetingsController::class,'index'])->name('meetings');
     Route::post('/meetings',[MeetingsController::class,'store'])->name('meetings.store');
+    Route::post('/meetings/{meeting}/finish',[MeetingsController::class,'finish'])->name('meetings.finish');
+    Route::post('/meetings/{meeting}/attendance',[MeetingsController::class,'recordAttendance'])->name('meetings.attendance');
     Route::get('/meetings/{meeting}/call',[MeetingsController::class,'call'])->name('meetings.call');
     Route::post('/meetings/{meeting}/agora-token',[MeetingsController::class,'token'])->name('meetings.agora.token');
     Route::get('/video',fn()=>redirect()->route('sk_pres.meetings'))->name('video');
@@ -148,6 +164,7 @@ Route::middleware('auth')->prefix('sk_pres')->name('sk_pres.')->group(function()
     | DOCUMENT / REPORT ARCHIVE
     |--------------------------------------------------------------------------
     */
+
     Route::get('/archive',[SkPresidentArchiveController::class,'index'])->name('archive');
     Route::get('/archive/download/bulk',[SkPresidentArchiveController::class,'bulkDownload'])->name('archive.bulk-download');
     Route::get('/archive/download/{sourceType}/{sourceId}',[SkPresidentArchiveController::class,'download'])->name('archive.download');
@@ -157,6 +174,7 @@ Route::middleware('auth')->prefix('sk_pres')->name('sk_pres.')->group(function()
     | USER MANAGEMENT
     |--------------------------------------------------------------------------
     */
+
     Route::get('/user-management',[SkPresidentUserManagementController::class,'index'])->name('user-management');
     Route::post('/user-management/officials',[SkPresidentUserManagementController::class,'storeOfficial'])->name('user-management.store-official');
     Route::post('/user-management/bulk-officials',[SkPresidentUserManagementController::class,'storeBulkOfficials'])->name('user-management.store-bulk-officials');
@@ -175,6 +193,7 @@ Route::middleware('auth')->prefix('sk_pres')->name('sk_pres.')->group(function()
     | PROFILE
     |--------------------------------------------------------------------------
     */
+
     Route::get('/profile',fn(ProfileSettingsController $c)=>$c->show('sk_president'))
         ->name('profile');
 
@@ -191,6 +210,7 @@ Route::middleware('auth')->prefix('sk_pres')->name('sk_pres.')->group(function()
 | SK CHAIRMAN
 |--------------------------------------------------------------------------
 */
+
 Route::middleware('auth')->prefix('sk_chairman')->name('sk_chairman.')->group(function () {
 
     Route::get('/home', [SkChairmanHomeController::class, 'index'])->name('home');
@@ -249,6 +269,7 @@ Route::middleware('auth')->prefix('sk_chairman')->name('sk_chairman.')->group(fu
 | SK SECRETARY
 |--------------------------------------------------------------------------
 */
+
 Route::middleware('auth')->prefix('sk_secretary')->name('sk_secretary.')->group(function () {
 
     Route::get('/home', [SkSecretaryHomeController::class, 'index'])->name('home');
@@ -290,40 +311,22 @@ Route::middleware('auth')->prefix('sk_secretary')->name('sk_secretary.')->group(
 | PUBLIC PORTAL
 |--------------------------------------------------------------------------
 */
+
 Route::prefix('public-portal')->name('public.')->group(function(){
 
     Route::get('/',[PublicHomeController::class,'index'])->name('home');
 
     Route::get('/announcements',[PublicAnnouncementController::class,'index'])->name('announcements');
-
     Route::get('/calendar',[PublicCalendarController::class,'index'])->name('calendar');
-
     Route::get('/leadership',[PublicLeadershipController::class,'index'])->name('leadership');
-
     Route::get('/annual-budgets',[PublicBudgetController::class,'index'])->name('budgets');
 
-    Route::post('/announcements/{announcementId}/like',[PublicAnnouncementInteractionController::class,'toggleLike'])
-        ->middleware('throttle:30,1')
-        ->name('announcements.like');
+    Route::post('/announcements/{announcementId}/like',[PublicAnnouncementInteractionController::class,'toggleLike'])->middleware('throttle:30,1')->name('announcements.like');
+    Route::post('/announcements/{announcementId}/view',[PublicAnnouncementInteractionController::class,'trackView'])->middleware('throttle:120,1')->name('announcements.view');
+    Route::get('/announcements/{announcementId}/feedback',[PublicAnnouncementInteractionController::class,'feedbackList'])->middleware('throttle:120,1')->name('announcements.feedback-list');
+    Route::post('/announcements/{announcementId}/feedback',[PublicAnnouncementInteractionController::class,'submitFeedback'])->middleware('throttle:public-feedback-submit')->name('announcements.feedback');
 
-    Route::post('/announcements/{announcementId}/view',[PublicAnnouncementInteractionController::class,'trackView'])
-        ->middleware('throttle:120,1')
-        ->name('announcements.view');
-
-    Route::get('/announcements/{announcementId}/feedback',[PublicAnnouncementInteractionController::class,'feedbackList'])
-        ->middleware('throttle:120,1')
-        ->name('announcements.feedback-list');
-
-    Route::post('/announcements/{announcementId}/feedback',[PublicAnnouncementInteractionController::class,'submitFeedback'])
-        ->middleware('throttle:public-feedback-submit')
-        ->name('announcements.feedback');
-
-    Route::post('/feedback/{feedbackId}/verify',[PublicAnnouncementInteractionController::class,'verifyFeedback'])
-        ->middleware('throttle:public-feedback-verify')
-        ->name('feedback.verify');
-
-    Route::post('/feedback/{feedbackId}/resend',[PublicAnnouncementInteractionController::class,'resendFeedback'])
-        ->middleware('throttle:public-feedback-resend')
-        ->name('feedback.resend');
+    Route::post('/feedback/{feedbackId}/verify',[PublicAnnouncementInteractionController::class,'verifyFeedback'])->middleware('throttle:public-feedback-verify')->name('feedback.verify');
+    Route::post('/feedback/{feedbackId}/resend',[PublicAnnouncementInteractionController::class,'resendFeedback'])->middleware('throttle:public-feedback-resend')->name('feedback.resend');
 
 });

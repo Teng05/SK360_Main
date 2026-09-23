@@ -11,55 +11,90 @@ use InvalidArgumentException;
 class RankingPointsService
 {
     public const ON_TIME_REPORT_SUBMISSION='on_time_report_submission';
-    public const MEETING_ATTENDANCE='meeting_attendance';
     public const COMMUNITY_ENGAGEMENT='community_engagement';
     public const QUALITY_DOCUMENTATION='quality_documentation';
     public const EVENT_PARTICIPATION='event_participation';
+
     public const LATE_SUBMISSION='late_submission';
+    public const MEETING_ATTENDANCE='meeting_attendance';
     public const MISSED_MEETING='missed_meeting';
 
+    public const YOUTH_DEVELOPMENT_PROGRAM_APPROVED='youth_development_program_approved';
+    public const KK_ASSEMBLY_APPROVED='kk_assembly_approved';
+
+    public const ANNUAL_BUDGET_APPROVED='annual_budget_approved';
+    public const COA_MONTHLY_APPROVED='coa_monthly_approved';
+    public const COA_QUARTERLY_APPROVED='coa_quarterly_approved';
+    public const COA_SEMI_ANNUAL_APPROVED='coa_semi_annual_approved';
+    public const COA_ANNUAL_APPROVED='coa_annual_approved';
+
+    protected array $ignoredActions=[
+        self::ON_TIME_REPORT_SUBMISSION,
+        self::COMMUNITY_ENGAGEMENT,
+        self::QUALITY_DOCUMENTATION,
+        self::EVENT_PARTICIPATION,
+    ];
+
     protected array $rules=[
-        self::ON_TIME_REPORT_SUBMISSION=>[
-            'label'=>'On-time Report Submission',
-            'points'=>50,
+        self::LATE_SUBMISSION=>[
+            'label'=>'Late Required Submission',
+            'points'=>-5,
             'column'=>'timely_submission_points',
-            'type'=>'positive',
+            'type'=>'negative',
         ],
         self::MEETING_ATTENDANCE=>[
-            'label'=>'Meeting Attendance',
-            'points'=>30,
+            'label'=>'Official Meeting Attendance',
+            'points'=>5,
             'column'=>'participation_points',
             'type'=>'positive',
         ],
-        self::COMMUNITY_ENGAGEMENT=>[
-            'label'=>'Community Engagement',
-            'points'=>25,
+        self::MISSED_MEETING=>[
+            'label'=>'Missed Official Meeting',
+            'points'=>-5,
             'column'=>'participation_points',
-            'type'=>'positive',
+            'type'=>'negative',
         ],
-        self::QUALITY_DOCUMENTATION=>[
-            'label'=>'Quality Documentation',
-            'points'=>20,
+        self::YOUTH_DEVELOPMENT_PROGRAM_APPROVED=>[
+            'label'=>'Youth Development Program',
+            'points'=>5,
             'column'=>'completeness_points',
             'type'=>'positive',
         ],
-        self::EVENT_PARTICIPATION=>[
-            'label'=>'Event Participation',
-            'points'=>15,
-            'column'=>'participation_points',
+        self::KK_ASSEMBLY_APPROVED=>[
+            'label'=>'KK Assembly',
+            'points'=>10,
+            'column'=>'completeness_points',
             'type'=>'positive',
         ],
-        self::LATE_SUBMISSION=>[
-            'label'=>'Late Submission',
-            'points'=>-25,
-            'column'=>'timely_submission_points',
-            'type'=>'negative',
+        self::ANNUAL_BUDGET_APPROVED=>[
+            'label'=>'Annual Budget',
+            'points'=>10,
+            'column'=>'completeness_points',
+            'type'=>'positive',
         ],
-        self::MISSED_MEETING=>[
-            'label'=>'Missed Meeting',
-            'points'=>-30,
-            'column'=>'participation_points',
-            'type'=>'negative',
+        self::COA_MONTHLY_APPROVED=>[
+            'label'=>'Monthly COA Report',
+            'points'=>5,
+            'column'=>'completeness_points',
+            'type'=>'positive',
+        ],
+        self::COA_QUARTERLY_APPROVED=>[
+            'label'=>'Quarterly COA Report',
+            'points'=>10,
+            'column'=>'completeness_points',
+            'type'=>'positive',
+        ],
+        self::COA_SEMI_ANNUAL_APPROVED=>[
+            'label'=>'Semi-Annual COA Report',
+            'points'=>10,
+            'column'=>'completeness_points',
+            'type'=>'positive',
+        ],
+        self::COA_ANNUAL_APPROVED=>[
+            'label'=>'Annual COA Report',
+            'points'=>20,
+            'column'=>'completeness_points',
+            'type'=>'positive',
         ],
     ];
 
@@ -77,6 +112,10 @@ class RankingPointsService
             !Schema::hasTable('ranking_point_logs') ||
             !Schema::hasTable('administration_terms')
         ){
+            return false;
+        }
+
+        if(in_array($action,$this->ignoredActions,true)){
             return false;
         }
 
@@ -166,6 +205,70 @@ class RankingPointsService
     public function rules(): array
     {
         return $this->rules;
+    }
+
+    public function recordMissedSubmissions(?string $period=null): void
+    {
+        if(
+            !Schema::hasTable('submission_slots') ||
+            !Schema::hasTable('users') ||
+            !Schema::hasTable('ranking_point_logs') ||
+            !Schema::hasTable('rankings') ||
+            !Schema::hasTable('administration_terms')
+        ){
+            return;
+        }
+
+        $termId=$this->currentTermId();
+
+        if(!$termId){
+            return;
+        }
+
+        $today=Carbon::now('Asia/Manila')->toDateString();
+
+        $slots=DB::table('submission_slots')
+            ->where('term_id',$termId)
+            ->whereDate('end_date','<',$today)
+            ->whereIn('submission_type',[
+                'accomplishment_report',
+                'budget_report',
+            ])
+            ->get();
+
+        foreach($slots as $slot){
+            $table=match($slot->submission_type){
+                'accomplishment_report'=>'accomplishment_reports',
+                'budget_report'=>'budget_reports',
+                default=>null,
+            };
+
+            if(!$table || !Schema::hasTable($table)){
+                continue;
+            }
+
+            $slotPeriod=$period
+                ?:Carbon::parse($slot->end_date,'Asia/Manila')->format('F Y');
+
+            foreach($this->eligibleBarangayIdsForSlot($slot) as $barangayId){
+                if($this->hasOnTimeSubmission(
+                    $table,
+                    $slot,
+                    (int)$barangayId
+                )){
+                    continue;
+                }
+
+                $this->award(
+                    (int)$barangayId,
+                    self::LATE_SUBMISSION,
+                    'submission_slot',
+                    (int)$slot->slot_id,
+                    null,
+                    $slotPeriod
+                );
+            }
+        }
     }
 
     public function recordMissedMeetings(?string $period=null): void
@@ -260,6 +363,60 @@ class RankingPointsService
         }
     }
 
+    protected function eligibleBarangayIdsForSlot(object $slot)
+    {
+        $roles=match($slot->role ?? 'Both'){
+            'SK Chairman'=>['sk_chairman'],
+            'SK Secretary'=>['sk_secretary'],
+            default=>[
+                'sk_chairman',
+                'sk_secretary',
+            ],
+        };
+
+        $query=DB::table('users')
+            ->whereIn('role',$roles)
+            ->whereNotNull('barangay_id');
+
+        if(Schema::hasColumn('users','status')){
+            $query->where('status','active');
+        }
+
+        if(Schema::hasColumn('users','archived_at')){
+            $query->whereNull('archived_at');
+        }
+
+        return $query
+            ->distinct()
+            ->pluck('barangay_id')
+            ->map(fn($id)=>(int)$id)
+            ->values();
+    }
+
+    protected function hasOnTimeSubmission(
+        string $table,
+        object $slot,
+        int $barangayId
+    ): bool {
+        $deadline=Carbon::parse(
+            $slot->end_date,
+            'Asia/Manila'
+        )->endOfDay()->format('Y-m-d H:i:s');
+
+        return DB::table($table)
+            ->where('term_id',(int)$slot->term_id)
+            ->where('barangay_id',$barangayId)
+            ->where('slot_id',(int)$slot->slot_id)
+            ->where(function($query) use($deadline){
+                $query->where('created_at','<=',$deadline)
+                    ->orWhere(function($query) use($deadline){
+                        $query->whereNull('created_at')
+                            ->where('submitted_at','<=',$deadline);
+                    });
+            })
+            ->exists();
+    }
+
     protected function currentTermId(): ?int
     {
         if(!Schema::hasTable('administration_terms')){
@@ -300,9 +457,6 @@ class RankingPointsService
         string $sourceId
     ): bool {
         $conflictingActions=match($action){
-            self::ON_TIME_REPORT_SUBMISSION=>[
-                self::LATE_SUBMISSION,
-            ],
             self::LATE_SUBMISSION=>[
                 self::ON_TIME_REPORT_SUBMISSION,
             ],

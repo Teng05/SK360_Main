@@ -116,6 +116,12 @@
                     </div>
                 @endif
 
+                @if (session('warning'))
+                    <div class="mt-6 rounded-2xl border border-yellow-200 bg-yellow-50 px-4 py-3 text-sm text-yellow-700">
+                        {{ session('warning') }}
+                    </div>
+                @endif
+
                 @if ($errors->any())
                     <div class="mt-6 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
                         {{ $errors->first() }}
@@ -136,11 +142,9 @@
                         <div class="flex items-center justify-between">
                             <div>
                                 <h2 class="text-base font-semibold text-gray-900">Upcoming Meetings</h2>
-                                <p class="text-xs text-gray-500">Scheduled meetings and sessions</p>
+                                <p class="text-xs text-gray-500">Scheduled meetings that have not started yet</p>
                             </div>
-                            <span class="rounded-full bg-red-50 px-3 py-1 text-xs font-semibold text-[#d90f1f]">
-                                {{ $upcomingMeetings->count() }} upcoming
-                            </span>
+                            <span class="rounded-full bg-red-50 px-3 py-1 text-xs font-semibold text-[#d90f1f]">{{ $upcomingMeetings->count() }} upcoming</span>
                         </div>
 
                         <div class="mt-4 space-y-3">
@@ -152,23 +156,53 @@
                                             <p class="mt-1 text-xs text-gray-500">{{ $meeting->preview_datetime }}</p>
                                             <p class="mt-2 text-xs text-gray-400">{{ $meeting->agenda ?: 'No agenda provided yet.' }}</p>
                                         </div>
-
-                                        <span class="inline-flex items-center rounded-full bg-green-50 px-3 py-1 text-[11px] font-semibold text-green-600">
-                                            {{ $meeting->status_label }}
-                                        </span>
+                                        <span class="inline-flex items-center rounded-full bg-blue-50 px-3 py-1 text-[11px] font-semibold text-blue-600">{{ $meeting->status_label }}</span>
                                     </div>
-
-                                    <div class="mt-4 flex flex-wrap gap-2">
-                                        <a href="{{ route('sk_pres.meetings.call', $meeting->meeting_id) }}"
-                                           class="inline-flex items-center rounded-xl bg-[#d90f1f] px-4 py-2 text-xs font-semibold text-white transition hover:bg-[#b90e1b]">
-                                            Join Meeting
-                                        </a>
+                                    <div class="mt-4">
+                                        <span class="inline-flex items-center rounded-xl bg-gray-100 px-4 py-2 text-xs font-semibold text-gray-500">Available when meeting starts</span>
                                     </div>
                                 </div>
                             @empty
                                 <div class="rounded-2xl border border-dashed border-gray-200 bg-white px-6 py-10 text-center">
-                                    <p class="text-sm font-semibold text-gray-700">No scheduled meetings yet.</p>
-                                    <p class="mt-2 text-xs text-gray-500">Create your first Agora-powered meeting from the schedule button above.</p>
+                                    <p class="text-sm font-semibold text-gray-700">No upcoming meetings.</p>
+                                </div>
+                            @endforelse
+                        </div>
+                    </div>
+
+                    <div class="rounded-[24px] border border-red-100 bg-red-50/40 p-5">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <h2 class="text-base font-semibold text-gray-900">Ongoing Meetings</h2>
+                                <p class="text-xs text-gray-500">Meetings currently open for face-to-face or video-call participation</p>
+                            </div>
+                            <span class="rounded-full bg-red-100 px-3 py-1 text-xs font-semibold text-red-600">{{ $activeMeetings->count() }} ongoing</span>
+                        </div>
+
+                        <div class="mt-4 space-y-3">
+                            @forelse ($activeMeetings as $meeting)
+                                <div class="rounded-2xl border border-red-100 bg-white p-4 shadow-sm">
+                                    <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                                        <div class="min-w-0">
+                                            <p class="text-sm font-semibold text-gray-900">{{ $meeting->title }}</p>
+                                            <p class="mt-1 text-xs text-gray-500">{{ $meeting->preview_datetime }}</p>
+                                            <p class="mt-2 text-xs text-gray-400">{{ $meeting->agenda ?: 'No agenda provided yet.' }}</p>
+                                        </div>
+                                        <span class="inline-flex items-center rounded-full bg-red-50 px-3 py-1 text-[11px] font-semibold text-red-600">{{ $meeting->status_label }}</span>
+                                    </div>
+
+                                    <div class="mt-4 flex flex-wrap gap-2">
+                                        <a href="{{ route('sk_pres.meetings.call',$meeting->meeting_id) }}" class="inline-flex items-center rounded-xl bg-[#d90f1f] px-4 py-2 text-xs font-semibold text-white transition hover:bg-[#b90e1b]">Join Video Call</a>
+                                        <form method="POST" action="{{ route('sk_pres.meetings.finish',$meeting->meeting_id) }}" onsubmit="return confirm('Finish this meeting? Video-call attendance will stop accepting new participants and attendance can then be finalized.');">
+                                            @csrf
+                                            <button type="submit" class="inline-flex items-center rounded-xl bg-gray-900 px-4 py-2 text-xs font-semibold text-white transition hover:bg-gray-700">Finish Meeting</button>
+                                        </form>
+                                    </div>
+                                </div>
+                            @empty
+                                <div class="rounded-2xl border border-dashed border-red-100 bg-white px-6 py-10 text-center">
+                                    <p class="text-sm font-semibold text-gray-700">No ongoing meetings.</p>
+                                    <p class="mt-2 text-xs text-gray-500">A scheduled meeting becomes ongoing once its start time arrives.</p>
                                 </div>
                             @endforelse
                         </div>
@@ -178,26 +212,40 @@
                         <div class="flex items-center justify-between">
                             <div>
                                 <h2 class="text-base font-semibold text-gray-900">Past Meetings</h2>
-                                <p class="text-xs text-gray-500">Meeting history and records</p>
+                                <p class="text-xs text-gray-500">Completed and cancelled meeting records</p>
                             </div>
-                            <span class="rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-600">
-                                {{ $pastMeetings->count() }} completed
-                            </span>
+                            <span class="rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-600">{{ $pastMeetings->count() }} past</span>
                         </div>
 
                         <div class="mt-4 space-y-3">
                             @forelse ($pastMeetings as $meeting)
                                 <div class="rounded-2xl border border-gray-100 bg-white p-4">
-                                    <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                                    <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                                         <div>
                                             <p class="text-sm font-semibold text-gray-900">{{ $meeting->title }}</p>
                                             <p class="mt-1 text-xs text-gray-500">{{ $meeting->preview_datetime }}</p>
+
+                                            @if($meeting->status==='completed' && $meeting->attendance_finalized)
+                                                <div class="mt-3 flex flex-wrap gap-2">
+                                                    <span class="rounded-full bg-green-50 px-3 py-1 text-[11px] font-semibold text-green-600">{{ $meeting->attendance_present_count }} present</span>
+                                                    <span class="rounded-full bg-red-50 px-3 py-1 text-[11px] font-semibold text-red-600">{{ $meeting->attendance_absent_count }} absent</span>
+                                                </div>
+                                            @endif
                                         </div>
 
-                                        <span class="rounded-full bg-gray-100 px-3 py-1 text-[11px] font-semibold text-gray-600">
-                                            {{ $meeting->status_label }}
-                                        </span>
+                                        <span class="rounded-full {{ $meeting->status==='cancelled' ? 'bg-red-50 text-red-600' : 'bg-gray-100 text-gray-600' }} px-3 py-1 text-[11px] font-semibold">{{ $meeting->status_label }}</span>
                                     </div>
+
+                                    @if($meeting->status==='completed')
+                                        <div class="mt-4 flex flex-wrap items-center gap-2">
+                                            @if($meeting->attendance_finalized)
+                                                <span class="inline-flex items-center rounded-xl bg-green-50 px-4 py-2 text-xs font-semibold text-green-700">Attendance Recorded</span>
+                                            @else
+                                                <button type="button" class="recordAttendanceBtn inline-flex items-center rounded-xl bg-[#d90f1f] px-4 py-2 text-xs font-semibold text-white transition hover:bg-[#b90e1b]" data-title="{{ $meeting->title }}" data-action="{{ route('sk_pres.meetings.attendance',$meeting->meeting_id) }}">Record Attendance</button>
+                                                <span class="text-[11px] text-gray-400">Face-to-face attendance is selected manually. Video-call attendance is included automatically.</span>
+                                            @endif
+                                        </div>
+                                    @endif
                                 </div>
                             @empty
                                 <div class="rounded-2xl border border-dashed border-gray-200 bg-white px-6 py-10 text-center">
@@ -212,78 +260,58 @@
                     <div class="grid gap-4 xl:grid-cols-[minmax(0,1fr)_240px]">
                         <div class="rounded-[24px] bg-[#1b2230] p-4 text-white shadow-inner">
                             <div class="flex items-center justify-between">
-                                <span class="rounded-full bg-red-500/20 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-red-200">
-                                    Live
-                                </span>
+                                <span class="rounded-full bg-red-500/20 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-red-200">Live</span>
                                 <span class="text-xs text-white/60">Agora Preview</span>
                             </div>
 
                             <div class="mt-4 flex h-[300px] flex-col items-center justify-center rounded-[20px] bg-[#202938]">
                                 @php
-                                    $activeMeeting = $activeMeetings->first();
-                                    $initials = collect(explode(' ', trim($fullName)))->filter()->map(fn ($part) => strtoupper(substr($part, 0, 1)))->take(2)->implode('');
+                                    $activeMeeting=$activeMeetings->first();
+                                    $initials=collect(explode(' ',trim($fullName)))->filter()->map(fn($part)=>strtoupper(substr($part,0,1)))->take(2)->implode('');
                                 @endphp
-                                <div class="flex h-24 w-24 items-center justify-center rounded-full bg-[#eb5757] text-2xl font-bold">
-                                    {{ $initials ?: 'SK' }}
-                                </div>
+                                <div class="flex h-24 w-24 items-center justify-center rounded-full bg-[#eb5757] text-2xl font-bold">{{ $initials ?: 'SK' }}</div>
                                 <p class="mt-4 text-lg font-semibold">{{ $fullName }}</p>
-                                <span class="mt-2 rounded-full bg-green-500/20 px-3 py-1 text-[11px] font-semibold text-green-300">
-                                    {{ $activeMeeting ? 'Ready to join' : 'No active room' }}
-                                </span>
+                                <span class="mt-2 rounded-full bg-green-500/20 px-3 py-1 text-[11px] font-semibold text-green-300">{{ $activeMeeting ? 'Ongoing - ready to join' : 'No active room' }}</span>
                             </div>
 
                             <div class="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4">
-                                @forelse ($upcomingMeetings->take(4) as $meeting)
-                                    <a href="{{ route('sk_pres.meetings.call', $meeting->meeting_id) }}" class="rounded-2xl bg-[#273042] p-3 transition hover:bg-[#2d384d]">
-                                        <div class="flex h-12 w-12 items-center justify-center rounded-full bg-[#ef4444] text-sm font-bold">
-                                            {{ strtoupper(substr($meeting->title, 0, 2)) }}
-                                        </div>
+                                @forelse ($activeMeetings->take(4) as $meeting)
+                                    <a href="{{ route('sk_pres.meetings.call',$meeting->meeting_id) }}" class="rounded-2xl bg-[#273042] p-3 transition hover:bg-[#2d384d]">
+                                        <div class="flex h-12 w-12 items-center justify-center rounded-full bg-[#ef4444] text-sm font-bold">{{ strtoupper(substr($meeting->title,0,2)) }}</div>
                                         <p class="mt-3 truncate text-xs font-semibold">{{ $meeting->title }}</p>
-                                        <p class="mt-1 text-[10px] text-white/50">Tap to join</p>
+                                        <p class="mt-1 text-[10px] text-white/50">Join ongoing call</p>
                                     </a>
                                 @empty
-                                    <div class="col-span-full rounded-2xl border border-dashed border-white/15 px-4 py-8 text-center text-sm text-white/60">
-                                        No live-ready meetings available.
-                                    </div>
+                                    <div class="col-span-full rounded-2xl border border-dashed border-white/15 px-4 py-8 text-center text-sm text-white/60">No ongoing meeting rooms available.</div>
                                 @endforelse
                             </div>
 
                             <div class="mt-4 flex items-center justify-center gap-3 rounded-2xl bg-white/5 px-4 py-3">
                                 <span class="rounded-xl bg-white/10 px-3 py-2 text-xs">Mic</span>
                                 <span class="rounded-xl bg-white/10 px-3 py-2 text-xs">Cam</span>
-                                <a href="{{ $activeMeeting ? route('sk_pres.meetings.call', $activeMeeting->meeting_id) : '#' }}"
-                                   class="rounded-xl bg-[#ef4444] px-4 py-2 text-xs font-semibold text-white {{ $activeMeeting ? '' : 'pointer-events-none opacity-50' }}">
-                                    Join Active Meeting
-                                </a>
+                                <a href="{{ $activeMeeting ? route('sk_pres.meetings.call',$activeMeeting->meeting_id) : '#' }}" class="rounded-xl bg-[#ef4444] px-4 py-2 text-xs font-semibold text-white {{ $activeMeeting ? '' : 'pointer-events-none opacity-50' }}">Join Active Meeting</a>
                                 <span class="rounded-xl bg-white/10 px-3 py-2 text-xs">More</span>
                             </div>
                         </div>
 
                         <div class="rounded-[24px] border border-gray-100 bg-white p-4">
                             <div class="flex items-center justify-between">
-                                <h3 class="text-sm font-semibold text-gray-900">Participants</h3>
-                                <span class="text-xs text-gray-400">{{ $upcomingMeetings->count() }} meetings</span>
+                                <h3 class="text-sm font-semibold text-gray-900">Active Meetings</h3>
+                                <span class="text-xs text-gray-400">{{ $activeMeetings->count() }} active</span>
                             </div>
 
                             <div class="meeting-scrollbar mt-4 space-y-3 max-h-[460px] overflow-y-auto pr-1">
-                                @forelse ($upcomingMeetings as $meeting)
+                                @forelse ($activeMeetings as $meeting)
                                     <div class="flex items-start gap-3 rounded-2xl border border-gray-100 p-3">
-                                        <div class="flex h-10 w-10 items-center justify-center rounded-full bg-[#fce8ea] text-xs font-bold text-[#d90f1f]">
-                                            {{ strtoupper(substr($meeting->title, 0, 2)) }}
-                                        </div>
+                                        <div class="flex h-10 w-10 items-center justify-center rounded-full bg-[#fce8ea] text-xs font-bold text-[#d90f1f]">{{ strtoupper(substr($meeting->title,0,2)) }}</div>
                                         <div class="min-w-0">
                                             <p class="truncate text-sm font-semibold text-gray-800">{{ $meeting->title }}</p>
                                             <p class="mt-1 text-[11px] text-gray-400">{{ $meeting->preview_datetime }}</p>
-                                            <div class="mt-2 flex items-center gap-2">
-                                                <span class="h-2 w-2 rounded-full bg-green-500"></span>
-                                                <span class="text-[11px] text-green-600">{{ $meeting->status_label }}</span>
-                                            </div>
+                                            <div class="mt-2 flex items-center gap-2"><span class="h-2 w-2 rounded-full bg-green-500"></span><span class="text-[11px] text-green-600">{{ $meeting->status_label }}</span></div>
                                         </div>
                                     </div>
                                 @empty
-                                    <div class="rounded-2xl border border-dashed border-gray-200 px-4 py-8 text-center text-sm text-gray-500">
-                                        No upcoming meeting rooms yet.
-                                    </div>
+                                    <div class="rounded-2xl border border-dashed border-gray-200 px-4 py-8 text-center text-sm text-gray-500">No ongoing meeting rooms.</div>
                                 @endforelse
                             </div>
                         </div>
@@ -338,6 +366,51 @@
         </form>
     </div>
 </div>
+
+<div id="attendanceModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/45 px-4">
+    <div class="w-full max-w-3xl rounded-[28px] bg-white p-6 shadow-2xl">
+        <div class="flex items-start justify-between gap-4">
+            <div>
+                <h2 class="text-2xl font-bold text-gray-900">Record Meeting Attendance</h2>
+                <p id="attendanceMeetingTitle" class="mt-1 text-sm font-semibold text-[#d90f1f]"></p>
+                <p class="mt-2 text-xs text-gray-500">Check barangays that attended face-to-face. Barangays that successfully joined the official SK360 video call are automatically counted as present even if left unchecked here.</p>
+            </div>
+            <button id="closeAttendanceModalBtn" type="button" class="rounded-xl p-2 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600">X</button>
+        </div>
+
+        <form id="attendanceForm" method="POST" class="mt-6">
+            @csrf
+
+            <label class="mb-4 flex cursor-pointer items-center gap-3 rounded-2xl border border-red-100 bg-red-50 px-4 py-3 transition hover:bg-red-100">
+                <input id="selectAllAttendance" type="checkbox" class="h-4 w-4 rounded border-gray-300 text-red-600 focus:ring-red-500">
+                <div>
+                    <p class="text-sm font-semibold text-red-700">Select All Present</p>
+                    <p class="text-[11px] text-red-500">Check all barangays as face-to-face attendees.</p>
+                </div>
+            </label>
+
+            <div class="meeting-scrollbar grid max-h-[420px] grid-cols-1 gap-2 overflow-y-auto pr-2 sm:grid-cols-2 lg:grid-cols-3">
+                @forelse($attendanceBarangays as $barangay)
+                    <label class="flex cursor-pointer items-center gap-3 rounded-xl border border-gray-100 bg-gray-50 px-3 py-3 transition hover:border-red-200 hover:bg-red-50">
+                        <input type="checkbox" name="present_barangays[]" value="{{ $barangay->barangay_id }}" class="h-4 w-4 rounded border-gray-300 text-red-600 focus:ring-red-500">
+                        <span class="text-xs font-semibold text-gray-700">{{ $barangay->barangay_name }}</span>
+                    </label>
+                @empty
+                    <div class="col-span-full rounded-xl border border-dashed border-gray-200 px-4 py-8 text-center text-sm text-gray-500">No current barangays available for attendance.</div>
+                @endforelse
+            </div>
+
+            <div class="mt-6 rounded-2xl bg-yellow-50 px-4 py-3 text-xs text-yellow-700">
+                Attendance is finalized once submitted. Present barangays receive +5 and barangays with neither face-to-face nor video-call attendance receive -5.
+            </div>
+
+            <div class="mt-6 flex justify-end gap-3">
+                <button id="cancelAttendanceBtn" type="button" class="rounded-xl bg-gray-100 px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-200">Cancel</button>
+                <button type="submit" class="rounded-xl bg-[#d90f1f] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#b90e1b]">Finalize Attendance</button>
+            </div>
+        </form>
+    </div>
+</div>
 @endsection
 
 @push('scripts')
@@ -353,6 +426,39 @@
     const conferenceTabBtn = document.getElementById('conferenceTabBtn');
     const scheduleTab = document.getElementById('scheduleTab');
     const conferenceTab = document.getElementById('conferenceTab');
+    const attendanceModal = document.getElementById('attendanceModal');
+    const attendanceForm = document.getElementById('attendanceForm');
+    const attendanceMeetingTitle = document.getElementById('attendanceMeetingTitle');
+    const closeAttendanceModalBtn = document.getElementById('closeAttendanceModalBtn');
+    const cancelAttendanceBtn = document.getElementById('cancelAttendanceBtn');
+    const selectAllAttendance = document.getElementById('selectAllAttendance');
+
+    const attendanceCheckboxes=()=>Array.from(
+        attendanceForm.querySelectorAll('input[name="present_barangays[]"]')
+    );
+
+    const syncSelectAllAttendance=()=>{
+        if(!selectAllAttendance) return;
+
+        const checkboxes=attendanceCheckboxes();
+        const checkedCount=checkboxes.filter((checkbox)=>checkbox.checked).length;
+
+        selectAllAttendance.checked=checkboxes.length>0 && checkedCount===checkboxes.length;
+        selectAllAttendance.indeterminate=checkedCount>0 && checkedCount<checkboxes.length;
+    };
+
+    if(selectAllAttendance){
+        selectAllAttendance.addEventListener('change',()=>{
+            attendanceCheckboxes().forEach((checkbox)=>{
+                checkbox.checked=selectAllAttendance.checked;
+            });
+            selectAllAttendance.indeterminate=false;
+        });
+    }
+
+    attendanceCheckboxes().forEach((checkbox)=>{
+        checkbox.addEventListener('change',syncSelectAllAttendance);
+    });
 
     if (notifBtn && notifDropdown) {
         notifBtn.addEventListener('click', (e) => {
@@ -417,6 +523,37 @@
             closeScheduleModal();
         }
     });
+
+    const openAttendanceModal=(button)=>{
+        attendanceForm.action=button.dataset.action;
+        attendanceMeetingTitle.textContent=button.dataset.title;
+        attendanceCheckboxes().forEach((checkbox)=>checkbox.checked=false);
+
+        if(selectAllAttendance){
+            selectAllAttendance.checked=false;
+            selectAllAttendance.indeterminate=false;
+        }
+
+        attendanceModal.classList.remove('hidden');
+        attendanceModal.classList.add('flex');
+    };
+
+    const closeAttendanceModal=()=>{
+        attendanceModal.classList.add('hidden');
+        attendanceModal.classList.remove('flex');
+    };
+
+    document.querySelectorAll('.recordAttendanceBtn').forEach((button)=>{
+        button.addEventListener('click',()=>openAttendanceModal(button));
+    });
+
+    if(closeAttendanceModalBtn) closeAttendanceModalBtn.addEventListener('click',closeAttendanceModal);
+    if(cancelAttendanceBtn) cancelAttendanceBtn.addEventListener('click',closeAttendanceModal);
+    if(attendanceModal){
+        attendanceModal.addEventListener('click',(e)=>{
+            if(e.target===attendanceModal) closeAttendanceModal();
+        });
+    }
 
     @if ($errors->any())
         openScheduleModal();

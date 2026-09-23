@@ -130,13 +130,13 @@
                 </div>
             @endif
 
-            {{-- COMPLETE LEADERBOARD --}}
+            {{-- LIVE TOP 10 LEADERBOARD --}}
             <div class="bg-white rounded-2xl border border-gray-100 p-6 mb-10 shadow-sm">
                 <div class="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-6">
                     <div>
-                        <h3 class="text-[10px] font-black text-gray-400 uppercase tracking-widest">Complete Leaderboard</h3>
+                        <h3 class="text-[10px] font-black text-gray-400 uppercase tracking-widest">Live Leaderboard - Top 10</h3>
                         <p class="text-xs text-gray-400 mt-1">
-                            Ranking metrics are based on recorded activity for {{ $latestPeriod ?? 'the selected ranking period' }}.
+                            Showing the top 10 barangays based on recorded points for {{ $latestPeriod ?? 'the selected ranking period' }}.
                         </p>
                     </div>
 
@@ -176,20 +176,49 @@
                                 </div>
                             </div>
 
-                            <div class="flex-1 grid grid-cols-1 md:grid-cols-3 gap-6 w-full">
+                            <div class="flex-1 grid grid-cols-1 md:grid-cols-3 gap-3 w-full">
                                 @foreach ([
-                                    ['label' => 'On-time Rate', 'val' => $row->on_time],
-                                    ['label' => 'Documentation', 'val' => $row->completion],
-                                    ['label' => 'Participation Score', 'val' => $row->engagement],
+                                    [
+                                        'label'=>'Submission Score',
+                                        'val'=>$row->submission_score,
+                                        'description'=>'Late submission penalties',
+                                    ],
+                                    [
+                                        'label'=>'Document Score',
+                                        'val'=>$row->document_score,
+                                        'description'=>'Approved required documents',
+                                    ],
+                                    [
+                                        'label'=>'Meeting Score',
+                                        'val'=>$row->meeting_score,
+                                        'description'=>'Official meeting attendance',
+                                    ],
                                 ] as $metric)
-                                    <div>
-                                        <div class="flex justify-between text-[8px] font-black uppercase text-gray-400 mb-1">
-                                            <span>{{ $metric['label'] }}</span>
-                                            <span>{{ $metric['val'] }}%</span>
-                                        </div>
+                                    @php
+                                        $metricValue=(int)$metric['val'];
+                                        $metricClass=$metricValue<0
+                                            ? 'bg-red-50 text-red-600 border-red-100'
+                                            : ($metricValue>0
+                                                ? 'bg-green-50 text-green-600 border-green-100'
+                                                : 'bg-gray-50 text-gray-500 border-gray-100');
+                                        $metricPrefix=$metricValue>0 ? '+' : '';
+                                    @endphp
 
-                                        <div class="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
-                                            <div class="bg-red-500 h-full" style="width: {{ max(0, min(100, $metric['val'])) }}%"></div>
+                                    <div class="rounded-xl border {{ $metricClass }} px-3 py-3">
+                                        <div class="flex items-start justify-between gap-3">
+                                            <div>
+                                                <p class="text-[8px] font-black uppercase tracking-wider">
+                                                    {{ $metric['label'] }}
+                                                </p>
+
+                                                <p class="text-[8px] opacity-70 mt-1">
+                                                    {{ $metric['description'] }}
+                                                </p>
+                                            </div>
+
+                                            <span class="text-sm font-black whitespace-nowrap">
+                                                {{ $metricPrefix }}{{ $metricValue }} pts
+                                            </span>
                                         </div>
                                     </div>
                                 @endforeach
@@ -245,7 +274,7 @@
                         </div>
 
                         <p class="text-[10px] text-gray-400 mt-4">
-                            Participation Score is relative to the highest recorded participation points for {{ $latestPeriod ?? 'the selected ranking period' }}.
+                            Category scores show the actual recorded points for {{ $latestPeriod ?? 'the selected ranking period' }}. Submission Score contains late-submission penalties, Document Score contains approved document points, and Meeting Score contains attendance or absence points.
                         </p>
                     </div>
                 @endif
@@ -312,9 +341,9 @@
                             </div>
 
                             <div>
-                                <h4 class="text-xs font-black text-gray-800 uppercase leading-none">Recorded Metrics</h4>
+                                <h4 class="text-xs font-black text-gray-800 uppercase leading-none">Recorded Category Scores</h4>
                                 <p class="text-[10px] text-gray-400 mt-1">
-                                    On-time, documentation, and participation values come from recorded ranking activity for the selected period.
+                                    Submission, document, and meeting scores show the actual points recorded for the selected period instead of percentage estimates.
                                 </p>
                             </div>
                         </div>

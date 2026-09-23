@@ -4,7 +4,6 @@ namespace App\Http\Controllers\sk_chairman;
 
 use App\Http\Controllers\Controller;
 use App\Services\NotificationService;
-use App\Services\RankingPointsService;
 use App\Services\SubmissionSlotService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
@@ -280,18 +279,10 @@ class BudgetController extends Controller
             'created_at'=>now(),
         ];
 
-        $data=$this->applySlotMetadata(
-            $data,
-            $slot
-        );
+        $data=$this->applySlotMetadata($data,$slot);
 
         try{
-            $budgetReportId=DB::transaction(function() use(
-                $data,
-                $slot,
-                $termId,
-                $existing
-            ){
+            $budgetReportId=DB::transaction(function() use($data,$slot,$termId,$existing){
                 $budgetReportId=$this->saveBudgetSubmission(
                     $data,
                     (int)$slot->slot_id,
@@ -299,17 +290,13 @@ class BudgetController extends Controller
                 );
 
                 if($existing){
-                    $this->resetQualityReviewForResubmission(
-                        $budgetReportId
-                    );
+                    $this->resetQualityReviewForResubmission($budgetReportId);
                 }
 
                 return $budgetReportId;
             });
         }catch(\Throwable $e){
-            $this->deleteBudgetFile(
-                $uploadPath
-            );
+            $this->deleteBudgetFile($uploadPath);
 
             return back()->with(
                 'report_error',
@@ -318,23 +305,11 @@ class BudgetController extends Controller
         }
 
         if(
-            $existing
-            &&
-            !empty($existing->uploaded_file_path)
-            &&
+            $existing &&
+            !empty($existing->uploaded_file_path) &&
             $existing->uploaded_file_path!==$uploadPath
         ){
-            $this->deleteBudgetFile(
-                $existing->uploaded_file_path
-            );
-        }
-
-        if(!$isResubmission){
-            $this->scoreSubmission(
-                $slot,
-                $budgetReportId,
-                'budget_report'
-            );
+            $this->deleteBudgetFile($existing->uploaded_file_path);
         }
 
         $this->notifyPresidentOfBudgetSubmission(
@@ -398,10 +373,7 @@ class BudgetController extends Controller
                 );
         }
 
-        $existing=$this->existingBudgetSubmission(
-            $slotId,
-            $termId
-        );
+        $existing=$this->existingBudgetSubmission($slotId,$termId);
 
         if($existing && $this->isQualityApproved((int)$existing->budget_report_id)){
             return redirect()
@@ -429,13 +401,8 @@ class BudgetController extends Controller
             : null;
 
         if(
-            $isAnnualCoa
-            &&
-            (
-                !is_numeric($actualExpenditure)
-                ||
-                (float)$actualExpenditure<=0
-            )
+            $isAnnualCoa &&
+            (!is_numeric($actualExpenditure) || (float)$actualExpenditure<=0)
         ){
             return redirect()
                 ->route('sk_chairman.budget')
@@ -624,18 +591,10 @@ class BudgetController extends Controller
             'created_at'=>now(),
         ];
 
-        $data=$this->applySlotMetadata(
-            $data,
-            $slot
-        );
+        $data=$this->applySlotMetadata($data,$slot);
 
         try{
-            $budgetReportId=DB::transaction(function() use(
-                $data,
-                $slot,
-                $termId,
-                $existing
-            ){
+            $budgetReportId=DB::transaction(function() use($data,$slot,$termId,$existing){
                 $budgetReportId=$this->saveBudgetSubmission(
                     $data,
                     (int)$slot->slot_id,
@@ -643,9 +602,7 @@ class BudgetController extends Controller
                 );
 
                 if($existing){
-                    $this->resetQualityReviewForResubmission(
-                        $budgetReportId
-                    );
+                    $this->resetQualityReviewForResubmission($budgetReportId);
                 }
 
                 return $budgetReportId;
@@ -660,17 +617,7 @@ class BudgetController extends Controller
         }
 
         if($existing && !empty($existing->uploaded_file_path)){
-            $this->deleteBudgetFile(
-                $existing->uploaded_file_path
-            );
-        }
-
-        if(!$isResubmission){
-            $this->scoreSubmission(
-                $slot,
-                $budgetReportId,
-                'budget_report'
-            );
+            $this->deleteBudgetFile($existing->uploaded_file_path);
         }
 
         $this->notifyPresidentOfBudgetSubmission(
@@ -728,11 +675,7 @@ class BudgetController extends Controller
                 );
         }
 
-        $data=json_decode(
-            $submission->template_data,
-            true
-        ) ?: [];
-
+        $data=json_decode($submission->template_data,true) ?: [];
         $paper=($data['report_type'] ?? 'quarterly')==='monthly'
             ? 'portrait'
             : 'landscape';
@@ -742,9 +685,7 @@ class BudgetController extends Controller
             'barangayName'=>auth()->user()->barangay->barangay_name ?? 'Barangay',
         ])->setPaper('a4',$paper);
 
-        return $pdf->download(
-            'budget-template-'.$budgetReportId.'.pdf'
-        );
+        return $pdf->download('budget-template-'.$budgetReportId.'.pdf');
     }
 
     public function viewTemplate(int $budgetReportId): Response|RedirectResponse
@@ -777,11 +718,7 @@ class BudgetController extends Controller
                 );
         }
 
-        $data=json_decode(
-            $submission->template_data,
-            true
-        ) ?: [];
-
+        $data=json_decode($submission->template_data,true) ?: [];
         $paper=($data['report_type'] ?? 'quarterly')==='monthly'
             ? 'portrait'
             : 'landscape';
@@ -791,9 +728,7 @@ class BudgetController extends Controller
             'barangayName'=>auth()->user()->barangay->barangay_name ?? 'Barangay',
         ])->setPaper('a4',$paper);
 
-        return $pdf->stream(
-            'budget-template-'.$budgetReportId.'.pdf'
-        );
+        return $pdf->stream('budget-template-'.$budgetReportId.'.pdf');
     }
 
     protected function templateAvailableForSlot(object $slot): bool
@@ -801,11 +736,7 @@ class BudgetController extends Controller
         return ($slot->budget_category ?? null)==='coa_report'
             && in_array(
                 $slot->budget_period_type ?? null,
-                [
-                    'monthly',
-                    'quarterly',
-                    'annual',
-                ],
+                ['monthly','quarterly','annual'],
                 true
             );
     }
@@ -859,28 +790,6 @@ class BudgetController extends Controller
         ];
     }
 
-    protected function scoreSubmission(object $slot,int $sourceId,string $sourceType): void
-    {
-        $user=auth()->user();
-        $points=app(RankingPointsService::class);
-
-        $isOnTime=now()->lessThanOrEqualTo(
-            Carbon::parse($slot->end_date)->endOfDay()
-        );
-
-        $submissionAction=$isOnTime
-            ? RankingPointsService::ON_TIME_REPORT_SUBMISSION
-            : RankingPointsService::LATE_SUBMISSION;
-
-        $points->award(
-            (int)$user->barangay_id,
-            $submissionAction,
-            $sourceType,
-            $sourceId,
-            (int)$user->user_id
-        );
-    }
-
     protected function saveBudgetSubmission(
         array $data,
         int $slotId,
@@ -904,10 +813,7 @@ class BudgetController extends Controller
         }
 
         return (int)DB::table('budget_reports')
-            ->insertGetId(
-                $data,
-                'budget_report_id'
-            );
+            ->insertGetId($data,'budget_report_id');
     }
 
     protected function existingBudgetSubmission(
@@ -1007,11 +913,7 @@ class BudgetController extends Controller
             return;
         }
 
-        $path=str_replace(
-            '\\',
-            '/',
-            ltrim($path,'/')
-        );
+        $path=str_replace('\\','/',ltrim($path,'/'));
 
         if(!str_starts_with($path,'uploads/budget_reports/')){
             return;
@@ -1075,8 +977,6 @@ class BudgetController extends Controller
             ->orderByDesc('term_id')
             ->value('term_id');
 
-        return $termId
-            ? (int)$termId
-            : null;
+        return $termId ? (int)$termId : null;
     }
 }

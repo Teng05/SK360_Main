@@ -609,6 +609,7 @@ class MobileSyncController extends Controller
             'dyte_meeting_id' => null,
             'created_by' => $request->user()->user_id,
             'status' => 'scheduled',
+            'ended_at' => null,
             'created_at' => now(),
             'updated_at' => now(),
         ], 'meeting_id');
@@ -639,33 +640,86 @@ class MobileSyncController extends Controller
             ], 404);
         }
 
+        $meeting = $this->decorateMobileMeeting($meeting);
+
+        if ($meeting->status === 'cancelled') {
+            return response()->json([
+                'message' => 'This meeting has been cancelled.',
+            ], 422);
+        }
+
+        if ($meeting->status === 'completed') {
+            return response()->json([
+                'message' => 'This meeting has already ended.',
+            ], 422);
+        }
+
+        if ($meeting->scheduled_at->isFuture()) {
+            return response()->json([
+                'message' => 'The meeting has not started yet.',
+            ], 422);
+        }
+
         return response()->json([
             'join_url' => URL::temporarySignedRoute(
                 'mobile.meetings.call',
                 now()->addHours(4),
-                ['meeting' => $meeting->meeting_id]
+                [
+                    'meeting' => $meeting->meeting_id,
+                    'user_id' => $request->user()->user_id,
+                ]
             ),
         ]);
     }
-    public function mobileMeetingCall(Meeting $meeting): View
+    public function mobileMeetingCall(Request $request, Meeting $meeting): View
     {
         abort_unless($this->isCurrentMobileMeeting($meeting), 404);
 
+        $user = $this->mobileSignedMeetingUser($request, $meeting);
+        abort_unless($user, 403);
+
+        $meeting = $this->decorateMobileMeeting($meeting);
+        abort_if($meeting->status === 'cancelled', 410);
+        abort_if($meeting->status === 'completed', 410);
+        abort_if($meeting->scheduled_at->isFuture(), 403);
+
+        $fullName = trim(($user->first_name ?? '').' '.($user->last_name ?? '')) ?: $user->email;
+
         return view('sk_pres.video-call', [
-            'fullName' => 'Mobile Participant',
+            'fullName' => $fullName,
             'menuItems' => [],
             'currentUrl' => url('/'),
-            'meeting' => $this->decorateMobileMeeting($meeting),
+            'meeting' => $meeting,
             'channelName' => 'meeting-'.$meeting->meeting_id,
+            'participantNames' => $this->mobileParticipantNames(),
             'backRoute' => url('/'),
             'tokenRoute' => URL::temporarySignedRoute(
                 'mobile.meetings.agora.token',
                 now()->addHours(4),
-                ['meeting' => $meeting->meeting_id]
+                [
+                    'meeting' => $meeting->meeting_id,
+                    'user_id' => $user->user_id,
+                ]
+            ),
+            'joinAttendanceRoute' => URL::temporarySignedRoute(
+                'mobile.meetings.call-attendance.join',
+                now()->addHours(4),
+                [
+                    'meeting' => $meeting->meeting_id,
+                    'user_id' => $user->user_id,
+                ]
+            ),
+            'leaveAttendanceRoute' => URL::temporarySignedRoute(
+                'mobile.meetings.call-attendance.leave',
+                now()->addHours(4),
+                [
+                    'meeting' => $meeting->meeting_id,
+                    'user_id' => $user->user_id,
+                ]
             ),
         ]);
     }
-    public function mobileMeetingToken(Meeting $meeting): JsonResponse
+    public function mobileMeetingToken(Request $request, Meeting $meeting): JsonResponse
     {
         if (! $this->isCurrentMobileMeeting($meeting)) {
             return response()->json([
@@ -673,7 +727,139 @@ class MobileSyncController extends Controller
             ], 404);
         }
 
-        return $this->buildAgoraTokenResponse($meeting);
+        $user = $this->mobileSignedMeetingUser($request, $meeting);
+
+        if (! $user) {
+            return response()->json([
+                'message' => 'This meeting link is not valid for a current SK official.',
+            ], 403);
+        }
+
+        $meeting = $this->decorateMobileMeeting($meeting);
+
+        if ($meeting->status === 'cancelled') {
+            return response()->json([
+                'message' => 'This meeting has been cancelled.',
+            ], 422);
+        }
+
+        if ($meeting->status === 'completed') {
+            return response()->json([
+                'message' => 'This meeting has already ended.',
+            ], 422);
+        }
+
+        if ($meeting->scheduled_at->isFuture()) {
+            return response()->json([
+                'message' => 'The meeting has not started yet.',
+            ], 422);
+        }
+
+        return $this->buildAgoraTokenResponse(
+            $meeting,
+            (int) $user->user_id
+        );
+    }
+    public function mobileMeetingAttendanceJoin(Request $request, Meeting $meeting): JsonResponse
+    {
+        if (! $this->isCurrentMobileMeeting($meeting)) {
+            return response()->json([
+                'message' => 'Meeting not found in the current administration.',
+            ], 404);
+        }
+
+        $user = $this->mobileSignedMeetingUser($request, $meeting);
+
+        if (! $user) {
+            return response()->json([
+                'message' => 'This meeting link is not valid for a current SK official.',
+            ], 403);
+        }
+
+        $meeting = $this->decorateMobileMeeting($meeting);
+
+        if ($meeting->status === 'cancelled') {
+            return response()->json([
+                'message' => 'This meeting has been cancelled.',
+            ], 422);
+        }
+
+        if ($meeting->status === 'completed') {
+            return response()->json([
+                'message' => 'This meeting has already ended.',
+            ], 422);
+        }
+
+        if ($meeting->scheduled_at->isFuture()) {
+            return response()->json([
+                'message' => 'The meeting has not started yet.',
+            ], 422);
+        }
+
+        if (! $user->barangay_id) {
+            return response()->json([
+                'recorded' => false,
+                'message' => 'Video call joined successfully.',
+            ]);
+        }
+
+        $existing = DB::table('meeting_call_attendance')
+            ->where('meeting_id', $meeting->meeting_id)
+            ->where('user_id', $user->user_id)
+            ->first();
+
+        if ($existing) {
+            DB::table('meeting_call_attendance')
+                ->where('attendance_id', $existing->attendance_id)
+                ->update([
+                    'left_at' => null,
+                    'updated_at' => now(),
+                ]);
+        } else {
+            DB::table('meeting_call_attendance')->insert([
+                'meeting_id' => $meeting->meeting_id,
+                'term_id' => $meeting->term_id,
+                'user_id' => $user->user_id,
+                'barangay_id' => $user->barangay_id,
+                'joined_at' => now(),
+                'left_at' => null,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+
+        return response()->json([
+            'recorded' => true,
+            'message' => 'Video call attendance recorded.',
+        ]);
+    }
+    public function mobileMeetingAttendanceLeave(Request $request, Meeting $meeting): JsonResponse
+    {
+        if (! $this->isCurrentMobileMeeting($meeting)) {
+            return response()->json([
+                'message' => 'Meeting not found in the current administration.',
+            ], 404);
+        }
+
+        $user = $this->mobileSignedMeetingUser($request, $meeting);
+
+        if (! $user) {
+            return response()->json([
+                'message' => 'This meeting link is not valid for a current SK official.',
+            ], 403);
+        }
+
+        DB::table('meeting_call_attendance')
+            ->where('meeting_id', $meeting->meeting_id)
+            ->where('user_id', $user->user_id)
+            ->update([
+                'left_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+        return response()->json([
+            'message' => 'Video call exit recorded.',
+        ]);
     }
     public function meetingAgoraToken(Request $request, Meeting $meeting): JsonResponse
     {
@@ -687,6 +873,26 @@ class MobileSyncController extends Controller
             return response()->json([
                 'message' => 'Meeting not found in the current administration.',
             ], 404);
+        }
+
+        $meeting = $this->decorateMobileMeeting($meeting);
+
+        if ($meeting->status === 'cancelled') {
+            return response()->json([
+                'message' => 'This meeting has been cancelled.',
+            ], 422);
+        }
+
+        if ($meeting->status === 'completed') {
+            return response()->json([
+                'message' => 'This meeting has already ended.',
+            ], 422);
+        }
+
+        if ($meeting->scheduled_at->isFuture()) {
+            return response()->json([
+                'message' => 'The meeting has not started yet.',
+            ], 422);
         }
 
         return $this->buildAgoraTokenResponse(
@@ -856,7 +1062,7 @@ class MobileSyncController extends Controller
                 ->first(),
         ], 201);
     }
-    public function storeOfficialSubmission(Request $request, RankingPointsService $points): JsonResponse
+    public function storeOfficialSubmission(Request $request): JsonResponse
     {
         $user = $request->user();
 
@@ -900,8 +1106,8 @@ class MobileSyncController extends Controller
 
         $now = now();
 
-        if (Carbon::parse($slot->start_date)->startOfDay()->gt($now) || Carbon::parse($slot->end_date)->endOfDay()->lt($now)) {
-            return response()->json(['message' => 'That submission slot is not active today.'], 422);
+        if (Carbon::parse($slot->start_date)->startOfDay()->gt($now)) {
+            return response()->json(['message' => 'That submission slot has not started yet.'], 422);
         }
 
         $existing = $this->existingMobileSubmission($user, (int) $slot->slot_id, $sourceType, $termId);
@@ -955,18 +1161,6 @@ class MobileSyncController extends Controller
 
         if ($isResubmission && $oldPath && $oldPath !== $newPath) {
             $this->deleteMobileSubmissionFile($oldPath, $sourceType);
-        }
-
-        if (! $isResubmission) {
-            $isOnTime = $now->lessThanOrEqualTo(Carbon::parse($slot->end_date)->endOfDay());
-
-            $points->award(
-                (int) $user->barangay_id,
-                $isOnTime ? RankingPointsService::ON_TIME_REPORT_SUBMISSION : RankingPointsService::LATE_SUBMISSION,
-                $sourceType,
-                $sourceId,
-                (int) $user->user_id
-            );
         }
 
         $row = $sourceType === 'budget_report'
@@ -1797,6 +1991,61 @@ class MobileSyncController extends Controller
         return $termId
             && (int) ($meeting->term_id ?? 0) === $termId;
     }
+    protected function mobileSignedMeetingUser(Request $request, Meeting $meeting): ?User
+    {
+        $userId = (int) $request->query('user_id', 0);
+
+        if ($userId <= 0) {
+            return null;
+        }
+
+        $user = User::query()
+            ->where('user_id', $userId)
+            ->whereIn('role', self::OFFICIAL_ROLES)
+            ->where('status', 'active')
+            ->where('is_verified', 1)
+            ->whereNull('archived_at')
+            ->first();
+
+        if (! $user || ! $this->hasCurrentOfficialAssignment($user, (int) $meeting->term_id)) {
+            return null;
+        }
+
+        return $user;
+    }
+    protected function mobileParticipantNames(): array
+    {
+        $termId = $this->mobileCurrentTermId();
+
+        if (! $termId) {
+            return [];
+        }
+
+        return DB::table('users as u')
+            ->join('official_terms as ot', 'ot.user_id', '=', 'u.user_id')
+            ->where('ot.term_id', $termId)
+            ->where('ot.status', 'current')
+            ->whereColumn('ot.role', 'u.role')
+            ->whereIn('u.role', self::OFFICIAL_ROLES)
+            ->where('u.status', 'active')
+            ->where('u.is_verified', 1)
+            ->whereNull('u.archived_at')
+            ->get([
+                'u.user_id',
+                'u.first_name',
+                'u.last_name',
+                'u.email',
+            ])
+            ->mapWithKeys(function ($user) {
+                $name = trim(($user->first_name ?? '').' '.($user->last_name ?? ''))
+                    ?: ($user->email ?: 'User');
+
+                return [
+                    (string) $user->user_id => $name,
+                ];
+            })
+            ->all();
+    }
 
     protected function currentSubmissionSlots(?Carbon $since): array
     {
@@ -2155,11 +2404,6 @@ class MobileSyncController extends Controller
         $meeting->scheduled_at =
             $scheduledAt;
 
-        $meeting->ends_at =
-            $scheduledAt
-                ->copy()
-                ->addHour();
-
         $meeting->display_datetime =
             $scheduledAt
                 ->format('Y-m-d h:i A');
@@ -2176,7 +2420,7 @@ class MobileSyncController extends Controller
             default =>
                 $meeting->scheduled_at->isFuture()
                     ? 'Upcoming'
-                    : 'Ready',
+                    : 'Ongoing',
         };
 
         return $meeting;
