@@ -473,6 +473,7 @@ class MobileSyncController extends Controller
         if (Schema::hasColumn('announcements', 'status')) {
             $changes['status'] = $validated['status'];
         }
+
         DB::table('announcements')->where('announcement_id', $announcementId)->update($changes);
 
         return response()->json([
@@ -529,7 +530,7 @@ class MobileSyncController extends Controller
             'event_type' => ['nullable', 'string', 'max:50'],
             'start_datetime' => ['required', 'date'],
             'end_datetime' => ['nullable', 'date', 'after_or_equal:start_datetime'],
-            'visibility' => ['nullable', 'in:public,officials_only'],
+            'visibility' => ['nullable', 'in:public,officials_only,chairman_only,secretary_only'],
         ]);
 
         $start = Carbon::parse($validated['start_datetime']);
@@ -580,11 +581,10 @@ class MobileSyncController extends Controller
             'event_type' => ['nullable', 'string', 'max:50'],
             'start_datetime' => ['required', 'date'],
             'end_datetime' => ['required', 'date', 'after:start_datetime'],
-            'visibility' => ['nullable', 'in:public,officials_only'],
+            'visibility' => ['nullable', 'in:public,officials_only,chairman_only,secretary_only'],
         ]);
 
-        $event = DB::table('events')->where('event_id', $eventId)->first();
-        if (! $event) {
+        if (! DB::table('events')->where('event_id', $eventId)->exists()) {
             return response()->json(['message' => 'Event not found.'], 404);
         }
 
@@ -662,9 +662,14 @@ class MobileSyncController extends Controller
             'meeting_date' => ['required', 'date'],
             'meeting_time' => ['required', 'date_format:H:i'],
         ]);
+
         $meeting = DB::table('meetings')->where('meeting_id', $meetingId)->first();
         if (! $meeting) {
             return response()->json(['message' => 'Meeting not found.'], 404);
+        }
+
+        if ($meeting->status !== 'scheduled') {
+            return response()->json(['message' => 'Only scheduled meetings can be edited.'], 422);
         }
 
         DB::table('meetings')->where('meeting_id', $meetingId)->update([
@@ -1431,6 +1436,12 @@ class MobileSyncController extends Controller
                 if ($this->isOfficial($user)) {
                     $query->orWhere('visibility', 'officials_only');
                 }
+                if ($user->role === 'sk_chairman') {
+                    $query->orWhere('visibility', 'chairman_only');
+                }
+                if ($user->role === 'sk_secretary') {
+                    $query->orWhere('visibility', 'secretary_only');
+                }
             });
 
         return $this->finish(
@@ -1656,6 +1667,9 @@ class MobileSyncController extends Controller
     protected function leadershipProfiles(User $user, ?Carbon $since): array
     {
         $leaders = collect();
+        $userProfilePicture = Schema::hasColumn('users', 'profile_pic')
+            ? 'profile_pic'
+            : DB::raw('NULL as profile_pic');
 
         $userLeaders = DB::table('users')
             ->whereIn('role', ['sk_chairman', 'sk_secretary'])
@@ -1663,7 +1677,7 @@ class MobileSyncController extends Controller
             ->select(
                 DB::raw('user_id as leadership_id'),
                 'user_id',
-                'profile_pic',
+                $userProfilePicture,
                 'barangay_id',
                 DB::raw("CONCAT(first_name, ' ', last_name) as full_name"),
                 DB::raw("
@@ -1706,6 +1720,9 @@ class MobileSyncController extends Controller
         }
 
         if (Schema::hasTable('leadership_profiles')) {
+            $joinedProfilePicture = Schema::hasColumn('users', 'profile_pic')
+                ? 'u.profile_pic'
+                : DB::raw('NULL as profile_pic');
             $profileRows = DB::table('leadership_profiles')
                 ->leftJoin('users as u', 'leadership_profiles.user_id', '=', 'u.user_id')
                 ->where('leadership_profiles.status', 'current')
@@ -1715,7 +1732,7 @@ class MobileSyncController extends Controller
                     'leadership_profiles.barangay_id',
                     'leadership_profiles.full_name',
                     'leadership_profiles.position',
-                    'u.profile_pic',
+                    $joinedProfilePicture,
                     DB::raw("
                         CASE
                             WHEN leadership_profiles.term_start IS NOT NULL AND leadership_profiles.term_end IS NOT NULL
