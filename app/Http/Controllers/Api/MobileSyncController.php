@@ -2,26 +2,26 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Http\Controllers\Concerns\BuildsRankingsData;
 use App\Http\Controllers\Controller;
 use App\Models\Meeting;
 use App\Models\MobileApiToken;
 use App\Models\User;
 use App\Services\NotificationService;
 use App\Services\RankingPointsService;
-use App\Http\Controllers\Concerns\BuildsRankingsData;
 use Carbon\Carbon;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Schema;
-use Illuminate\Support\Str;
 use Illuminate\Support\Facades\URL;
+use Illuminate\Support\Str;
 use Illuminate\View\View;
 use TaylanUnutmaz\AgoraTokenBuilder\RtcTokenBuilder;
 
@@ -29,12 +29,13 @@ class MobileSyncController extends Controller
 {
     use BuildsRankingsData;
 
-    private const OFFICIAL_ROLES=[
+    private const OFFICIAL_ROLES = [
         'sk_president',
         'sk_chairman',
         'sk_secretary',
     ];
 
+    // Authentication and password recovery.
     public function barangays(): JsonResponse
     {
         return response()->json([
@@ -84,19 +85,24 @@ class MobileSyncController extends Controller
         ]);
     }
 
+    public function logout(Request $request): JsonResponse
+    {
+        $request->attributes->get('mobile_api_token')?->delete();
+
+        return response()->json([
+            'message' => 'Logged out.',
+        ]);
+    }
+
     public function requestPasswordReset(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'method' => ['required', 'in:email,phone'],
-            'email' => ['nullable', 'required_if:method,email', 'email'],
-            'phone' => ['nullable', 'required_if:method,phone', 'string', 'max:30'],
+            'method' => ['required', 'in:email'],
+            'email' => ['required', 'email'],
         ]);
 
         if ($validated['method'] === 'email') {
-            $user = User::where('email', $validated['email'])
-                ->whereIn('role', self::OFFICIAL_ROLES)
-                ->whereNull('archived_at')
-                ->first();
+            $user = $this->findOfficialByEmail($validated['email']);
 
             if (! $user) {
                 return response()->json(['message' => 'No account found with this email.'], 404);
@@ -160,7 +166,7 @@ class MobileSyncController extends Controller
     public function verifyPasswordReset(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'method' => ['required', 'in:email,phone'],
+            'method' => ['required', 'in:email'],
             'target' => ['required', 'string', 'max:255'],
             'code' => ['required', 'digits:6'],
             'password' => ['required', 'confirmed', 'min:8', 'regex:/[A-Z]/', 'regex:/[a-z]/', 'regex:/[0-9]/'],
@@ -169,10 +175,7 @@ class MobileSyncController extends Controller
         ]);
 
         if ($validated['method'] === 'email') {
-            $user = User::where('email', $validated['target'])
-                ->whereIn('role', self::OFFICIAL_ROLES)
-                ->whereNull('archived_at')
-                ->first();
+            $user = $this->findOfficialByEmail($validated['target']);
 
             $reset = DB::table('password_reset_tokens')
                 ->where('email', $validated['target'])
@@ -225,15 +228,7 @@ class MobileSyncController extends Controller
         ]);
     }
 
-    public function logout(Request $request): JsonResponse
-    {
-        $request->attributes->get('mobile_api_token')?->delete();
-
-        return response()->json([
-            'message' => 'Logged out.',
-        ]);
-    }
-
+    // Profile, contact verification, and password changes.
     public function me(Request $request): JsonResponse
     {
         return response()->json([
@@ -243,7 +238,7 @@ class MobileSyncController extends Controller
 
     public function updateProfile(Request $request): JsonResponse
     {
-        $validated = $request->validate([
+        $request->validate([
             'first_name' => ['nullable', 'string', 'max:50'],
             'last_name' => ['nullable', 'string', 'max:50'],
             'profile_pic' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
@@ -363,11 +358,6 @@ class MobileSyncController extends Controller
         ]);
     }
 
-    protected function contactChangeCacheKey(int $userId): string
-    {
-        return 'mobile_contact_change:'.$userId;
-    }
-
     public function updatePassword(Request $request): JsonResponse
     {
         $validated = $request->validate([
@@ -443,6 +433,7 @@ class MobileSyncController extends Controller
         return response()->json(['message' => 'Password updated successfully.']);
     }
 
+    // Download the records used by the mobile app.
     // Sends the records currently shared between web and mobile.
     public function sync(Request $request): JsonResponse
     {
@@ -477,6 +468,7 @@ class MobileSyncController extends Controller
         ]);
     }
 
+    // Community posts and feedback.
     public function storeWallPost(Request $request): JsonResponse
     {
         $validated = $request->validate([
@@ -617,6 +609,33 @@ class MobileSyncController extends Controller
         ]);
     }
 
+    // Allows officials to hide or restore public feedback.
+    public function updateFeedback(Request $request, int $feedbackId): JsonResponse
+    {
+        if (! $this->isOfficial($request->user())) {
+            return response()->json(['message' => 'Only SK officials can manage feedback.'], 403);
+        }
+
+        $validated = $request->validate([
+            'status' => ['required', 'in:posted,hidden'],
+        ]);
+
+        if (! Schema::hasTable('announcement_feedback')) {
+            return response()->json(['message' => 'Feedback is not available.'], 404);
+        }
+
+        $updated = DB::table('announcement_feedback')
+            ->where('feedback_id', $feedbackId)
+            ->update(['status' => $validated['status']]);
+
+        if ($updated === 0) {
+            return response()->json(['message' => 'Feedback not found.'], 404);
+        }
+
+        return response()->json(['message' => 'Feedback status updated.']);
+    }
+
+    // Calendar events.
     public function storeEvent(Request $request): JsonResponse
     {
         if (! $this->isPresident($request->user())) {
@@ -712,6 +731,7 @@ class MobileSyncController extends Controller
         return response()->json(['message' => 'Event updated.', 'event_id' => $eventId]);
     }
 
+    // Meeting schedules and video calls.
     public function storeMeeting(Request $request): JsonResponse
     {
         if (! $this->isPresident($request->user())) {
@@ -821,6 +841,22 @@ class MobileSyncController extends Controller
         ]);
     }
 
+    public function meetingAgoraToken(Request $request, Meeting $meeting): JsonResponse
+    {
+        if (! $this->isOfficial($request->user())) {
+            return response()->json(['message' => 'Only SK officials can join meetings.'], 403);
+        }
+
+        if ($this->meetingUnavailable($meeting)) {
+            return response()->json(['message' => 'This meeting is no longer available.'], 422);
+        }
+
+        return $this->buildAgoraTokenResponse(
+            $meeting,
+            (int) $request->user()->user_id
+        );
+    }
+
     public function mobileMeetingCall(Meeting $meeting): View
     {
         return view('sk_pres.video-call', [
@@ -843,68 +879,7 @@ class MobileSyncController extends Controller
         return $this->buildAgoraTokenResponse($meeting);
     }
 
-    public function meetingAgoraToken(Request $request, Meeting $meeting): JsonResponse
-    {
-        if (! $this->isOfficial($request->user())) {
-            return response()->json(['message' => 'Only SK officials can join meetings.'], 403);
-        }
-
-        if ($this->meetingUnavailable($meeting)) {
-            return response()->json(['message' => 'This meeting is no longer available.'], 422);
-        }
-
-        return $this->buildAgoraTokenResponse(
-            $meeting,
-            (int) $request->user()->user_id
-        );
-    }
-
-    protected function buildAgoraTokenResponse(Meeting $meeting, ?int $uid = null): JsonResponse
-    {
-        $appId = config('services.agora.app_id');
-        $appCertificate = config('services.agora.app_certificate');
-
-        if (! filled($appId) || ! filled($appCertificate)) {
-            return response()->json([
-                'message' => 'Agora is not configured. Set AGORA_APP_ID and AGORA_APP_CERTIFICATE in .env.',
-            ], 500);
-        }
-
-        $uid = $uid && $uid > 0 ? $uid : random_int(1000, 999999);
-        $channel = 'meeting-'.$meeting->meeting_id;
-
-        try {
-            $token = RtcTokenBuilder::buildTokenWithUid(
-                $appId,
-                $appCertificate,
-                $channel,
-                $uid,
-                RtcTokenBuilder::RolePublisher,
-                now()->addHours(4)->timestamp
-            );
-        } catch (\Throwable $e) {
-            report($e);
-
-            return response()->json([
-                'message' => 'Failed to generate Agora RTC token.',
-            ], 500);
-        }
-
-        return response()->json([
-            'appId' => $appId,
-            'token' => $token,
-            'channel' => $channel,
-            'uid' => $uid,
-            'title' => $meeting->title,
-        ]);
-    }
-
-    protected function meetingUnavailable(Meeting $meeting): bool
-    {
-        return $meeting->status === 'completed'
-            || ($meeting->scheduled_at && $meeting->scheduled_at->isPast());
-    }
-
+    // Chat contacts and barangay officials.
     public function chatUsers(Request $request): JsonResponse
     {
         $keyword = trim((string) $request->query('search', ''));
@@ -912,7 +887,7 @@ class MobileSyncController extends Controller
 
         $chatRoles = $user->role === 'sk_president'
             ? ['sk_chairman', 'sk_secretary']
-            : ['sk_president', 'sk_chairman', 'sk_secretary'];
+            : self::OFFICIAL_ROLES;
 
         $query = DB::table('users as u')
             ->leftJoin('barangays as b', 'u.barangay_id', '=', 'b.barangay_id')
@@ -1023,6 +998,56 @@ class MobileSyncController extends Controller
         ], 201);
     }
 
+    public function updateCouncilMember(Request $request, int $councilId): JsonResponse
+    {
+        $user = $request->user();
+        if ($user->role !== 'sk_chairman') {
+            return response()->json(['message' => 'Only SK Chairman can edit SK council members.'], 403);
+        }
+
+        $member = DB::table('sk_council')
+            ->where('council_id', $councilId)
+            ->where('barangay_id', $user->barangay_id)
+            ->where('status', 'current')
+            ->where(function ($query) {
+                $query->whereRaw('LOWER(position) LIKE ?', ['%councilor%'])
+                    ->orWhereRaw('LOWER(position) LIKE ?', ['%kagawad%']);
+            })
+            ->first();
+        if (! $member) {
+            return response()->json(['message' => 'SK council member not found.'], 404);
+        }
+
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'email' => ['nullable', 'email', 'max:255'],
+            'phone' => ['nullable', 'string', 'max:20'],
+            'term' => ['nullable', 'string', 'max:50'],
+            'profile_img' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
+        ]);
+
+        $changes = [
+            'name' => trim($validated['name']),
+            'email' => $validated['email'] ?? null,
+            'phone' => $validated['phone'] ?? null,
+            'term' => filled($validated['term'] ?? null) ? $validated['term'] : $member->term,
+        ];
+        if ($request->hasFile('profile_img')) {
+            $directory = public_path('uploads/council_profiles');
+            File::ensureDirectoryExists($directory);
+            $path = 'uploads/council_profiles/'.Str::random(32).'.'.$request->file('profile_img')->extension();
+            $request->file('profile_img')->move($directory, basename($path));
+            $changes['profile_img'] = $path;
+        }
+
+        DB::table('sk_council')->where('council_id', $councilId)->update($changes);
+
+        return response()->json([
+            'message' => 'SK council member updated.',
+            'council_member' => DB::table('sk_council')->where('council_id', $councilId)->first(),
+        ]);
+    }
+
     public function storeSecretaryAccount(Request $request): JsonResponse
     {
         $chairman = $request->user();
@@ -1093,6 +1118,7 @@ class MobileSyncController extends Controller
                 ['email' => $user->email],
                 ['token' => Hash::make($token), 'created_at' => now()]
             );
+
             return $user;
         });
 
@@ -1104,6 +1130,7 @@ class MobileSyncController extends Controller
             });
         } catch (\Throwable $exception) {
             \Log::error('Mobile Secretary setup email failed for '.$secretary->email.': '.$exception->getMessage());
+
             return response()->json([
                 'message' => 'Secretary account created, but the setup email could not be sent. Use the web Leadership page to resend it.',
                 'secretary_created' => true,
@@ -1116,56 +1143,7 @@ class MobileSyncController extends Controller
         ], 201);
     }
 
-    public function updateCouncilMember(Request $request, int $councilId): JsonResponse
-    {
-        $user = $request->user();
-        if ($user->role !== 'sk_chairman') {
-            return response()->json(['message' => 'Only SK Chairman can edit SK council members.'], 403);
-        }
-
-        $member = DB::table('sk_council')
-            ->where('council_id', $councilId)
-            ->where('barangay_id', $user->barangay_id)
-            ->where('status', 'current')
-            ->where(function ($query) {
-                $query->whereRaw('LOWER(position) LIKE ?', ['%councilor%'])
-                    ->orWhereRaw('LOWER(position) LIKE ?', ['%kagawad%']);
-            })
-            ->first();
-        if (! $member) {
-            return response()->json(['message' => 'SK council member not found.'], 404);
-        }
-
-        $validated = $request->validate([
-            'name' => ['required', 'string', 'max:255'],
-            'email' => ['nullable', 'email', 'max:255'],
-            'phone' => ['nullable', 'string', 'max:20'],
-            'term' => ['nullable', 'string', 'max:50'],
-            'profile_img' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
-        ]);
-
-        $changes = [
-            'name' => trim($validated['name']),
-            'email' => $validated['email'] ?? null,
-            'phone' => $validated['phone'] ?? null,
-            'term' => filled($validated['term'] ?? null) ? $validated['term'] : $member->term,
-        ];
-        if ($request->hasFile('profile_img')) {
-            $directory = public_path('uploads/council_profiles');
-            File::ensureDirectoryExists($directory);
-            $path = 'uploads/council_profiles/'.Str::random(32).'.'.$request->file('profile_img')->extension();
-            $request->file('profile_img')->move($directory, basename($path));
-            $changes['profile_img'] = $path;
-        }
-
-        DB::table('sk_council')->where('council_id', $councilId)->update($changes);
-
-        return response()->json([
-            'message' => 'SK council member updated.',
-            'council_member' => DB::table('sk_council')->where('council_id', $councilId)->first(),
-        ]);
-    }
-
+    // Report uploads, submission slots, and consolidation.
     public function storeOfficialSubmission(Request $request, RankingPointsService $points): JsonResponse
     {
         $user = $request->user();
@@ -1285,51 +1263,6 @@ class MobileSyncController extends Controller
         ]);
     }
 
-    public function toggleSubmissionSlot(Request $request, int $slotId): JsonResponse
-    {
-        if (! $this->isPresident($request->user())) {
-            return response()->json(['message' => 'Only SK President can manage submission slots.'], 403);
-        }
-
-        $slot = DB::table('submission_slots')->where('slot_id', $slotId)->first();
-        if (! $slot) return response()->json(['message' => 'Submission slot not found.'], 404);
-
-        DB::table('submission_slots')
-            ->where('slot_id', $slotId)
-            ->update(['status' => $slot->status === 'open' ? 'closed' : 'open']);
-
-        return response()->json(['message' => 'Submission slot status updated.']);
-    }
-
-    public function submissionSlotSubmissions(Request $request, int $slotId): JsonResponse
-    {
-        if (! $this->isPresident($request->user())) {
-            return response()->json(['message' => 'Only SK President can view submissions.'], 403);
-        }
-
-        $slot = DB::table('submission_slots')->where('slot_id', $slotId)->first();
-        if (! $slot) return response()->json(['message' => 'Submission slot not found.'], 404);
-
-        $table = $slot->submission_type === 'budget_report' ? 'budget_reports' : 'accomplishment_reports';
-        $idColumn = $table === 'budget_reports' ? 'budget_report_id' : 'report_id';
-        $rows = DB::table('barangays as b')
-            ->leftJoin($table.' as r', function ($join) use ($slot) {
-                $join->on('r.barangay_id', '=', 'b.barangay_id')
-                    ->where('r.slot_id', '=', $slot->slot_id);
-            })
-            ->select('b.barangay_id', 'b.barangay_name', 'r.'.$idColumn.' as submission_id', 'r.title', 'r.uploaded_file_name', 'r.uploaded_file_path', 'r.generated_pdf_path', 'r.created_at as submitted_at')
-            ->orderBy('b.barangay_name')
-            ->get()
-            ->map(function ($row) {
-                $path = $row->uploaded_file_path ?: $row->generated_pdf_path;
-                $row->file_url = $path && !in_array($path, ['SYSTEM_GEN', 'TEMPLATE_GEN'], true) ? $this->publicUrl($path) : null;
-                $row->submitted = $row->submission_id !== null;
-                return $row;
-            });
-
-        return response()->json(['slot' => $slot, 'submissions' => $rows]);
-    }
-
     public function storeSubmissionSlot(Request $request, NotificationService $notifications): JsonResponse
     {
         if (! $this->isPresident($request->user())) {
@@ -1372,6 +1305,56 @@ class MobileSyncController extends Controller
         ], 201);
     }
 
+    public function toggleSubmissionSlot(Request $request, int $slotId): JsonResponse
+    {
+        if (! $this->isPresident($request->user())) {
+            return response()->json(['message' => 'Only SK President can manage submission slots.'], 403);
+        }
+
+        $slot = DB::table('submission_slots')->where('slot_id', $slotId)->first();
+        if (! $slot) {
+            return response()->json(['message' => 'Submission slot not found.'], 404);
+        }
+
+        DB::table('submission_slots')
+            ->where('slot_id', $slotId)
+            ->update(['status' => $slot->status === 'open' ? 'closed' : 'open']);
+
+        return response()->json(['message' => 'Submission slot status updated.']);
+    }
+
+    public function submissionSlotSubmissions(Request $request, int $slotId): JsonResponse
+    {
+        if (! $this->isPresident($request->user())) {
+            return response()->json(['message' => 'Only SK President can view submissions.'], 403);
+        }
+
+        $slot = DB::table('submission_slots')->where('slot_id', $slotId)->first();
+        if (! $slot) {
+            return response()->json(['message' => 'Submission slot not found.'], 404);
+        }
+
+        $table = $slot->submission_type === 'budget_report' ? 'budget_reports' : 'accomplishment_reports';
+        $idColumn = $table === 'budget_reports' ? 'budget_report_id' : 'report_id';
+        $rows = DB::table('barangays as b')
+            ->leftJoin($table.' as r', function ($join) use ($slot) {
+                $join->on('r.barangay_id', '=', 'b.barangay_id')
+                    ->where('r.slot_id', '=', $slot->slot_id);
+            })
+            ->select('b.barangay_id', 'b.barangay_name', 'r.'.$idColumn.' as submission_id', 'r.title', 'r.uploaded_file_name', 'r.uploaded_file_path', 'r.generated_pdf_path', 'r.created_at as submitted_at')
+            ->orderBy('b.barangay_name')
+            ->get()
+            ->map(function ($row) {
+                $path = $row->uploaded_file_path ?: $row->generated_pdf_path;
+                $row->file_url = $path && ! in_array($path, ['SYSTEM_GEN', 'TEMPLATE_GEN'], true) ? $this->publicUrl($path) : null;
+                $row->submitted = $row->submission_id !== null;
+
+                return $row;
+            });
+
+        return response()->json(['slot' => $slot, 'submissions' => $rows]);
+    }
+
     public function deleteSubmissionSlot(Request $request, int $slotId): JsonResponse
     {
         if (! $this->isPresident($request->user())) {
@@ -1408,71 +1391,7 @@ class MobileSyncController extends Controller
         ]);
     }
 
-    // Allows officials to hide or restore public feedback.
-    public function updateFeedback(Request $request, int $feedbackId): JsonResponse
-    {
-        if (! $this->isOfficial($request->user())) {
-            return response()->json(['message' => 'Only SK officials can manage feedback.'], 403);
-        }
-
-        $validated = $request->validate([
-            'status' => ['required', 'in:posted,hidden'],
-        ]);
-
-        if (! Schema::hasTable('announcement_feedback')) {
-            return response()->json(['message' => 'Feedback is not available.'], 404);
-        }
-
-        $updated = DB::table('announcement_feedback')
-            ->where('feedback_id', $feedbackId)
-            ->update(['status' => $validated['status']]);
-
-        if ($updated === 0) {
-            return response()->json(['message' => 'Feedback not found.'], 404);
-        }
-
-        return response()->json(['message' => 'Feedback status updated.']);
-    }
-
-    // Keep email addresses out of mobile feedback responses for privacy.
-    protected function feedback(User $user): array
-    {
-        if (! $this->isOfficial($user) || ! Schema::hasTable('announcement_feedback')) {
-            return [];
-        }
-
-        return DB::table('announcement_feedback as f')
-            ->leftJoin('announcements as a', 'a.announcement_id', '=', 'f.announcement_id')
-            ->select(
-                'f.feedback_id',
-                'f.announcement_id',
-                'f.name',
-                'f.comment',
-                'f.status',
-                'f.verified_at',
-                'f.created_at',
-                'a.title as announcement_title'
-            )
-            ->whereIn('f.status', ['posted', 'hidden'])
-            ->orderByDesc('f.created_at')
-            ->limit(500)
-            ->get()
-            ->map(function ($row) {
-                return [
-                    'feedback_id' => $row->feedback_id,
-                    'announcement_id' => $row->announcement_id,
-                    'announcement_title' => $row->announcement_title ?: 'Announcement',
-                    'name' => trim((string) $row->name) ?: 'Anonymous',
-                    'comment' => $row->comment,
-                    'status' => $row->status,
-                    'verified_at' => $row->verified_at,
-                    'created_at' => $row->created_at,
-                ];
-            })
-            ->values()
-            ->all();
-    }
-
+    // Notifications.
     public function markNotificationRead(Request $request, int $notificationId): JsonResponse
     {
         $updated = DB::table('notifications')
@@ -1492,6 +1411,7 @@ class MobileSyncController extends Controller
         ]);
     }
 
+    // Shared helpers: account data and role checks.
     protected function userPayload(User $user): array
     {
         return [
@@ -1513,6 +1433,31 @@ class MobileSyncController extends Controller
         ];
     }
 
+    protected function isOfficial(User $user): bool
+    {
+        return in_array($user->role, self::OFFICIAL_ROLES, true);
+    }
+
+    protected function isPresident(User $user): bool
+    {
+        return $user->role === 'sk_president';
+    }
+
+    protected function contactChangeCacheKey(int $userId): string
+    {
+        return 'mobile_contact_change:'.$userId;
+    }
+
+    // Password reset only applies to non-archived official accounts.
+    protected function findOfficialByEmail(string $email): ?User
+    {
+        return User::where('email', $email)
+            ->whereIn('role', self::OFFICIAL_ROLES)
+            ->whereNull('archived_at')
+            ->first();
+    }
+
+    // Shared helpers: SMS verification and phone formatting.
     protected function twilioRequest(string $type, array $payload): array
     {
         $sid = config('services.twilio.sid');
@@ -1597,6 +1542,7 @@ class MobileSyncController extends Controller
         return null;
     }
 
+    // Sync helpers: select and format each type of record.
     protected function announcements(User $user, ?Carbon $since): array
     {
         if (! Schema::hasTable('announcements')) {
@@ -1685,6 +1631,45 @@ class MobileSyncController extends Controller
         }
 
         return $posts;
+    }
+
+    // Keep email addresses out of mobile feedback responses for privacy.
+    protected function feedback(User $user): array
+    {
+        if (! $this->isOfficial($user) || ! Schema::hasTable('announcement_feedback')) {
+            return [];
+        }
+
+        return DB::table('announcement_feedback as f')
+            ->leftJoin('announcements as a', 'a.announcement_id', '=', 'f.announcement_id')
+            ->select(
+                'f.feedback_id',
+                'f.announcement_id',
+                'f.name',
+                'f.comment',
+                'f.status',
+                'f.verified_at',
+                'f.created_at',
+                'a.title as announcement_title'
+            )
+            ->whereIn('f.status', ['posted', 'hidden'])
+            ->orderByDesc('f.created_at')
+            ->limit(500)
+            ->get()
+            ->map(function ($row) {
+                return [
+                    'feedback_id' => $row->feedback_id,
+                    'announcement_id' => $row->announcement_id,
+                    'announcement_title' => $row->announcement_title ?: 'Announcement',
+                    'name' => trim((string) $row->name) ?: 'Anonymous',
+                    'comment' => $row->comment,
+                    'status' => $row->status,
+                    'verified_at' => $row->verified_at,
+                    'created_at' => $row->created_at,
+                ];
+            })
+            ->values()
+            ->all();
     }
 
     protected function events(User $user, ?Carbon $since): array
@@ -1789,13 +1774,10 @@ class MobileSyncController extends Controller
         }, $rows);
     }
 
-    protected function accomplishmentReports(User $user, ?Carbon $since): array
+    // Presidents see submitted reports; other officials also see their barangay's reports.
+    protected function visibleReportQuery(string $table, User $user): Builder
     {
-        if (! Schema::hasTable('accomplishment_reports')) {
-            return [];
-        }
-
-        $query = DB::table('accomplishment_reports')
+        return DB::table($table)
             ->where(function (Builder $query) use ($user) {
                 $query->where('user_id', $user->user_id);
 
@@ -1805,6 +1787,15 @@ class MobileSyncController extends Controller
                     $query->orWhere('barangay_id', $user->barangay_id);
                 }
             });
+    }
+
+    protected function accomplishmentReports(User $user, ?Carbon $since): array
+    {
+        if (! Schema::hasTable('accomplishment_reports')) {
+            return [];
+        }
+
+        $query = $this->visibleReportQuery('accomplishment_reports', $user);
 
         $rows = $this->finish(
             $query,
@@ -1828,16 +1819,7 @@ class MobileSyncController extends Controller
             return [];
         }
 
-        $query = DB::table('budget_reports')
-            ->where(function (Builder $query) use ($user) {
-                $query->where('user_id', $user->user_id);
-
-                if ($this->isPresident($user)) {
-                    $query->orWhereNotNull('user_id');
-                } elseif ($this->isOfficial($user) && $user->barangay_id) {
-                    $query->orWhere('barangay_id', $user->barangay_id);
-                }
-            });
+        $query = $this->visibleReportQuery('budget_reports', $user);
 
         $rows = $this->finish(
             $query,
@@ -1852,81 +1834,6 @@ class MobileSyncController extends Controller
 
             return $row;
         }, $rows);
-    }
-
-    protected function archiveDocuments(User $user, ?Carbon $since): array
-    {
-        $documents = collect();
-
-        if (Schema::hasTable('accomplishment_reports')) {
-            $query = DB::table('accomplishment_reports as ar')
-                ->leftJoin('barangays as b', 'ar.barangay_id', '=', 'b.barangay_id')
-                ->select(
-                    DB::raw("'accomplishment_report' as source_type"),
-                    'ar.report_id as source_id',
-                    'ar.title',
-                    'ar.barangay_id',
-                    'b.barangay_name',
-                    'ar.uploaded_file_path',
-                    'ar.generated_pdf_path',
-                    'ar.created_at'
-                );
-
-            if (! $this->isPresident($user) && $user->barangay_id) {
-                $query->where('ar.barangay_id', $user->barangay_id);
-            }
-
-            $this->applySince(
-                $query,
-                'accomplishment_reports',
-                $since
-            );
-
-            $documents = $documents->merge($query->get());
-        }
-
-        if (Schema::hasTable('budget_reports')) {
-            $query = DB::table('budget_reports as br')
-                ->leftJoin('barangays as b', 'br.barangay_id', '=', 'b.barangay_id')
-                ->select(
-                    DB::raw("'budget_report' as source_type"),
-                    'br.budget_report_id as source_id',
-                    'br.title',
-                    'br.barangay_id',
-                    'b.barangay_name',
-                    'br.uploaded_file_path',
-                    'br.generated_pdf_path',
-                    'br.created_at'
-                );
-
-            if (! $this->isPresident($user) && $user->barangay_id) {
-                $query->where('br.barangay_id', $user->barangay_id);
-            }
-
-            $this->applySince(
-                $query,
-                'budget_reports',
-                $since
-            );
-
-            $documents = $documents->merge($query->get());
-        }
-
-        return $documents
-            ->sortByDesc('created_at')
-            ->take(500)
-            ->map(function ($row) {
-                $path = $row->uploaded_file_path ?? $row->generated_pdf_path ?? null;
-
-                $row->file_url = $this->publicUrl($path);
-                $row->document_type = $row->source_type === 'budget_report'
-                    ? 'Budget'
-                    : 'Report';
-
-                return $row;
-            })
-            ->values()
-            ->all();
     }
 
     protected function leadershipProfiles(User $user, ?Carbon $since): array
@@ -2059,6 +1966,82 @@ class MobileSyncController extends Controller
             ->all();
     }
 
+    protected function archiveDocuments(User $user, ?Carbon $since): array
+    {
+        $documents = collect();
+
+        if (Schema::hasTable('accomplishment_reports')) {
+            $query = DB::table('accomplishment_reports as ar')
+                ->leftJoin('barangays as b', 'ar.barangay_id', '=', 'b.barangay_id')
+                ->select(
+                    DB::raw("'accomplishment_report' as source_type"),
+                    'ar.report_id as source_id',
+                    'ar.title',
+                    'ar.barangay_id',
+                    'b.barangay_name',
+                    'ar.uploaded_file_path',
+                    'ar.generated_pdf_path',
+                    'ar.created_at'
+                );
+
+            if (! $this->isPresident($user) && $user->barangay_id) {
+                $query->where('ar.barangay_id', $user->barangay_id);
+            }
+
+            $this->applySince(
+                $query,
+                'accomplishment_reports',
+                $since
+            );
+
+            $documents = $documents->merge($query->get());
+        }
+
+        if (Schema::hasTable('budget_reports')) {
+            $query = DB::table('budget_reports as br')
+                ->leftJoin('barangays as b', 'br.barangay_id', '=', 'b.barangay_id')
+                ->select(
+                    DB::raw("'budget_report' as source_type"),
+                    'br.budget_report_id as source_id',
+                    'br.title',
+                    'br.barangay_id',
+                    'b.barangay_name',
+                    'br.uploaded_file_path',
+                    'br.generated_pdf_path',
+                    'br.created_at'
+                );
+
+            if (! $this->isPresident($user) && $user->barangay_id) {
+                $query->where('br.barangay_id', $user->barangay_id);
+            }
+
+            $this->applySince(
+                $query,
+                'budget_reports',
+                $since
+            );
+
+            $documents = $documents->merge($query->get());
+        }
+
+        return $documents
+            ->sortByDesc('created_at')
+            ->take(500)
+            ->map(function ($row) {
+                $path = $row->uploaded_file_path ?? $row->generated_pdf_path ?? null;
+
+                $row->file_url = $this->publicUrl($path);
+                $row->document_type = $row->source_type === 'budget_report'
+                    ? 'Budget'
+                    : 'Report';
+
+                return $row;
+            })
+            ->values()
+            ->all();
+    }
+
+    // Shared helpers: sync dates, ordering, and file links.
     protected function tableRows(string $table, ?Carbon $since, string $orderColumn): array
     {
         if (! Schema::hasTable($table)) {
@@ -2133,6 +2116,7 @@ class MobileSyncController extends Controller
         );
     }
 
+    // Submission helpers: prepare each report and save it.
     protected function saveMobileAccomplishmentSubmission(User $user, object $slot, array $validated): int
     {
         $year = (int) ($validated['reporting_year'] ?? now()->year);
@@ -2160,21 +2144,7 @@ class MobileSyncController extends Controller
             'created_at' => now(),
         ];
 
-        $existing = DB::table('accomplishment_reports')
-            ->where('barangay_id', $user->barangay_id)
-            ->where('slot_id', $slot->slot_id)
-            ->first();
-
-        if ($existing) {
-            DB::table('accomplishment_reports')
-                ->where('report_id', $existing->report_id)
-                ->update($data);
-
-            return (int) $existing->report_id;
-        }
-
-        return (int) DB::table('accomplishment_reports')
-            ->insertGetId($data, 'report_id');
+        return $this->saveSlotReport('accomplishment_reports', 'report_id', $data);
     }
 
     protected function saveMobileBudgetSubmission(User $user, object $slot, array $validated): int
@@ -2211,21 +2181,73 @@ class MobileSyncController extends Controller
                 : null;
         }
 
-        $existing = DB::table('budget_reports')
-            ->where('barangay_id', $user->barangay_id)
-            ->where('slot_id', $slot->slot_id)
+        return $this->saveSlotReport('budget_reports', 'budget_report_id', $data);
+    }
+
+    // Reuse the existing report ID when a barangay submits to the same slot again.
+    protected function saveSlotReport(string $table, string $idColumn, array $data): int
+    {
+        $existing = DB::table($table)
+            ->where('barangay_id', $data['barangay_id'])
+            ->where('slot_id', $data['slot_id'])
             ->first();
 
         if ($existing) {
-            DB::table('budget_reports')
-                ->where('budget_report_id', $existing->budget_report_id)
+            DB::table($table)
+                ->where($idColumn, $existing->{$idColumn})
                 ->update($data);
 
-            return (int) $existing->budget_report_id;
+            return (int) $existing->{$idColumn};
         }
 
-        return (int) DB::table('budget_reports')
-            ->insertGetId($data, 'budget_report_id');
+        return (int) DB::table($table)->insertGetId($data, $idColumn);
+    }
+
+    // Meeting helpers: call tokens and display details.
+    protected function buildAgoraTokenResponse(Meeting $meeting, ?int $uid = null): JsonResponse
+    {
+        $appId = config('services.agora.app_id');
+        $appCertificate = config('services.agora.app_certificate');
+
+        if (! filled($appId) || ! filled($appCertificate)) {
+            return response()->json([
+                'message' => 'Agora is not configured. Set AGORA_APP_ID and AGORA_APP_CERTIFICATE in .env.',
+            ], 500);
+        }
+
+        $uid = $uid && $uid > 0 ? $uid : random_int(1000, 999999);
+        $channel = 'meeting-'.$meeting->meeting_id;
+
+        try {
+            $token = RtcTokenBuilder::buildTokenWithUid(
+                $appId,
+                $appCertificate,
+                $channel,
+                $uid,
+                RtcTokenBuilder::RolePublisher,
+                now()->addHours(4)->timestamp
+            );
+        } catch (\Throwable $e) {
+            report($e);
+
+            return response()->json([
+                'message' => 'Failed to generate Agora RTC token.',
+            ], 500);
+        }
+
+        return response()->json([
+            'appId' => $appId,
+            'token' => $token,
+            'channel' => $channel,
+            'uid' => $uid,
+            'title' => $meeting->title,
+        ]);
+    }
+
+    protected function meetingUnavailable(Meeting $meeting): bool
+    {
+        return $meeting->status === 'completed'
+            || ($meeting->scheduled_at && $meeting->scheduled_at->isPast());
     }
 
     protected function decorateMobileMeeting(Meeting $meeting): Meeting
@@ -2246,20 +2268,7 @@ class MobileSyncController extends Controller
         return $meeting;
     }
 
-    protected function isOfficial(User $user): bool
-    {
-        return in_array(
-            $user->role,
-            ['sk_president', 'sk_chairman', 'sk_secretary'],
-            true
-        );
-    }
-
-    protected function isPresident(User $user): bool
-    {
-        return $user->role === 'sk_president';
-    }
-
+    // Consolidation helpers: filters, totals, and available years.
     protected function consolidationFilters(Request $request): array
     {
         $year = (int) $request->query('year', now()->year);
@@ -2406,6 +2415,45 @@ class MobileSyncController extends Controller
         ];
     }
 
+    protected function consolidationStatusLabel(int $count, int $reportCount = 0, int $budgetCount = 0): string
+    {
+        if ($count <= 0) {
+            return 'Pending';
+        }
+
+        return $count.' submitted (R: '.$reportCount.', B: '.$budgetCount.')';
+    }
+
+    protected function consolidationYears(): array
+    {
+        $reportYears = Schema::hasTable('accomplishment_reports')
+            ? DB::table('accomplishment_reports')
+                ->select('reporting_year')
+                ->distinct()
+                ->pluck('reporting_year')
+                ->map(fn ($year) => (int) $year)
+            : collect();
+
+        $budgetYears = Schema::hasTable('budget_reports')
+            ? DB::table('budget_reports')
+                ->select('fiscal_year')
+                ->distinct()
+                ->pluck('fiscal_year')
+                ->map(fn ($year) => (int) $year)
+            : collect();
+
+        $years = $reportYears
+            ->merge($budgetYears)
+            ->filter()
+            ->unique()
+            ->sortDesc()
+            ->values()
+            ->all();
+
+        return $years ?: [now()->year];
+    }
+
+    // Ranking helpers: current leaderboard and past periods.
     protected function mobileRankings(): array
     {
         return $this->mobileRankingRows($this->rankingsLeaderboard());
@@ -2446,43 +2494,5 @@ class MobileSyncController extends Controller
             })
             ->values()
             ->all();
-    }
-
-    protected function consolidationStatusLabel(int $count, int $reportCount = 0, int $budgetCount = 0): string
-    {
-        if ($count <= 0) {
-            return 'Pending';
-        }
-
-        return $count.' submitted (R: '.$reportCount.', B: '.$budgetCount.')';
-    }
-
-    protected function consolidationYears(): array
-    {
-        $reportYears = Schema::hasTable('accomplishment_reports')
-            ? DB::table('accomplishment_reports')
-                ->select('reporting_year')
-                ->distinct()
-                ->pluck('reporting_year')
-                ->map(fn ($year) => (int) $year)
-            : collect();
-
-        $budgetYears = Schema::hasTable('budget_reports')
-            ? DB::table('budget_reports')
-                ->select('fiscal_year')
-                ->distinct()
-                ->pluck('fiscal_year')
-                ->map(fn ($year) => (int) $year)
-            : collect();
-
-        $years = $reportYears
-            ->merge($budgetYears)
-            ->filter()
-            ->unique()
-            ->sortDesc()
-            ->values()
-            ->all();
-
-        return $years ?: [now()->year];
     }
 }
