@@ -13,6 +13,8 @@ Route::prefix('mobile')->group(function(){
         Route::post('/logout',[MobileSyncController::class,'logout'])->name('mobile.logout');
         Route::get('/me',[MobileSyncController::class,'me'])->name('mobile.me');
         Route::post('/profile',[MobileSyncController::class,'updateProfile'])->name('mobile.profile.update');
+        Route::post('/profile/contact/request',[MobileSyncController::class,'requestContactChange'])->middleware('throttle:5,10')->name('mobile.profile.contact.request');
+        Route::post('/profile/contact/verify',[MobileSyncController::class,'verifyContactChange'])->middleware('throttle:10,10')->name('mobile.profile.contact.verify');
         Route::post('/profile/password',[MobileSyncController::class,'updatePassword'])->name('mobile.profile.password');
         Route::post('/profile/password/request',[MobileSyncController::class,'requestPasswordChange'])->name('mobile.profile.password.request');
         Route::post('/profile/password/verify',[MobileSyncController::class,'verifyPasswordChange'])->name('mobile.profile.password.verify');

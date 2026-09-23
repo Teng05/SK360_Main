@@ -243,16 +243,12 @@ class MobileSyncController extends Controller
     public function updateProfile(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'first_name' => ['required', 'string', 'max:50'],
-            'last_name' => ['required', 'string', 'max:50'],
+            'first_name' => ['nullable', 'string', 'max:50'],
+            'last_name' => ['nullable', 'string', 'max:50'],
             'profile_pic' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
         ]);
 
         $user = $request->user();
-        $user->update([
-            'first_name' => trim($validated['first_name']),
-            'last_name' => trim($validated['last_name']),
-        ]);
 
         if ($request->hasFile('profile_pic') && Schema::hasColumn('users', 'profile_pic')) {
             $directory = public_path('uploads/profile_pics');
@@ -264,6 +260,110 @@ class MobileSyncController extends Controller
 
         return response()->json([
             'message' => 'Profile updated successfully.',
+            'user' => $this->userPayload($user->fresh('barangay')),
+        ]);
+    }
+
+    public function requestContactChange(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'type' => ['required', 'in:email,phone'],
+            'value' => ['required', 'string', 'max:255'],
+        ]);
+        $user = $request->user();
+        $type = $validated['type'];
+        $value = trim($validated['value']);
+
+        if ($type === 'email') {
+            $request->validate(['value' => ['email', 'max:255']]);
+            $value = strtolower($value);
+            if (strcasecmp($value, (string) $user->email) === 0) {
+                return response()->json(['message' => 'This is already your email address.'], 422);
+            }
+            if (User::where('email', $value)->where('user_id', '!=', $user->user_id)->exists()) {
+                return response()->json(['message' => 'That email address is already in use.'], 422);
+            }
+            $deliveryEmail = $value;
+        } else {
+            if (! preg_match('/^[0-9+()\-\s]{7,30}$/', $value)) {
+                return response()->json(['message' => 'Enter a valid phone number.'], 422);
+            }
+            if ($value === (string) $user->phone_number) {
+                return response()->json(['message' => 'This is already your phone number.'], 422);
+            }
+            $deliveryEmail = (string) $user->email;
+        }
+
+        $code = (string) random_int(100000, 999999);
+        DB::table('mobile_contact_changes')->updateOrInsert(
+            ['user_id' => $user->user_id],
+            [
+                'change_type' => $type,
+                'new_value' => $value,
+                'token' => Hash::make($code),
+                'expires_at' => now()->addMinutes(15),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]
+        );
+
+        $label = $type === 'email' ? 'email address' : 'phone number';
+        Mail::raw(
+            "Your SK360 verification code for changing your {$label} is: {$code}\n\nThis code expires in 15 minutes.",
+            function ($message) use ($deliveryEmail, $user, $label) {
+                $message->to($deliveryEmail, trim($user->first_name.' '.$user->last_name))
+                    ->subject('SK360 '.ucfirst($label).' Change Verification');
+            }
+        );
+
+        return response()->json([
+            'message' => $type === 'email'
+                ? 'Verification code sent to your new email address.'
+                : 'Verification code sent to your registered email address.',
+            'delivery_email' => $deliveryEmail,
+        ]);
+    }
+
+    public function verifyContactChange(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'type' => ['required', 'in:email,phone'],
+            'value' => ['required', 'string', 'max:255'],
+            'code' => ['required', 'digits:6'],
+        ]);
+        $user = $request->user();
+        $value = trim($validated['value']);
+        if ($validated['type'] === 'email') {
+            $value = strtolower($value);
+        }
+
+        $change = DB::table('mobile_contact_changes')
+            ->where('user_id', $user->user_id)
+            ->where('change_type', $validated['type'])
+            ->where('new_value', $value)
+            ->first();
+
+        if (! $change || now()->greaterThan($change->expires_at) || ! Hash::check($validated['code'], $change->token)) {
+            return response()->json(['message' => 'Invalid or expired verification code.'], 422);
+        }
+
+        if ($validated['type'] === 'email') {
+            if (User::where('email', $value)->where('user_id', '!=', $user->user_id)->exists()) {
+                return response()->json(['message' => 'That email address is already in use.'], 422);
+            }
+            $changes = ['email' => $value];
+            if (Schema::hasColumn('users', 'email_verified_at')) {
+                $changes['email_verified_at'] = now();
+            }
+        } else {
+            $changes = ['phone_number' => $value];
+        }
+
+        $user->update($changes);
+        DB::table('mobile_contact_changes')->where('user_id', $user->user_id)->delete();
+
+        return response()->json([
+            'message' => ucfirst($validated['type']).' updated successfully.',
             'user' => $this->userPayload($user->fresh('barangay')),
         ]);
     }
