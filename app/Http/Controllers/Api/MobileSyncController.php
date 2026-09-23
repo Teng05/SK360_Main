@@ -475,6 +475,8 @@ class MobileSyncController extends Controller
             'title' => ['nullable', 'string', 'max:255'],
             'post_content' => ['required', 'string', 'max:5000'],
             'post_category' => ['nullable', 'string', 'max:50'],
+            'audience' => ['nullable', 'in:public,officials_only'],
+            'status' => ['nullable', 'in:draft,published'],
         ]);
 
         $category = strtolower($validated['post_category'] ?? 'update');
@@ -494,7 +496,7 @@ class MobileSyncController extends Controller
             'user_id' => $request->user()->user_id,
             'title' => $title,
             'content' => $validated['post_content'],
-            'visibility' => 'public',
+            'visibility' => $validated['audience'] ?? 'public',
             'created_at' => now(),
             'updated_at' => now(),
         ];
@@ -533,8 +535,6 @@ class MobileSyncController extends Controller
         ], 201);
     }
 
-<<<<<<< HEAD
-=======
     public function updateWallPost(Request $request, int $announcementId): JsonResponse
     {
         $announcement = DB::table('announcements')
@@ -574,7 +574,6 @@ class MobileSyncController extends Controller
         ]);
     }
 
->>>>>>> 8be44d88dcdba57569d8b1353a362937691e31b7
     public function toggleWallLike(Request $request, int $announcementId): JsonResponse
     {
         $postExists = DB::table('announcements')
@@ -688,8 +687,6 @@ class MobileSyncController extends Controller
         ], 201);
     }
 
-<<<<<<< HEAD
-=======
     public function updateEvent(Request $request, int $eventId): JsonResponse
     {
         if (! $this->isPresident($request->user())) {
@@ -735,7 +732,6 @@ class MobileSyncController extends Controller
     }
 
     // Meeting schedules and video calls.
->>>>>>> 8be44d88dcdba57569d8b1353a362937691e31b7
     public function storeMeeting(Request $request): JsonResponse
     {
         if (! $this->isPresident($request->user())) {
@@ -774,8 +770,6 @@ class MobileSyncController extends Controller
         ], 201);
     }
 
-<<<<<<< HEAD
-=======
     public function updateMeeting(Request $request, int $meetingId): JsonResponse
     {
         if (! $this->isPresident($request->user())) {
@@ -809,7 +803,6 @@ class MobileSyncController extends Controller
         return response()->json(['message' => 'Meeting updated.', 'meeting_id' => $meetingId]);
     }
 
->>>>>>> 8be44d88dcdba57569d8b1353a362937691e31b7
     public function endMeeting(Request $request, Meeting $meeting): JsonResponse
     {
         if (! $this->isPresident($request->user())) {
@@ -2048,120 +2041,7 @@ class MobileSyncController extends Controller
             ->all();
     }
 
-<<<<<<< HEAD
-    protected function leadershipProfiles(User $user, ?Carbon $since): array
-    {
-        $leaders = collect();
-        $userProfilePicture = Schema::hasColumn('users', 'profile_pic')
-            ? 'profile_pic'
-            : DB::raw('NULL as profile_pic');
-
-        $userLeaders = DB::table('users')
-            ->whereIn('role', ['sk_chairman', 'sk_secretary'])
-            ->whereNotNull('barangay_id')
-            ->select(
-                DB::raw('user_id as leadership_id'),
-                'user_id',
-                $userProfilePicture,
-                'barangay_id',
-                DB::raw("CONCAT(first_name, ' ', last_name) as full_name"),
-                DB::raw("
-                    CASE
-                        WHEN role = 'sk_chairman' THEN 'sk_chairman'
-                        WHEN role = 'sk_secretary' THEN 'sk_secretary'
-                        ELSE role
-                    END as position
-                "),
-                DB::raw("'2024-2026' as term"),
-                DB::raw("'current' as status")
-            )
-            ->get();
-
-        $leaders = $leaders->merge($userLeaders);
-
-        if (Schema::hasTable('sk_council')) {
-            $councilRows = DB::table('sk_council')
-                ->select(
-                    DB::raw('NULL as leadership_id'),
-                    DB::raw('NULL as user_id'),
-                    'barangay_id',
-                    DB::raw('name as full_name'),
-                    DB::raw("
-                        CASE
-                            WHEN LOWER(position) LIKE '%chairman%' THEN 'sk_chairman'
-                            WHEN LOWER(position) LIKE '%secretary%' THEN 'sk_secretary'
-                            WHEN LOWER(position) LIKE '%treasurer%' THEN 'sk_treasurer'
-                            WHEN LOWER(position) LIKE '%councilor%' THEN 'sk_councilor'
-                            WHEN LOWER(position) LIKE '%kagawad%' THEN 'sk_councilor'
-                            ELSE LOWER(REPLACE(position, ' ', '_'))
-                        END as position
-                    "),
-                    DB::raw("COALESCE(term, '2024-2026') as term"),
-                    DB::raw("'current' as status")
-                )
-                ->get();
-
-            $leaders = $leaders->merge($councilRows);
-        }
-
-        if (Schema::hasTable('leadership_profiles')) {
-            $joinedProfilePicture = Schema::hasColumn('users', 'profile_pic')
-                ? 'u.profile_pic'
-                : DB::raw('NULL as profile_pic');
-            $profileRows = DB::table('leadership_profiles')
-                ->leftJoin('users as u', 'leadership_profiles.user_id', '=', 'u.user_id')
-                ->where('leadership_profiles.status', 'current')
-                ->select(
-                    'leadership_profiles.leadership_id',
-                    'leadership_profiles.user_id',
-                    'leadership_profiles.barangay_id',
-                    'leadership_profiles.full_name',
-                    'leadership_profiles.position',
-                    $joinedProfilePicture,
-                    DB::raw("
-                        CASE
-                            WHEN leadership_profiles.term_start IS NOT NULL AND leadership_profiles.term_end IS NOT NULL
-                                THEN CONCAT(YEAR(leadership_profiles.term_start), '-', YEAR(leadership_profiles.term_end))
-                            WHEN leadership_profiles.term_start IS NOT NULL
-                                THEN CONCAT(YEAR(leadership_profiles.term_start), '-present')
-                            ELSE '2024-2026'
-                        END as term
-                    "),
-                    'leadership_profiles.status'
-                )
-                ->get();
-
-            $leaders = $leaders->merge($profileRows);
-        }
-
-        if (! $this->isPresident($user) && $user->barangay_id) {
-            $leaders = $leaders->where('barangay_id', $user->barangay_id);
-        }
-
-        return $leaders
-            ->filter(fn ($leader) => ! empty($leader->barangay_id))
-            ->unique(fn ($leader) => strtolower(
-                ($leader->full_name ?? '').'|'.
-                ($leader->position ?? '').'|'.
-                ($leader->barangay_id ?? '')
-            ))
-            ->values()
-            ->map(function ($leader) {
-                $path = $leader->profile_pic ?? null;
-                $leader->profile_pic_url = $path
-                    ? $this->publicUrl(Str::startsWith($path, 'uploads/')
-                        ? $path
-                        : 'uploads/profile_pics/'.$path)
-                    : null;
-
-                return $leader;
-            })
-            ->all();
-    }
-
-=======
     // Shared helpers: sync dates, ordering, and file links.
->>>>>>> 8be44d88dcdba57569d8b1353a362937691e31b7
     protected function tableRows(string $table, ?Carbon $since, string $orderColumn): array
     {
         if (! Schema::hasTable($table)) {
