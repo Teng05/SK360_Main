@@ -14,6 +14,7 @@ use Illuminate\Database\Query\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
@@ -295,17 +296,11 @@ class MobileSyncController extends Controller
         }
 
         $code = (string) random_int(100000, 999999);
-        DB::table('mobile_contact_changes')->updateOrInsert(
-            ['user_id' => $user->user_id],
-            [
-                'change_type' => $type,
-                'new_value' => $value,
-                'token' => Hash::make($code),
-                'expires_at' => now()->addMinutes(15),
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]
-        );
+        Cache::put($this->contactChangeCacheKey((int) $user->user_id), [
+            'change_type' => $type,
+            'new_value' => $value,
+            'token' => Hash::make($code),
+        ], now()->addMinutes(15));
 
         $label = $type === 'email' ? 'email address' : 'phone number';
         Mail::raw(
@@ -337,13 +332,13 @@ class MobileSyncController extends Controller
             $value = strtolower($value);
         }
 
-        $change = DB::table('mobile_contact_changes')
-            ->where('user_id', $user->user_id)
-            ->where('change_type', $validated['type'])
-            ->where('new_value', $value)
-            ->first();
+        $cacheKey = $this->contactChangeCacheKey((int) $user->user_id);
+        $change = Cache::get($cacheKey);
 
-        if (! $change || now()->greaterThan($change->expires_at) || ! Hash::check($validated['code'], $change->token)) {
+        if (! is_array($change)
+            || ($change['change_type'] ?? null) !== $validated['type']
+            || ($change['new_value'] ?? null) !== $value
+            || ! Hash::check($validated['code'], $change['token'] ?? '')) {
             return response()->json(['message' => 'Invalid or expired verification code.'], 422);
         }
 
@@ -360,12 +355,17 @@ class MobileSyncController extends Controller
         }
 
         $user->update($changes);
-        DB::table('mobile_contact_changes')->where('user_id', $user->user_id)->delete();
+        Cache::forget($cacheKey);
 
         return response()->json([
             'message' => ucfirst($validated['type']).' updated successfully.',
             'user' => $this->userPayload($user->fresh('barangay')),
         ]);
+    }
+
+    protected function contactChangeCacheKey(int $userId): string
+    {
+        return 'mobile_contact_change:'.$userId;
     }
 
     public function updatePassword(Request $request): JsonResponse
