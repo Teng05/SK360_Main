@@ -1023,6 +1023,99 @@ class MobileSyncController extends Controller
         ], 201);
     }
 
+    public function storeSecretaryAccount(Request $request): JsonResponse
+    {
+        $chairman = $request->user();
+        if ($chairman->role !== 'sk_chairman') {
+            return response()->json(['message' => 'Only SK Chairman can create a Secretary account.'], 403);
+        }
+
+        $currentTerm = DB::table('administration_terms')
+            ->where('status', 'current')
+            ->orderByDesc('term_id')
+            ->first();
+        if (! $currentTerm) {
+            return response()->json(['message' => 'There is no active administration term.'], 422);
+        }
+
+        $assigned = DB::table('official_terms')
+            ->where('user_id', $chairman->user_id)
+            ->where('term_id', $currentTerm->term_id)
+            ->where('role', 'sk_chairman')
+            ->where('status', 'current')
+            ->exists();
+        if (! $assigned) {
+            return response()->json(['message' => 'Your Chairman account is not connected to the current administration term.'], 422);
+        }
+
+        $validated = $request->validate([
+            'first_name' => ['required', 'string', 'max:100'],
+            'last_name' => ['required', 'string', 'max:100'],
+            'email' => ['required', 'email', 'max:100', 'unique:users,email'],
+            'phone' => ['nullable', 'string', 'max:20', 'unique:users,phone_number'],
+        ]);
+
+        $existing = User::where('barangay_id', $chairman->barangay_id)
+            ->where('role', 'sk_secretary')
+            ->whereNull('archived_at')
+            ->exists();
+        if ($existing) {
+            return response()->json(['message' => 'Your barangay already has a current or pending SK Secretary.'], 422);
+        }
+
+        $token = Str::random(64);
+        $secretary = DB::transaction(function () use ($validated, $chairman, $currentTerm, $token) {
+            $user = User::create([
+                'first_name' => trim($validated['first_name']),
+                'last_name' => trim($validated['last_name']),
+                'email' => strtolower($validated['email']),
+                'phone_number' => filled($validated['phone'] ?? null) ? trim($validated['phone']) : null,
+                'barangay_id' => $chairman->barangay_id,
+                'role' => 'sk_secretary',
+                'password' => Hash::make(Str::random(64)),
+                'is_verified' => 0,
+                'status' => 'inactive',
+                'term_start' => null,
+                'term_end' => null,
+                'archived_at' => null,
+            ]);
+
+            DB::table('official_terms')->insert([
+                'user_id' => $user->user_id,
+                'term_id' => $currentTerm->term_id,
+                'barangay_id' => $chairman->barangay_id,
+                'role' => 'sk_secretary',
+                'status' => 'pending',
+                'started_at' => null,
+                'completed_at' => null,
+            ]);
+            DB::table('password_reset_tokens')->updateOrInsert(
+                ['email' => $user->email],
+                ['token' => Hash::make($token), 'created_at' => now()]
+            );
+            return $user;
+        });
+
+        $setupLink = route('password.setup', ['token' => $token, 'email' => $secretary->email]);
+        try {
+            Mail::send('email.account-setup', ['user' => $secretary, 'setupLink' => $setupLink], function ($message) use ($secretary) {
+                $message->to($secretary->email, trim($secretary->first_name.' '.$secretary->last_name))
+                    ->subject('Set Up Your SK360 Account');
+            });
+        } catch (\Throwable $exception) {
+            \Log::error('Mobile Secretary setup email failed for '.$secretary->email.': '.$exception->getMessage());
+            return response()->json([
+                'message' => 'Secretary account created, but the setup email could not be sent. Use the web Leadership page to resend it.',
+                'secretary_created' => true,
+            ], 201);
+        }
+
+        return response()->json([
+            'message' => 'SK Secretary account created. A password setup link was sent to '.$secretary->email.'.',
+            'secretary_created' => true,
+        ], 201);
+    }
+
     public function updateCouncilMember(Request $request, int $councilId): JsonResponse
     {
         $user = $request->user();
@@ -1851,6 +1944,9 @@ class MobileSyncController extends Controller
                 'user_id',
                 $userProfilePicture,
                 'barangay_id',
+                'email',
+                DB::raw('phone_number as phone'),
+                'is_verified',
                 DB::raw("CONCAT(first_name, ' ', last_name) as full_name"),
                 DB::raw("
                     CASE
@@ -1859,8 +1955,16 @@ class MobileSyncController extends Controller
                         ELSE role
                     END as position
                 "),
-                DB::raw("'2024-2026' as term"),
-                DB::raw("'current' as status")
+                DB::raw("COALESCE((
+                    SELECT CONCAT(at.start_year, '-', at.end_year)
+                    FROM official_terms ot
+                    JOIN administration_terms at ON at.term_id = ot.term_id
+                    WHERE ot.user_id = users.user_id
+                      AND ot.status IN ('pending', 'current')
+                    ORDER BY ot.official_term_id DESC
+                    LIMIT 1
+                ), 'N/A') as term"),
+                'status'
             )
             ->get();
 
@@ -1908,6 +2012,9 @@ class MobileSyncController extends Controller
                     'leadership_profiles.barangay_id',
                     'leadership_profiles.full_name',
                     'leadership_profiles.position',
+                    'u.email',
+                    DB::raw('u.phone_number as phone'),
+                    'u.is_verified',
                     $joinedProfilePicture,
                     DB::raw("
                         CASE
