@@ -36,7 +36,12 @@
         ->take(2)
         ->map(fn ($part) => mb_strtoupper(mb_substr($part, 0, 1)))
         ->implode('');
-    $skPhoto = !empty($skUser->profile_pic ?? null) ? asset('uploads/profile_pics/' . $skUser->profile_pic) : null;
+    $skProfilePic = $skUser->profile_pic ?? null;
+    $skPhoto = !empty($skProfilePic)
+        ? asset(\Illuminate\Support\Str::startsWith($skProfilePic, 'uploads/')
+            ? $skProfilePic
+            : 'uploads/profile_pics/'.$skProfilePic)
+        : null;
     $skAccountButtonId = $accountButtonId ?? 'userMenuBtn';
     $skAccountMenuId = $accountMenuId ?? 'userDropdown';
     $skBindBell = $bindBell ?? false;

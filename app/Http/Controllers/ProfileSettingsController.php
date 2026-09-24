@@ -98,26 +98,42 @@ class ProfileSettingsController extends Controller
     public function update(Request $request, string $role): RedirectResponse
     {
         $config = $this->authorizeRole($role);
-
-        $validated = $request->validate([
-            'first_name' => ['required', 'string', 'max:50'],
-            'last_name' => ['required', 'string', 'max:50'],
-            'profile_pic' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
-        ]);
-
         $user = auth()->user();
-        unset($validated['profile_pic']);
-        $user->update($validated);
+        $hasProfilePicColumn = Schema::hasColumn('users', 'profile_pic');
 
-        if ($request->hasFile('profile_pic') && Schema::hasColumn('users', 'profile_pic')) {
+        $rules = [
+            'first_name' => ['sometimes', 'required', 'string', 'max:50'],
+            'last_name' => ['sometimes', 'required', 'string', 'max:50'],
+        ];
+
+        if ($hasProfilePicColumn) {
+            $rules['profile_pic'] = ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'];
+            $rules['remove_photo'] = ['nullable', 'boolean'];
+        }
+
+        $validated = $request->validateWithBag('profile', $rules);
+
+        $changes = collect($validated)
+            ->only(['first_name', 'last_name'])
+            ->all();
+
+        if ($hasProfilePicColumn && $request->boolean('remove_photo')) {
+            $changes['profile_pic'] = null;
+        } elseif ($hasProfilePicColumn && $request->hasFile('profile_pic')) {
             $directory = public_path('uploads/profile_pics');
             File::ensureDirectoryExists($directory);
             $filename = $user->user_id.'-'.Str::random(20).'.'.$request->file('profile_pic')->extension();
             $request->file('profile_pic')->move($directory, $filename);
-            $user->update(['profile_pic' => 'uploads/profile_pics/'.$filename]);
+            $changes['profile_pic'] = 'uploads/profile_pics/'.$filename;
         }
 
-        return redirect()->route($config['prefix'].'.profile')->with('status', 'Profile updated successfully.');
+        if ($changes !== []) {
+            $user->update($changes);
+        }
+
+        return redirect()
+            ->route($config['prefix'].'.profile')
+            ->with('status', 'Profile updated successfully.');
     }
 
     public function updatePassword(Request $request, string $role): RedirectResponse
@@ -125,18 +141,23 @@ class ProfileSettingsController extends Controller
         $config = $this->authorizeRole($role);
         $user = auth()->user();
 
-        $validated = $request->validate([
+        $validated = $request->validateWithBag('password', [
             'current_password' => ['required'],
             'password' => ['required', 'confirmed', 'min:8'],
         ]);
 
         if (! Hash::check($validated['current_password'], $user->password)) {
-            return back()->withErrors(['current_password' => 'Current password is incorrect.']);
+            return back()->withErrors([
+                'current_password' => 'Current password is incorrect.',
+            ], 'password');
         }
 
         $user->update(['password' => $validated['password']]);
 
-        return redirect()->route($config['prefix'].'.profile')->with('status', 'Password updated successfully.');
+        return redirect()
+            ->route($config['prefix'].'.profile')
+            ->with('status', 'Password updated successfully.')
+            ->with('tab', 'security');
     }
 
     protected function authorizeRole(string $role): array
