@@ -55,7 +55,7 @@
                                 <div class="border-l-4 border-red-500 pl-3">
                                     <div class="flex items-center justify-between gap-2">
                                         <p class="text-[11px] font-black text-gray-800 uppercase leading-none">{{ $event->title }}</p>
-                                        <span data-sk-event="{{ $event->event_type }}" class="rounded-full px-2 py-1 text-[8px] font-bold uppercase {{ $event->type_badge }}">
+                                        <span data-sk-event="{{ $event->event_type ?? 'submission_slot' }}" class="rounded-full px-2 py-1 text-[8px] font-bold uppercase {{ $event->type_badge }}">
                                             {{ $event->type_label }}
                                         </span>
                                     </div>
@@ -63,7 +63,7 @@
                                         {{ \Carbon\Carbon::parse($event->start_datetime)->format('M d, Y • h:i A') }}
                                     </p>
                                     <p class="text-[9px] text-gray-400 mt-1">
-                                        {{ $event->location ?: 'No location provided' }}
+                                        {{ $event->location ?? 'No location provided' }}
                                     </p>
                                 </div>
                             @empty

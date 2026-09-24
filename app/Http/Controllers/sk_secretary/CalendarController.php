@@ -88,6 +88,11 @@ class CalendarController extends Controller
                     $slot->start_date
                 )->startOfDay();
 
+                $slot->event_type=
+                    $slot->submission_type==='budget_report'
+                        ? 'budget_slot'
+                        : 'report_slot';
+
                 $slot->type_label=
                     $slot->submission_type==='budget_report'
                         ? 'Budget Slot'
