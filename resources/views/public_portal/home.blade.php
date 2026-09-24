@@ -7,105 +7,44 @@
     <title>SK360 Public Portal</title>
 
     <script src="https://cdn.tailwindcss.com"></script>
+    @include('partials.public.assets')
 </head>
 
-<body class="bg-gray-50 text-gray-800">
+<body class="sk-app sk-portal text-gray-800">
 
 {{-- HEADER --}}
-<header class="sticky top-0 z-40 bg-red-600 text-white shadow">
-
-    <div class="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
-
-        <div class="flex items-center gap-3">
-
-            <img
-                src="{{ asset('images/logo.png') }}"
-                class="w-10 h-10 rounded-full object-cover"
-                alt="SK360 Logo"
-            >
-
-            <div>
-
-                <h1 class="text-xl font-black">
-                    SK 360°
-                </h1>
-
-                <p class="text-[10px] opacity-80 uppercase tracking-widest">
-                    Public Information Portal
-                </p>
-
-            </div>
-
-        </div>
-
-        <a
-            href="{{ url('/') }}"
-            class="text-xs font-bold hover:text-yellow-300 transition"
-        >
-            ← Main Website
-        </a>
-
-    </div>
-
-</header>
+@include('partials.public.header')
 
 <main>
 
 {{-- HERO --}}
-<section class="bg-gradient-to-br from-red-600 to-red-700 text-white">
+<x-public-hero eyebrow="City of Lipa" title="SK360 Public Portal" :centered="true">
+        Access official public information from the Sangguniang Kabataan
+        Federation of Lipa City. Stay informed about announcements,
+        upcoming activities, current barangay SK leadership, and
+        Annual Budget information.
 
-    <div class="max-w-4xl mx-auto px-6 py-14 text-center">
-
-        <p class="text-xs font-black uppercase tracking-[0.2em] text-red-100 mb-3">
-            City of Lipa
-        </p>
-
-        <h2 class="text-4xl md:text-5xl font-black mb-4">
-            SK360 Public Portal
-        </h2>
-
-        <p class="max-w-2xl mx-auto text-red-100 leading-relaxed">
-            Access official public information from the Sangguniang Kabataan
-            Federation of Lipa City. Stay informed about announcements,
-            upcoming activities, current barangay SK leadership, and
-            Annual Budget information.
-        </p>
-
-        <div class="flex flex-wrap justify-center gap-3 mt-8">
-
-            <a
-                href="{{ route('public.announcements') }}"
-                class="bg-white text-red-600 px-6 py-3 rounded-xl font-black text-sm hover:bg-red-50 transition"
-            >
-                📢 Announcements
+        <x-slot:extra>
+            <div class="flex flex-wrap justify-center gap-3 mt-8">
+            <a href="{{ route('public.announcements') }}" class="sk-btn sk-btn--secondary">
+                @include('partials.ui.icon', ['icon' => 'megaphone', 'iconSize' => 17, 'iconClass' => 'text-red-600'])
+                Announcements
             </a>
-
-            <a
-                href="{{ route('public.calendar') }}"
-                class="bg-white text-red-600 px-6 py-3 rounded-xl font-black text-sm hover:bg-red-50 transition"
-            >
-                📅 Calendar
+            <a href="{{ route('public.calendar') }}" class="sk-btn sk-btn--secondary">
+                @include('partials.ui.icon', ['icon' => 'calendar-days', 'iconSize' => 17, 'iconClass' => 'text-red-600'])
+                Calendar
             </a>
-
-            <a
-                href="{{ route('public.leadership') }}"
-                class="bg-white text-red-600 px-6 py-3 rounded-xl font-black text-sm hover:bg-red-50 transition"
-            >
-                👥 Leadership
+            <a href="{{ route('public.leadership') }}" class="sk-btn sk-btn--secondary">
+                @include('partials.ui.icon', ['icon' => 'id-card', 'iconSize' => 17, 'iconClass' => 'text-red-600'])
+                Leadership
             </a>
-
-            <a
-                href="{{ route('public.budgets') }}"
-                class="bg-white text-red-600 px-6 py-3 rounded-xl font-black text-sm hover:bg-red-50 transition"
-            >
-                💰 Annual Budget
+            <a href="{{ route('public.budgets') }}" class="sk-btn sk-btn--secondary">
+                @include('partials.ui.icon', ['icon' => 'wallet', 'iconSize' => 17, 'iconClass' => 'text-red-600'])
+                Annual Budget
             </a>
-
-        </div>
-
-    </div>
-
-</section>
+            </div>
+        </x-slot:extra>
+    </x-public-hero>
 
 {{-- LATEST UPDATES --}}
 <section class="max-w-4xl mx-auto px-6 py-12">
@@ -133,12 +72,12 @@
             @if($item->feed_type === 'announcement')
 
                 {{-- ANNOUNCEMENT PREVIEW --}}
-                <div class="bg-white border border-gray-100 rounded-2xl shadow-sm p-5">
+                <div class="bg-white border border-gray-100 rounded-2xl shadow-sm p-5" data-sk-tone="blue">
 
                     <div class="flex items-start gap-3 mb-4">
 
                         <div class="w-11 h-11 bg-red-50 text-red-600 rounded-xl flex items-center justify-center shrink-0">
-                            📢
+                            @include('partials.ui.icon', ['icon' => 'megaphone', 'iconSize' => 18])
                         </div>
 
                         <div class="min-w-0">
@@ -179,7 +118,7 @@
                                 href="{{ route('public.announcements') }}"
                                 class="text-xs font-black text-red-600 hover:text-red-700 whitespace-nowrap"
                             >
-                                View →
+                                View <span class="inline-flex align-[-2px]">@include('partials.ui.icon', ['icon' => 'arrow-right', 'iconSize' => 14])</span>
                             </a>
 
                         </div>
@@ -191,12 +130,12 @@
             @else
 
                 {{-- EVENT PREVIEW --}}
-                <div class="bg-white border border-gray-100 rounded-2xl shadow-sm p-5">
+                <div class="bg-white border border-gray-100 rounded-2xl shadow-sm p-5" data-sk-tone="yellow">
 
                     <div class="flex items-start gap-3 mb-4">
 
-                        <div class="w-11 h-11 bg-red-50 text-red-600 rounded-xl flex items-center justify-center shrink-0">
-                            📅
+                        <div class="w-11 h-11 bg-yellow-50 text-yellow-700 rounded-xl flex items-center justify-center shrink-0">
+                            @include('partials.ui.icon', ['icon' => 'calendar-days', 'iconSize' => 18])
                         </div>
 
                         <div class="min-w-0">
@@ -224,17 +163,17 @@
                     <div class="space-y-1 mt-4 text-xs text-gray-500">
 
                         <p>
-                            📅
+                            @include('partials.ui.icon', ['icon' => 'calendar-days', 'iconSize' => 18])
                             {{ \Carbon\Carbon::parse($item->start_datetime)->format('M d, Y') }}
                         </p>
 
                         <p>
-                            🕐
+                            @include('partials.ui.icon', ['icon' => 'clock', 'iconSize' => 18])
                             {{ \Carbon\Carbon::parse($item->start_datetime)->format('h:i A') }}
                         </p>
 
                         <p class="truncate">
-                            📍
+                            @include('partials.ui.icon', ['icon' => 'map-pin', 'iconSize' => 18])
                             {{ $item->location ?: 'Location not specified' }}
                         </p>
 
@@ -246,7 +185,7 @@
                             href="{{ route('public.calendar') }}"
                             class="text-xs font-black text-red-600 hover:text-red-700"
                         >
-                            View Calendar →
+                            View Calendar <span class="inline-flex align-[-2px]">@include('partials.ui.icon', ['icon' => 'arrow-right', 'iconSize' => 14])</span>
                         </a>
 
                     </div>
@@ -259,8 +198,8 @@
 
             <div class="md:col-span-2 bg-white border border-gray-100 rounded-2xl px-6 py-12 text-center">
 
-                <div class="text-4xl mb-3">
-                    📭
+                <div class="sk-icon-tile sk-icon-tile--gray mx-auto mb-3" style="width:56px;height:56px;border-radius:18px">
+                    @include('partials.ui.icon', ['icon' => 'inbox', 'iconSize' => 24])
                 </div>
 
                 <h3 class="font-black text-gray-700">
@@ -287,7 +226,7 @@
         <div class="flex flex-col md:flex-row md:items-center gap-5">
 
             <div class="w-14 h-14 bg-red-50 text-red-600 rounded-2xl flex items-center justify-center text-2xl shrink-0">
-                🏛️
+                @include('partials.ui.icon', ['icon' => 'landmark', 'iconSize' => 18])
             </div>
 
             <div>
@@ -320,17 +259,11 @@
     title="Back to top"
     class="hidden fixed bottom-6 right-6 z-50 w-12 h-12 rounded-full bg-red-600 text-white shadow-xl hover:bg-red-700 transition items-center justify-center text-xl"
 >
-    ↑
+    @include('partials.ui.icon', ['icon' => 'arrow-up', 'iconSize' => 20])
 </button>
 
 {{-- FOOTER --}}
-<footer class="bg-gray-900 text-gray-400">
-
-    <div class="max-w-6xl mx-auto px-6 py-6 text-center text-xs">
-        &copy; {{ date('Y') }} SK360 • Sangguniang Kabataan Federation of Lipa City
-    </div>
-
-</footer>
+@include('partials.public.footer')
 
 <script>
 const backToTopBtn = document.getElementById('backToTopBtn');

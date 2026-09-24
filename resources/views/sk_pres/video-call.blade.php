@@ -54,7 +54,7 @@
                 <div class="flex flex-wrap items-center gap-2">
                     <button id="toggleMicBtn" type="button" class="rounded-xl bg-white/10 px-4 py-2 text-xs font-semibold hover:bg-white/20">Mute Mic</button>
                     <button id="toggleCamBtn" type="button" class="rounded-xl bg-white/10 px-4 py-2 text-xs font-semibold hover:bg-white/20">Turn Off Camera</button>
-                    <button id="leaveBtn" type="button" class="rounded-xl bg-[#ef4444] px-4 py-2 text-xs font-semibold text-white hover:bg-[#dc2626]">Leave Meeting</button>
+                    <button id="leaveBtn" type="button" class="rounded-xl bg-[#dc2626] px-4 py-2 text-xs font-bold text-white hover:bg-[#c0202c]">Leave Meeting</button>
                 </div>
             </div>
         </div>

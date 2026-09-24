@@ -3,121 +3,86 @@
 
 @section('title', 'SK 360 | Reset Password')
 
+{{-- Styled by the shared design system (public/css/sk360-ui.css, .sk-auth). --}}
 @section('page_css')
-<style>
-    body {
-        margin: 0;
-        background: #f2f6fb;
-        font-family: Inter, "Segoe UI", Tahoma, sans-serif;
-    }
-
-    .reset-page {
-        min-height: 100vh;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: 24px;
-    }
-
-    .auth-card {
-        background: #fff;
-        border-radius: 30px;
-        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
-        max-width: 450px;
-        width: 100%;
-        padding: 40px;
-    }
-
-    h1 {
-        color: #d32f2f;
-        margin: 0 0 8px;
-        text-align: center;
-    }
-
-    p {
-        color: #6b7280;
-        text-align: center;
-        margin: 0 0 24px;
-    }
-
-    label {
-        display: block;
-        margin: 14px 0 8px;
-        font-size: 0.85rem;
-        font-weight: 700;
-    }
-
-    input {
-        box-sizing: border-box;
-        width: 100%;
-        background-color: #f1f3f5;
-        border: 0;
-        border-radius: 10px;
-        padding: 13px 15px;
-        outline: none;
-    }
-
-    button {
-        background-color: #d32f2f;
-        border: 0;
-        border-radius: 10px;
-        padding: 13px;
-        font-weight: 700;
-        width: 100%;
-        margin-top: 20px;
-        color: #fff;
-        cursor: pointer;
-    }
-
-    .error {
-        background: #fff5f5;
-        color: #d32f2f;
-        border: 1px solid #ffebed;
-        border-radius: 10px;
-        padding: 12px;
-        margin-bottom: 16px;
-        font-size: 0.85rem;
-    }
-
-    .back-link {
-        display: block;
-        margin-top: 16px;
-        text-align: center;
-        color: #6b7280;
-        text-decoration: none;
-        font-size: 0.85rem;
-    }
-</style>
 @endsection
 
 @section('content')
-<div class="reset-page">
-    <form method="POST" action="{{ route('password.update') }}" class="auth-card">
-        @csrf
-        <h1>Create New Password</h1>
-        <p>Enter a new password for your SK360 account.</p>
-
-        @if ($errors->any())
-            <div class="error">
-                @foreach ($errors->all() as $error)
-                    <div>{{ $error }}</div>
-                @endforeach
+<div class="sk-auth">
+    <section class="sk-auth__brand">
+        <div class="sk-auth__top">
+            <div class="sk-auth__mark">
+                <img src="{{ asset('images/logo.png') }}" alt="SK 360 logo">
+                <div>
+                    <p class="sk-auth__mark-name">SK 360&deg;</p>
+                    <p class="sk-auth__mark-tag">Management System</p>
+                </div>
             </div>
-        @endif
 
-        <input type="hidden" name="token" value="{{ $token }}">
+            <a class="sk-auth__back" href="{{ route('login') }}">
+                @include('partials.ui.icon', ['icon' => 'chevron-left', 'iconSize' => 16])
+                Back to Login
+            </a>
+        </div>
 
-        <label>Email Address</label>
-        <input type="email" name="email" value="{{ old('email', $email) }}" required>
+        <div>
+            <h1 class="sk-auth__headline">Create New Password</h1>
+            <p class="sk-auth__lead">Enter a new password for your SK360 account.</p>
+        </div>
 
-        <label>New Password</label>
-        <input type="password" name="password" required>
+        <div></div>
+    </section>
 
-        <label>Confirm Password</label>
-        <input type="password" name="password_confirmation" required>
+    <section class="sk-auth__panel">
+        <form method="POST" action="{{ route('password.update') }}" class="sk-auth__form">
+            @csrf
+            <span class="sk-eyebrow"><span class="sk-dot"></span>Account Security</span>
+            <h2 class="sk-auth__title">Create New Password</h2>
+            <p class="sk-auth__subtitle">Enter a new password for your SK360 account.</p>
 
-        <button type="submit">Reset Password</button>
-        <a href="{{ route('login') }}" class="back-link">Back to Login</a>
-    </form>
+            @if ($errors->any())
+                <div class="sk-alert sk-alert--error" style="margin-top: 20px;">
+                    @include('partials.ui.icon', ['icon' => 'circle-alert', 'iconSize' => 18])
+                    <div>
+                        @foreach ($errors->all() as $error)
+                            <div>{{ $error }}</div>
+                        @endforeach
+                    </div>
+                </div>
+            @endif
+
+            <input type="hidden" name="token" value="{{ $token }}">
+
+            <label class="sk-field">
+                <span class="sk-field__label">Email Address</span>
+                <span class="sk-field__control">
+                    @include('partials.ui.icon', ['icon' => 'mail', 'iconSize' => 18])
+                    <input type="email" name="email" value="{{ old('email', $email) }}" required>
+                </span>
+            </label>
+
+            <label class="sk-field">
+                <span class="sk-field__label">New Password</span>
+                <span class="sk-field__control">
+                    @include('partials.ui.icon', ['icon' => 'lock', 'iconSize' => 18])
+                    <input type="password" name="password" required>
+                </span>
+            </label>
+
+            <label class="sk-field">
+                <span class="sk-field__label">Confirm Password</span>
+                <span class="sk-field__control">
+                    @include('partials.ui.icon', ['icon' => 'lock', 'iconSize' => 18])
+                    <input type="password" name="password_confirmation" required>
+                </span>
+            </label>
+
+            <button type="submit" class="sk-btn sk-btn--primary sk-btn--lg" style="width: 100%; margin-top: 28px;">Reset Password</button>
+
+            <div class="sk-auth__footer" style="justify-content: center;">
+                <a href="{{ route('login') }}" class="sk-link">Back to Login</a>
+            </div>
+        </form>
+    </section>
 </div>
 @endsection

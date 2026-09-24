@@ -14,104 +14,19 @@
     </title>
 
     <script src="https://cdn.tailwindcss.com"></script>
+    @include('partials.public.assets')
 </head>
 
-<body class="bg-gray-50 text-gray-800">
+<body class="sk-app sk-portal text-gray-800">
 
-<header class="bg-red-600 text-white shadow">
-
-    <div class="max-w-6xl mx-auto px-6 py-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-
-        <a
-            href="{{ route('public.home') }}"
-            class="flex items-center gap-3"
-        >
-
-            <img
-                src="{{ asset('images/logo.png') }}"
-                class="w-10 h-10 rounded-full object-cover"
-                alt="SK360 Logo"
-            >
-
-            <div>
-
-                <h1 class="text-xl font-black">
-                    SK 360°
-                </h1>
-
-                <p class="text-[10px] opacity-80 uppercase tracking-widest">
-                    Public Information Portal
-                </p>
-
-            </div>
-
-        </a>
-
-        <nav class="flex flex-wrap items-center gap-4 text-xs font-bold">
-
-            <a
-                href="{{ route('public.home') }}"
-                class="hover:text-yellow-300 transition"
-            >
-                Home
-            </a>
-
-            <a
-                href="{{ route('public.announcements') }}"
-                class="hover:text-yellow-300 transition"
-            >
-                Announcements
-            </a>
-
-            <a
-                href="{{ route('public.calendar') }}"
-                class="hover:text-yellow-300 transition"
-            >
-                Calendar
-            </a>
-
-            <a
-                href="{{ route('public.leadership') }}"
-                class="hover:text-yellow-300 transition"
-            >
-                Leadership
-            </a>
-
-            <a
-                href="{{ route('public.budgets') }}"
-                class="text-yellow-300"
-            >
-                Annual Budget
-            </a>
-
-        </nav>
-
-    </div>
-
-</header>
+@include('partials.public.header')
 
 <main>
 
     {{-- HERO --}}
-    <section class="bg-gradient-to-br from-red-600 to-red-700 text-white">
-
-        <div class="max-w-6xl mx-auto px-6 py-14 text-center">
-
-            <p class="text-xs font-black uppercase tracking-[0.2em] text-red-100 mb-3">
-                Budget Transparency
-            </p>
-
-            <h2 class="text-4xl md:text-5xl font-black mb-4">
-                Barangay Annual Budgets
-            </h2>
-
-            <p class="max-w-2xl mx-auto text-red-100 leading-relaxed">
-                View Annual Budget records submitted by Sangguniang Kabataan barangays through the SK360 system.
-            </p>
-
-        </div>
-
-    </section>
+    <x-public-hero eyebrow="Budget Transparency" title="Barangay Annual Budgets" :centered="true" width="max-w-6xl">
+        View Annual Budget records submitted by Sangguniang Kabataan barangays through the SK360 system.
+    </x-public-hero>
 
     <section class="max-w-6xl mx-auto px-6 py-10">
 
@@ -414,7 +329,7 @@
                                     rel="noopener"
                                     class="mt-5 flex items-center justify-center gap-2 rounded-xl bg-red-600 px-4 py-3 text-xs font-black uppercase text-white hover:bg-red-700 transition"
                                 >
-                                    <span>📄</span>
+                                    <span class="inline-flex">@include('partials.ui.icon', ['icon' => 'file-text', 'iconSize' => 15])</span>
                                     View Annual Budget
                                 </a>
 
@@ -430,8 +345,8 @@
 
                             <div class="mt-6 rounded-2xl border border-dashed border-gray-200 bg-gray-50 p-6 text-center">
 
-                                <div class="text-3xl mb-3">
-                                    📄
+                                <div class="sk-icon-tile sk-icon-tile--gray mx-auto mb-3" style="width:56px;height:56px;border-radius:18px">
+                                    @include('partials.ui.icon', ['icon' => 'file-text', 'iconSize' => 24])
                                 </div>
 
                                 <p class="font-black text-gray-600">
@@ -456,8 +371,8 @@
 
                     <div class="bg-white rounded-3xl border border-dashed border-gray-200 p-12 text-center">
 
-                        <div class="text-4xl mb-4">
-                            📊
+                        <div class="sk-icon-tile sk-icon-tile--gray mx-auto mb-3" style="width:56px;height:56px;border-radius:18px">
+                            @include('partials.ui.icon', ['icon' => 'chart-column', 'iconSize' => 24])
                         </div>
 
                         <h4 class="text-lg font-black text-gray-700">
@@ -480,58 +395,7 @@
 
 </main>
 
-<footer class="border-t border-gray-200 bg-white mt-10">
-
-    <div class="max-w-6xl mx-auto px-6 py-8">
-
-        <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-
-            <div class="flex items-center gap-3">
-
-                <img
-                    src="{{ asset('images/logo.png') }}"
-                    class="w-8 h-8 rounded-full object-cover"
-                    alt="SK360 Logo"
-                >
-
-                <div>
-
-                    <p class="font-black text-gray-700">
-                        SK 360°
-                    </p>
-
-                    <p class="text-[10px] uppercase tracking-widest text-gray-400">
-                        Public Information Portal
-                    </p>
-
-                </div>
-
-            </div>
-
-            <p class="max-w-xl text-xs text-gray-400 md:text-right">
-                Annual Budget information displayed on this page is based on records submitted by authorized SK officials through the SK360 system.
-            </p>
-
-        </div>
-
-        <div class="border-t border-gray-100 mt-6 pt-5 flex flex-col md:flex-row gap-3 md:items-center md:justify-between text-[10px] text-gray-400">
-
-            <p>
-                © {{ date('Y') }} SK 360°. All rights reserved.
-            </p>
-
-            <a
-                href="{{ route('public.home') }}"
-                class="font-bold hover:text-red-600 transition"
-            >
-                Back to Public Portal
-            </a>
-
-        </div>
-
-    </div>
-
-</footer>
+@include('partials.public.footer', ['footerNote' => 'Annual Budget information displayed on this page is based on records submitted by authorized SK officials through the SK360 system.'])
 
 </body>
 </html>

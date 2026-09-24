@@ -8,132 +8,104 @@
 @endsection
 
 @section('content')
+@php
+    // Presentation only: an icon and tint for each stat the controller sends.
+    $statStyles = [
+        'Total Barangays' => ['icon' => 'building-2', 'tone' => 'blue'],
+        'Submitted' => ['icon' => 'circle-check', 'tone' => 'green'],
+        'Pending' => ['icon' => 'hourglass', 'tone' => 'yellow'],
+        'Late' => ['icon' => 'triangle-alert', 'tone' => ''],
+    ];
+
+    $qualityCriteria = [
+        'complete_contents' => ['Complete Contents', 'Required content is present.'],
+        'correct_document' => ['Correct Document', 'Matches the required submission.'],
+        'correct_period' => ['Correct Period', 'Reporting period and details are correct.'],
+        'readable_organized' => ['Readable / Organized', 'Document is readable and organized.'],
+        'supporting_documents' => ['Supporting Documents', 'Check when applicable and complete.'],
+    ];
+
+    $filterSelect = 'w-full h-11 rounded-xl border border-gray-200 bg-white px-3.5 text-sm font-semibold text-gray-700';
+@endphp
+
 <div class="flex h-screen overflow-hidden bg-gray-100">
-    <div class="w-64 bg-red-600 text-white flex flex-col p-3 overflow-y-auto">
-        <div class="flex items-center gap-3 mb-4">
-            <img src="{{ asset('images/logo.png') }}" class="w-8 h-8 rounded-full object-cover" alt="logo">
-            <div class="leading-tight">
-                <h2 class="text-lg font-extrabold tracking-wide">SK 360°</h2>
-                <p class="text-[10px] opacity-80">Management System</p>
-            </div>
-        </div>
+    @include('partials.app.sidebar')
 
-        <div class="bg-red-500 rounded-lg p-2 flex items-center gap-2 mb-3 shadow text-xs">
-            <div class="bg-yellow-400 text-red-600 p-1 rounded-full text-sm">&#128100;</div>
-            <div>
-                <p class="font-semibold text-xs">SK President</p>
-                <p class="text-xs opacity-80">Active Role</p>
-            </div>
-        </div>
+    <div class="flex-1 flex flex-col min-w-0">
+        @include('partials.app.topbar')
 
-        <nav class="space-y-1 text-xs">
-            @foreach ($menuItems as $item)
-                <a href="{{ $item['link'] }}"
-                   class="flex items-center gap-2 p-2 rounded-lg {{ $item['link'] === $currentUrl ? 'bg-red-500' : 'hover:bg-red-500 transition' }}">
-                    <span class="{{ $item['link'] === $currentUrl ? 'bg-yellow-400 text-red-600' : 'bg-red-400' }} p-1 rounded text-sm">{!! $item['icon'] !!}</span>
-                    <span class="{{ $item['link'] === $currentUrl ? 'text-yellow-300 font-semibold' : '' }} text-xs">{{ $item['label'] }}</span>
-                </a>
-            @endforeach
-        </nav>
-    </div>
-
-    <div class="flex-1 flex flex-col">
-        <div class="bg-red-600 text-white px-6 py-3 flex justify-between items-center shadow">
-            <input type="text" placeholder="Search..." class="px-4 py-2 rounded-full text-black w-1/3 focus:outline-none">
-
-            <div class="flex items-center gap-3 relative">
-                <div class="relative">
-                    <button id="notifBtn" type="button" class="text-xl hover:bg-red-500 p-2 rounded-lg transition">&#128276;</button>
-
-                    <div id="notifDropdown" class="hidden absolute right-0 mt-3 w-72 bg-white rounded-2xl shadow-xl border z-50 overflow-hidden">
-                        <div class="px-4 py-3 font-semibold border-b text-gray-800">Notifications</div>
-                        <div class="max-h-64 overflow-y-auto">
-                            <div class="px-4 py-3 hover:bg-gray-100 text-sm text-gray-700">No notifications yet</div>
-                        </div>
-                    </div>
+        <main class="flex-1 overflow-y-auto p-8">
+            <div class="sk-page-head">
+                <div class="sk-page-head__text">
+                    <span class="sk-eyebrow"><span class="sk-dot"></span>Consolidation</span>
+                    <h1 class="sk-page-title">Report Consolidation</h1>
+                    <p class="sk-page-subtitle">
+                        Automatically compile barangay reports into unified monthly, quarterly, and annual documents.
+                    </p>
                 </div>
 
-                <div class="relative">
-                    <button id="userMenuBtn" type="button" class="flex items-center gap-2 hover:bg-red-500 px-3 py-2 rounded-lg transition">
-                        <span class="font-semibold">{{ $fullName }}</span>
-                    </button>
-
-                    <div id="userDropdown" class="hidden absolute right-0 mt-3 w-64 bg-white rounded-2xl shadow-xl border overflow-hidden z-50">
-                        <div class="px-5 py-4 font-semibold text-gray-800 border-b">My Account</div>
-
-                        <a href="{{ route('sk_pres.profile') }}" class="flex items-center gap-3 px-5 py-3 hover:bg-gray-100 transition">
-                            <span>&#128100;</span>
-                            <span class="text-gray-700">Profile Settings</span>
-                        </a>
-
-                        <form method="POST" action="{{ route('logout') }}">
-                            @csrf
-                            <button type="submit" class="w-full text-left flex items-center gap-3 px-5 py-3 text-red-500 hover:bg-gray-100 transition">
-                                <span>&#8617;</span>
-                                <span>Log Out</span>
-                            </button>
-                        </form>
-                    </div>
+                <div class="sk-page-head__actions">
+                    <a href="{{ $downloadRoute }}" class="sk-btn sk-btn--primary sk-btn--lg">
+                        @include('partials.ui.icon', ['icon' => 'download', 'iconSize' => 18])
+                        Download Consolidated PDF
+                    </a>
                 </div>
-            </div>
-        </div>
-
-        <main class="flex-1 overflow-y-auto p-10 bg-gray-100">
-            <div class="mb-8">
-                <h1 class="text-4xl font-bold text-gray-900 mb-2">Report Consolidation</h1>
-                <p class="text-gray-600 text-lg">
-                    Automatically compile barangay reports into unified monthly, quarterly, and annual documents.
-                </p>
             </div>
 
             @if (session('quality_status'))
-                <div class="mb-6 rounded-2xl border border-green-200 bg-green-50 px-5 py-4 text-sm text-green-700">
-                    {{ session('quality_status') }}
+                <div class="sk-alert sk-alert--success mb-6">
+                    @include('partials.ui.icon', ['icon' => 'circle-check', 'iconSize' => 18])
+                    <span>{{ session('quality_status') }}</span>
                 </div>
             @endif
 
             @if ($errors->has('quality_review'))
-                <div class="mb-6 rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-700">
-                    {{ $errors->first('quality_review') }}
+                <div class="sk-alert sk-alert--error mb-6">
+                    @include('partials.ui.icon', ['icon' => 'circle-alert', 'iconSize' => 18])
+                    <span>{{ $errors->first('quality_review') }}</span>
                 </div>
             @endif
 
+            {{-- SUMMARY --}}
             <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5 mb-8">
                 @foreach ($stats as $stat)
-                    <div class="bg-white rounded-2xl p-5 shadow-sm">
-                        <p class="text-sm text-gray-500 mb-2">{{ $stat['label'] }}</p>
-                        <h2 class="text-4xl font-bold {{ $stat['valueClass'] }}">{{ $stat['value'] }}</h2>
+                    @php $style = $statStyles[$stat['label']] ?? ['icon' => 'layout-grid', 'tone' => '']; @endphp
+
+                    <div class="sk-stat">
+                        <div class="sk-stat__top">
+                            <div>
+                                <p class="sk-stat__label">{{ $stat['label'] }}</p>
+                                <p class="sk-stat__value {{ $stat['valueClass'] }}">{{ $stat['value'] }}</p>
+                            </div>
+                            <span class="sk-icon-tile {{ $style['tone'] ? 'sk-icon-tile--' . $style['tone'] : '' }}">
+                                @include('partials.ui.icon', ['icon' => $style['icon'], 'iconSize' => 21])
+                            </span>
+                        </div>
                     </div>
                 @endforeach
             </div>
 
-            <section class="bg-white rounded-2xl shadow-sm p-6">
-                <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6">
-                    <div>
-                        <h2 class="text-xl font-semibold text-gray-900">Barangay Submissions</h2>
-                        <p class="text-gray-500 text-sm">Review citywide report completion and archive consolidated outputs.</p>
-                    </div>
-
-                    <div class="flex flex-wrap gap-3">
-                        <a href="{{ $downloadRoute }}" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-xl text-sm font-medium">
-                            &#11015; Download Consolidated PDF
-                        </a>
-                    </div>
+            {{-- RECORDS --}}
+            <section class="sk-card overflow-hidden">
+                <div class="px-6 pt-6">
+                    <h2 class="sk-section-title">Barangay Submissions</h2>
+                    <p class="sk-section-subtitle">Review citywide report completion and archive consolidated outputs.</p>
                 </div>
 
-                <form method="GET" action="{{ route('sk_pres.consolidation') }}" class="flex flex-col xl:flex-row xl:items-end xl:justify-between gap-4 mb-5">
-                    <div class="w-full max-w-sm">
-                        <label class="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">Search Barangay</label>
-                        <div class="border rounded-xl px-4 py-3 flex items-center gap-3">
-                            <span class="text-gray-400">&#128269;</span>
-                            <input id="barangaySearch" type="text" placeholder="Search barangay..." class="w-full outline-none text-sm">
+                {{-- FILTERS --}}
+                <form method="GET" action="{{ route('sk_pres.consolidation') }}" class="mx-6 mt-5 flex flex-col xl:flex-row xl:items-end gap-4 rounded-2xl border border-gray-100 bg-[#f8f9fb] p-4">
+                    <div class="w-full xl:max-w-xs">
+                        <label for="barangaySearch" class="sk-overline block mb-2">Search Barangay</label>
+                        <div class="sk-search">
+                            @include('partials.ui.icon', ['icon' => 'search', 'iconSize' => 18])
+                            <input id="barangaySearch" type="text" placeholder="Search barangay..." class="!bg-white !border-gray-200">
                         </div>
                     </div>
 
-                    <div class="grid grid-cols-1 md:grid-cols-4 gap-3 w-full xl:w-auto">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 flex-1">
                         <div>
-                            <label class="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">Year</label>
-                            <select name="year" class="w-full border rounded-xl px-4 py-3 text-sm text-gray-600 outline-none bg-white">
+                            <label class="sk-overline block mb-2">Year</label>
+                            <select name="year" class="{{ $filterSelect }}">
                                 @foreach ($years as $year)
                                     <option value="{{ $year }}" {{ (int) $filters['year'] === (int) $year ? 'selected' : '' }}>{{ $year }}</option>
                                 @endforeach
@@ -141,8 +113,8 @@
                         </div>
 
                         <div>
-                            <label class="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">Period</label>
-                            <select name="period" id="periodFilter" class="w-full border rounded-xl px-4 py-3 text-sm text-gray-600 outline-none bg-white">
+                            <label class="sk-overline block mb-2">Period</label>
+                            <select name="period" id="periodFilter" class="{{ $filterSelect }}">
                                 <option value="all" {{ $filters['period'] === 'all' ? 'selected' : '' }}>All Reports</option>
                                 <option value="monthly" {{ $filters['period'] === 'monthly' ? 'selected' : '' }}>Monthly</option>
                                 <option value="quarterly" {{ $filters['period'] === 'quarterly' ? 'selected' : '' }}>Quarterly</option>
@@ -151,8 +123,8 @@
                         </div>
 
                         <div id="monthFilterWrap">
-                            <label class="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">Month</label>
-                            <select name="month" class="w-full border rounded-xl px-4 py-3 text-sm text-gray-600 outline-none bg-white">
+                            <label class="sk-overline block mb-2">Month</label>
+                            <select name="month" class="{{ $filterSelect }}">
                                 @foreach ($months as $number => $month)
                                     <option value="{{ $number }}" {{ (int) $filters['month'] === (int) $number ? 'selected' : '' }}>{{ $month }}</option>
                                 @endforeach
@@ -160,8 +132,8 @@
                         </div>
 
                         <div id="quarterFilterWrap">
-                            <label class="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">Quarter</label>
-                            <select name="quarter" class="w-full border rounded-xl px-4 py-3 text-sm text-gray-600 outline-none bg-white">
+                            <label class="sk-overline block mb-2">Quarter</label>
+                            <select name="quarter" class="{{ $filterSelect }}">
                                 @foreach ($quarters as $quarter)
                                     <option value="{{ $quarter }}" {{ $filters['quarter'] === $quarter ? 'selected' : '' }}>{{ $quarter }}</option>
                                 @endforeach
@@ -170,54 +142,72 @@
                     </div>
 
                     <div class="flex gap-2">
-                        <button type="submit" class="bg-red-500 hover:bg-red-600 text-white px-5 py-3 rounded-xl text-sm font-semibold">Apply</button>
-                        <a href="{{ route('sk_pres.consolidation') }}" class="bg-white hover:bg-gray-50 text-gray-600 border px-5 py-3 rounded-xl text-sm font-semibold">Reset</a>
+                        <button type="submit" class="sk-btn sk-btn--primary">
+                            @include('partials.ui.icon', ['icon' => 'filter', 'iconSize' => 16])
+                            Apply
+                        </button>
+                        <a href="{{ route('sk_pres.consolidation') }}" class="sk-btn sk-btn--secondary">Reset</a>
                     </div>
                 </form>
 
-                <div class="mb-4 rounded-2xl border border-blue-100 bg-blue-50 px-5 py-4 text-sm text-blue-800">
-                    This module compiles barangay accomplishment reports into one citywide view for monthly, quarterly, and annual monitoring.
+                <div class="sk-alert sk-alert--info mx-6 mt-4">
+                    @include('partials.ui.icon', ['icon' => 'info', 'iconSize' => 18])
+                    <span>This module compiles barangay accomplishment reports into one citywide view for monthly, quarterly, and annual monitoring.</span>
                 </div>
 
-                <div class="overflow-x-auto">
-                    <table class="w-full text-sm text-left border-separate border-spacing-y-2">
+                <div class="overflow-x-auto mt-5 border-t border-gray-100">
+                    <table class="w-full text-sm text-left">
                         <thead>
-                            <tr class="text-gray-500">
-                                <th class="px-4 py-3">Barangay</th>
-                                <th class="px-4 py-3">Monthly</th>
-                                <th class="px-4 py-3">Quarterly</th>
-                                <th class="px-4 py-3">Annual</th>
-                                <th class="px-4 py-3">Last Submission</th>
-                                <th class="px-4 py-3 text-center">Status</th>
+                            <tr>
+                                <th class="px-6 py-3.5">Barangay</th>
+                                <th class="px-6 py-3.5">Monthly</th>
+                                <th class="px-6 py-3.5">Quarterly</th>
+                                <th class="px-6 py-3.5">Annual</th>
+                                <th class="px-6 py-3.5">Last Submission</th>
+                                <th class="px-6 py-3.5 text-center">Status</th>
                             </tr>
                         </thead>
 
                         <tbody id="submissionRows">
                             @forelse ($submissions as $submission)
-                                <tr class="bg-gray-50" data-barangay="{{ strtolower($submission['barangay']) }}">
-                                    <td class="px-4 py-4 rounded-l-xl font-semibold text-gray-800">Barangay {{ $submission['barangay'] }}</td>
-
-                                    <td class="px-4 py-4">
-                                        <span class="{{ $submission['monthly_count'] > 0 ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700' }} rounded-full px-3 py-1 text-xs font-bold">{{ $submission['monthly'] }}</span>
+                                <tr data-barangay="{{ strtolower($submission['barangay']) }}">
+                                    <td class="px-6 py-4">
+                                        <div class="flex items-center gap-3">
+                                            <span class="sk-icon-tile sk-icon-tile--sm sk-icon-tile--gray">
+                                                @include('partials.ui.icon', ['icon' => 'building-2', 'iconSize' => 16])
+                                            </span>
+                                            <span class="font-bold text-gray-900">Barangay {{ $submission['barangay'] }}</span>
+                                        </div>
                                     </td>
 
-                                    <td class="px-4 py-4">
-                                        <span class="{{ $submission['quarterly_count'] > 0 ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700' }} rounded-full px-3 py-1 text-xs font-bold">{{ $submission['quarterly'] }}</span>
+                                    <td class="px-6 py-4">
+                                        <span class="sk-badge {{ $submission['monthly_count'] > 0 ? 'sk-badge--green' : 'sk-badge--yellow' }}">{{ $submission['monthly'] }}</span>
                                     </td>
 
-                                    <td class="px-4 py-4">
-                                        <span class="{{ $submission['annual_count'] > 0 ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700' }} rounded-full px-3 py-1 text-xs font-bold">{{ $submission['annual'] }}</span>
+                                    <td class="px-6 py-4">
+                                        <span class="sk-badge {{ $submission['quarterly_count'] > 0 ? 'sk-badge--green' : 'sk-badge--yellow' }}">{{ $submission['quarterly'] }}</span>
                                     </td>
 
-                                    <td class="px-4 py-4 text-gray-600">{{ $submission['last_submission'] }}</td>
+                                    <td class="px-6 py-4">
+                                        <span class="sk-badge {{ $submission['annual_count'] > 0 ? 'sk-badge--green' : 'sk-badge--yellow' }}">{{ $submission['annual'] }}</span>
+                                    </td>
 
-                                    <td class="px-4 py-4 rounded-r-xl text-center">
-                                        <span class="{{ $submission['status'] === 'submitted' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700' }} rounded-full px-3 py-1 text-xs font-bold uppercase">{{ $submission['status'] }}</span>
+                                    <td class="px-6 py-4 font-semibold text-gray-600 whitespace-nowrap">{{ $submission['last_submission'] }}</td>
+
+                                    <td class="px-6 py-4 text-center">
+                                        <span class="sk-badge sk-badge--dot {{ $submission['status'] === 'submitted' ? 'sk-badge--green' : 'sk-badge--yellow' }} capitalize">{{ $submission['status'] }}</span>
                                     </td>
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="6" class="px-4 py-10 text-center text-gray-400">No barangay submissions yet.</td>
+                                    <td colspan="6">
+                                        <div class="sk-empty">
+                                            <span class="sk-icon-tile sk-icon-tile--gray">
+                                                @include('partials.ui.icon', ['icon' => 'inbox', 'iconSize' => 24])
+                                            </span>
+                                            <p class="sk-empty__text">No barangay submissions yet.</p>
+                                        </div>
+                                    </td>
                                 </tr>
                             @endforelse
                         </tbody>
@@ -230,12 +220,18 @@
                 $focusId = (int) request()->query('focus_id', 0);
             @endphp
 
-            <section id="qualityDocumentationSection" class="bg-white rounded-2xl shadow-sm p-6 mt-8 mb-10">
-                <div class="mb-6">
-                    <h2 class="text-xl font-semibold text-gray-900">Quality Documentation Review</h2>
-                    <p class="text-gray-500 text-sm mt-1">
-                        Review submitted documents before awarding Quality Documentation points.
-                    </p>
+            {{-- DETAIL / INSPECTION --}}
+            <section id="qualityDocumentationSection" class="sk-card p-6 mt-8 mb-10">
+                <div class="flex items-start gap-3 mb-6">
+                    <span class="sk-icon-tile">
+                        @include('partials.ui.icon', ['icon' => 'shield-check', 'iconSize' => 21])
+                    </span>
+                    <div>
+                        <h2 class="sk-section-title">Quality Documentation Review</h2>
+                        <p class="sk-section-subtitle">
+                            Review submitted documents before awarding Quality Documentation points.
+                        </p>
+                    </div>
                 </div>
 
                 <div class="space-y-5">
@@ -244,9 +240,9 @@
                             $status = $item->quality_status ?? 'pending';
 
                             $statusClass = match ($status) {
-                                'approved' => 'bg-green-100 text-green-700',
-                                'needs_revision' => 'bg-red-100 text-red-700',
-                                default => 'bg-yellow-100 text-yellow-700',
+                                'approved' => 'sk-badge--green',
+                                'needs_revision' => 'sk-badge--red',
+                                default => 'sk-badge--yellow',
                             };
 
                             $statusLabel = match ($status) {
@@ -266,45 +262,61 @@
                             data-source-type="{{ $item->source_type }}"
                             data-source-id="{{ $item->source_id }}"
                             data-focus-target="{{ $isFocused ? '1' : '0' }}"
-                            class="border rounded-2xl p-5 transition-all duration-500 {{ $isFocused ? 'border-yellow-400 bg-yellow-50 ring-4 ring-yellow-200 shadow-lg' : 'border-gray-200' }}"
+                            class="rounded-2xl border p-5 transition-all duration-500 {{ $isFocused ? 'border-yellow-300 bg-[#fffbeb] ring-4 ring-yellow-100 shadow-lg' : 'border-gray-200 bg-white hover:shadow-sm' }}"
                         >
                             @if ($isFocused)
-                                <div class="mb-4 flex items-center gap-2 rounded-xl border border-yellow-200 bg-yellow-100 px-4 py-3 text-sm font-semibold text-yellow-800">
-                                    <span>&#128276;</span>
+                                <div class="sk-alert sk-alert--warning mb-4">
+                                    @include('partials.ui.icon', ['icon' => 'bell', 'iconSize' => 17])
                                     <span>This is the submission from the notification you opened.</span>
                                 </div>
                             @endif
 
                             <div class="flex flex-col xl:flex-row xl:items-start xl:justify-between gap-4 mb-5">
-                                <div>
-                                    <div class="flex flex-wrap items-center gap-2 mb-2">
-                                        <h3 class="font-bold text-gray-900">
-                                            Barangay {{ $item->barangay_name }}
-                                        </h3>
+                                <div class="flex items-start gap-4 min-w-0">
+                                    <span class="sk-thumb">
+                                        @include('partials.ui.icon', ['icon' => 'file-text', 'iconSize' => 24])
+                                    </span>
 
-                                        <span class="{{ $statusClass }} rounded-full px-3 py-1 text-[10px] font-bold uppercase">
-                                            {{ $statusLabel }}
-                                        </span>
-                                    </div>
+                                    <div class="min-w-0">
+                                        <div class="flex flex-wrap items-center gap-2 mb-1">
+                                            <h3 class="font-bold text-gray-900">
+                                                Barangay {{ $item->barangay_name }}
+                                            </h3>
 
-                                    <p class="text-sm text-gray-700 font-medium">
-                                        {{ $item->title ?: $item->source_label }}
-                                    </p>
+                                            <span class="sk-badge sk-badge--dot {{ $statusClass }}">
+                                                {{ $statusLabel }}
+                                            </span>
+                                        </div>
 
-                                    <div class="flex flex-wrap gap-x-5 gap-y-1 text-xs text-gray-500 mt-2">
-                                        <span>{{ $item->source_label }}</span>
-                                        <span>{{ $item->period_label }}</span>
-                                        <span>Submitted: {{ $item->submitted_label }}</span>
+                                        <p class="text-sm text-gray-700 font-semibold">
+                                            {{ $item->title ?: $item->source_label }}
+                                        </p>
+
+                                        <div class="sk-meta mt-2">
+                                            <span class="sk-meta__item">
+                                                @include('partials.ui.icon', ['icon' => 'files', 'iconSize' => 14])
+                                                {{ $item->source_label }}
+                                            </span>
+                                            <span class="sk-meta__item">
+                                                @include('partials.ui.icon', ['icon' => 'calendar-days', 'iconSize' => 14])
+                                                {{ $item->period_label }}
+                                            </span>
+                                            <span class="sk-meta__item">
+                                                @include('partials.ui.icon', ['icon' => 'clock', 'iconSize' => 14])
+                                                Submitted: {{ $item->submitted_label }}
+                                            </span>
+                                        </div>
                                     </div>
                                 </div>
 
                                 @if ($item->file_url)
                                     <a href="{{ $item->file_url }}" target="_blank" rel="noopener noreferrer"
-                                       class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-xl text-sm font-semibold whitespace-nowrap">
+                                       class="sk-btn sk-btn--secondary shrink-0">
+                                        @include('partials.ui.icon', ['icon' => 'eye', 'iconSize' => 16])
                                         View Document
                                     </a>
                                 @else
-                                    <span class="bg-gray-100 text-gray-400 px-4 py-2 rounded-xl text-sm font-semibold whitespace-nowrap">
+                                    <span class="sk-btn sk-btn--ghost !bg-gray-100 !text-gray-400 cursor-default shrink-0">
                                         No File Available
                                     </span>
                                 @endif
@@ -312,30 +324,17 @@
 
                             @if ($status === 'approved')
                                 <div class="rounded-xl bg-green-50 border border-green-100 p-4">
-                                    <p class="text-sm font-semibold text-green-700">
+                                    <p class="flex items-center gap-1.5 text-sm font-bold text-green-700">
+                                        @include('partials.ui.icon', ['icon' => 'circle-check', 'iconSize' => 16])
                                         Quality Documentation Approved
                                     </p>
 
-                                    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-2 mt-3 text-xs">
-                                        <span class="{{ $item->complete_contents ? 'text-green-700' : 'text-gray-400' }}">
-                                            {{ $item->complete_contents ? '✓' : '—' }} Complete Contents
-                                        </span>
-
-                                        <span class="{{ $item->correct_document ? 'text-green-700' : 'text-gray-400' }}">
-                                            {{ $item->correct_document ? '✓' : '—' }} Correct Document
-                                        </span>
-
-                                        <span class="{{ $item->correct_period ? 'text-green-700' : 'text-gray-400' }}">
-                                            {{ $item->correct_period ? '✓' : '—' }} Correct Period
-                                        </span>
-
-                                        <span class="{{ $item->readable_organized ? 'text-green-700' : 'text-gray-400' }}">
-                                            {{ $item->readable_organized ? '✓' : '—' }} Readable / Organized
-                                        </span>
-
-                                        <span class="{{ $item->supporting_documents ? 'text-green-700' : 'text-gray-400' }}">
-                                            {{ $item->supporting_documents ? '✓' : '—' }} Supporting Documents
-                                        </span>
+                                    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-2 mt-3 text-xs font-semibold">
+                                        @foreach ($qualityCriteria as $field => [$criterionLabel])
+                                            <span class="{{ $item->{$field} ? 'text-green-700' : 'text-gray-400' }}">
+                                                {{ $item->{$field} ? '✓' : '—' }} {{ $criterionLabel }}
+                                            </span>
+                                        @endforeach
                                     </div>
 
                                     @if ($item->quality_remarks)
@@ -352,85 +351,45 @@
                                     <input type="hidden" name="source_id" value="{{ $item->source_id }}">
 
                                     <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-3">
-                                        <label class="flex items-start gap-2 border rounded-xl p-3 cursor-pointer hover:bg-gray-50">
-                                            <input type="hidden" name="complete_contents" value="0">
-                                            <input type="checkbox" name="complete_contents" value="1"
-                                                   class="mt-1"
-                                                   {{ $item->complete_contents ? 'checked' : '' }}>
-                                            <span>
-                                                <span class="block text-xs font-bold text-gray-700">Complete Contents</span>
-                                                <span class="text-[10px] text-gray-400">Required content is present.</span>
-                                            </span>
-                                        </label>
-
-                                        <label class="flex items-start gap-2 border rounded-xl p-3 cursor-pointer hover:bg-gray-50">
-                                            <input type="hidden" name="correct_document" value="0">
-                                            <input type="checkbox" name="correct_document" value="1"
-                                                   class="mt-1"
-                                                   {{ $item->correct_document ? 'checked' : '' }}>
-                                            <span>
-                                                <span class="block text-xs font-bold text-gray-700">Correct Document</span>
-                                                <span class="text-[10px] text-gray-400">Matches the required submission.</span>
-                                            </span>
-                                        </label>
-
-                                        <label class="flex items-start gap-2 border rounded-xl p-3 cursor-pointer hover:bg-gray-50">
-                                            <input type="hidden" name="correct_period" value="0">
-                                            <input type="checkbox" name="correct_period" value="1"
-                                                   class="mt-1"
-                                                   {{ $item->correct_period ? 'checked' : '' }}>
-                                            <span>
-                                                <span class="block text-xs font-bold text-gray-700">Correct Period</span>
-                                                <span class="text-[10px] text-gray-400">Reporting period and details are correct.</span>
-                                            </span>
-                                        </label>
-
-                                        <label class="flex items-start gap-2 border rounded-xl p-3 cursor-pointer hover:bg-gray-50">
-                                            <input type="hidden" name="readable_organized" value="0">
-                                            <input type="checkbox" name="readable_organized" value="1"
-                                                   class="mt-1"
-                                                   {{ $item->readable_organized ? 'checked' : '' }}>
-                                            <span>
-                                                <span class="block text-xs font-bold text-gray-700">Readable / Organized</span>
-                                                <span class="text-[10px] text-gray-400">Document is readable and organized.</span>
-                                            </span>
-                                        </label>
-
-                                        <label class="flex items-start gap-2 border rounded-xl p-3 cursor-pointer hover:bg-gray-50">
-                                            <input type="hidden" name="supporting_documents" value="0">
-                                            <input type="checkbox" name="supporting_documents" value="1"
-                                                   class="mt-1"
-                                                   {{ $item->supporting_documents ? 'checked' : '' }}>
-                                            <span>
-                                                <span class="block text-xs font-bold text-gray-700">Supporting Documents</span>
-                                                <span class="text-[10px] text-gray-400">Check when applicable and complete.</span>
-                                            </span>
-                                        </label>
+                                        @foreach ($qualityCriteria as $field => [$criterionLabel, $criterionHint])
+                                            <label class="flex items-start gap-2.5 rounded-xl border border-gray-200 bg-[#f8f9fb] p-3 cursor-pointer transition hover:bg-white hover:border-gray-300 has-[:checked]:border-red-200 has-[:checked]:bg-red-50/60">
+                                                <input type="hidden" name="{{ $field }}" value="0">
+                                                <input type="checkbox" name="{{ $field }}" value="1"
+                                                       class="mt-0.5 h-4 w-4 rounded"
+                                                       {{ $item->{$field} ? 'checked' : '' }}>
+                                                <span>
+                                                    <span class="block text-xs font-bold text-gray-800">{{ $criterionLabel }}</span>
+                                                    <span class="text-[11px] leading-snug text-gray-500">{{ $criterionHint }}</span>
+                                                </span>
+                                            </label>
+                                        @endforeach
                                     </div>
 
                                     <div class="mt-4">
-                                        <label class="block text-xs font-bold text-gray-600 mb-2">
+                                        <label class="sk-label">
                                             Review Remarks
                                         </label>
 
                                         <textarea name="remarks"
                                                   rows="3"
                                                   placeholder="Add remarks, especially when revision is needed..."
-                                                  class="w-full border rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-red-100">{{ $item->quality_remarks }}</textarea>
+                                                  class="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm">{{ $item->quality_remarks }}</textarea>
                                     </div>
 
                                     <div class="flex flex-wrap justify-end gap-3 mt-4">
                                         <button type="submit"
                                                 name="status"
                                                 value="needs_revision"
-                                                class="bg-white border border-red-200 hover:bg-red-50 text-red-600 px-4 py-2 rounded-xl text-sm font-semibold">
+                                                class="sk-btn sk-btn--secondary !text-red-600 !border-red-200 hover:!bg-red-50">
+                                            @include('partials.ui.icon', ['icon' => 'circle-alert', 'iconSize' => 16])
                                             Needs Revision
                                         </button>
 
                                         <button type="submit"
                                                 name="status"
                                                 value="approved"
-                                                class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-xl text-sm font-semibold">
+                                                class="sk-btn !bg-green-600 hover:!bg-green-700 !text-white">
+                                            @include('partials.ui.icon', ['icon' => 'circle-check', 'iconSize' => 16])
                                             Approve Quality
                                         </button>
                                     </div>
@@ -438,8 +397,11 @@
                             @endif
                         </div>
                     @empty
-                        <div class="border border-dashed border-gray-200 rounded-2xl p-10 text-center">
-                            <p class="text-gray-400 text-sm">
+                        <div class="sk-empty rounded-2xl border border-dashed border-gray-200 bg-[#f8f9fb]">
+                            <span class="sk-icon-tile sk-icon-tile--gray">
+                                @include('partials.ui.icon', ['icon' => 'shield-check', 'iconSize' => 24])
+                            </span>
+                            <p class="sk-empty__text">
                                 No submitted documents available for Quality Documentation review.
                             </p>
                         </div>

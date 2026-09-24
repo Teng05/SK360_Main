@@ -3,100 +3,131 @@
 
 @section('title', 'SK 360 | Login')
 
+{{-- Styled by the shared design system (public/css/sk360-ui.css, .sk-auth). --}}
 @section('page_css')
-    @if (file_exists(public_path('build/manifest.json')) || file_exists(public_path('hot')))
-        @vite(['resources/css/login.css'])
-    @elseif (file_exists(resource_path('css/login.css')))
-        <style>
-            {!! file_get_contents(resource_path('css/login.css')) !!}
-        </style>
-    @endif
 @endsection
 
 @section('content')
-    <div class="login-page">
-        <div class="container">
-            <div class="left-panel">
-                <div class="back">
-                    <a href="{{ url('/') }}">Back to home</a>
+    <div class="sk-auth">
+        <section class="sk-auth__brand">
+            <div class="sk-auth__top">
+                <div class="sk-auth__mark">
+                    <img src="{{ asset('images/logo.png') }}" alt="SK 360 logo">
+                    <div>
+                        <p class="sk-auth__mark-name">SK 360&deg;</p>
+                        <p class="sk-auth__mark-tag">Management System</p>
+                    </div>
                 </div>
 
-                <h2 class="logo">SK 360&deg;</h2>
-                <h1>Welcome Back!</h1>
+                <a class="sk-auth__back" href="{{ url('/') }}">
+                    @include('partials.ui.icon', ['icon' => 'chevron-left', 'iconSize' => 16])
+                    Back to home
+                </a>
+            </div>
 
-                <p>
+            <div>
+                <h1 class="sk-auth__headline">Welcome Back!</h1>
+
+                <p class="sk-auth__lead">
                     Access your dashboard to manage reports, coordinate with your team,
                     and drive youth governance forward.
                 </p>
+            </div>
 
-                <div class="features">
-                    <div class="feature">
-                        <span class="feature-icon">Secure</span>
-                        <div>
-                            <b>Secure Access</b>
-                            <p>Role-based authentication for data protection</p>
-                        </div>
+            <div class="sk-auth__features">
+                <div class="sk-auth__feature">
+                    <span class="sk-auth__feature-icon">
+                        @include('partials.ui.icon', ['icon' => 'shield-check', 'iconSize' => 21])
+                    </span>
+                    <div>
+                        <b>Secure Access</b>
+                        <p>Role-based authentication for data protection</p>
                     </div>
+                </div>
 
-                    <div class="feature">
-                        <span class="feature-icon">Dash</span>
-                        <div>
-                            <b>Centralized Dashboard</b>
-                            <p>All your tools in one place</p>
-                        </div>
+                <div class="sk-auth__feature">
+                    <span class="sk-auth__feature-icon">
+                        @include('partials.ui.icon', ['icon' => 'layout-dashboard', 'iconSize' => 21])
+                    </span>
+                    <div>
+                        <b>Centralized Dashboard</b>
+                        <p>All your tools in one place</p>
                     </div>
+                </div>
 
-                    <div class="feature">
-                        <span class="feature-icon">Team</span>
-                        <div>
-                            <b>Real-Time Collaboration</b>
-                            <p>Connect with SK officials instantly</p>
-                        </div>
+                <div class="sk-auth__feature">
+                    <span class="sk-auth__feature-icon">
+                        @include('partials.ui.icon', ['icon' => 'users', 'iconSize' => 21])
+                    </span>
+                    <div>
+                        <b>Real-Time Collaboration</b>
+                        <p>Connect with SK officials instantly</p>
                     </div>
                 </div>
             </div>
+        </section>
 
-            <div class="right-panel">
-                <h2>Sign In</h2>
-                <p class="subtitle">Enter your official account credentials</p>
+        <section class="sk-auth__panel">
+            <div class="sk-auth__form">
+                <span class="sk-eyebrow"><span class="sk-dot"></span>Official Account</span>
+                <h2 class="sk-auth__title">Sign In</h2>
+                <p class="sk-auth__subtitle">Enter your official account credentials</p>
 
                 <form method="POST" action="{{ route('login.submit') }}">
                     @csrf
 
-                    <label for="email">Email Address</label>
-                    <input
-                        id="email"
-                        type="email"
-                        name="email"
-                        placeholder="x.sk@gmail.com"
-                        value="{{ old('email') }}"
-                        autocomplete="email"
-                        required
-                    >
+                    <label class="sk-field" for="email">
+                        <span class="sk-field__label">Email Address</span>
+                        <span class="sk-field__control">
+                            @include('partials.ui.icon', ['icon' => 'mail', 'iconSize' => 18])
+                            <input
+                                id="email"
+                                type="email"
+                                name="email"
+                                placeholder="x.sk@gmail.com"
+                                value="{{ old('email') }}"
+                                autocomplete="email"
+                                required
+                            >
+                        </span>
+                    </label>
 
-                    <label for="password">Password</label>
-                    <input
-                        id="password"
-                        type="password"
-                        name="password"
-                        placeholder="Enter your password"
-                        autocomplete="current-password"
-                        required
-                    >
+                    <label class="sk-field" for="password">
+                        <span class="sk-field__label">Password</span>
+                        <span class="sk-field__control">
+                            @include('partials.ui.icon', ['icon' => 'lock', 'iconSize' => 18])
+                            <input
+                                id="password"
+                                type="password"
+                                name="password"
+                                placeholder="Enter your password"
+                                autocomplete="current-password"
+                                required
+                            >
+                        </span>
+                    </label>
 
-                    <div class="options">
-                        <label class="remember-me">
+                    <div class="sk-auth__options">
+                        <label class="sk-check">
                             <input type="checkbox" name="remember" value="1" {{ old('remember') ? 'checked' : '' }}>
                             Remember me
                         </label>
 
-                        <a href="{{ route('password.request') }}">Forgot Password?</a>
+                        <a class="sk-link" href="{{ route('password.request') }}">Forgot Password?</a>
                     </div>
 
-                    <button class="login-btn" type="submit">Sign In</button>
+                    <button class="sk-btn sk-btn--primary sk-btn--lg" type="submit" style="width: 100%; margin-top: 28px;">
+                        Sign In
+                        @include('partials.ui.icon', ['icon' => 'arrow-right', 'iconSize' => 18])
+                    </button>
                 </form>
+
+                <div class="sk-auth__footer">
+                    @include('partials.ui.icon', ['icon' => 'shield-check', 'iconSize' => 17])
+                    <span>SK 360&deg; &middot; Sangguniang Kabataan of Lipa City</span>
+                </div>
             </div>
-        </div>
+        </section>
     </div>
 @endsection
 

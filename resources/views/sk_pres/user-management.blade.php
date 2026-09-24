@@ -11,100 +11,13 @@
 <div class="flex h-screen bg-gray-100">
 
     <!-- Sidebar -->
-    <div class="w-64 bg-red-600 text-white flex flex-col p-3 overflow-y-auto shrink-0">
-        <div class="flex items-center gap-3 mb-4">
-            <img src="{{ asset('images/logo.png') }}" class="w-8 h-8 rounded-full object-cover" alt="logo">
-
-            <div class="leading-tight">
-                <h2 class="text-lg font-extrabold tracking-wide">SK 360°</h2>
-                <p class="text-[10px] opacity-80">Management System</p>
-            </div>
-        </div>
-
-        <div class="bg-red-500 rounded-lg p-2 flex items-center gap-2 mb-3 shadow text-xs">
-            <div class="bg-yellow-400 text-red-600 p-1 rounded-full text-sm">&#128100;</div>
-
-            <div>
-                <p class="font-semibold text-xs">{{ $fullName }}</p>
-                <p class="text-xs opacity-80">SK President</p>
-            </div>
-        </div>
-
-        <nav class="space-y-1 text-xs">
-            @foreach($menuItems as $item)
-                @php $isActive=$item['link'] === $currentUrl; @endphp
-
-                <a href="{{ $item['link'] }}"
-                    class="flex items-center gap-2 p-2 rounded-lg {{ $isActive ? 'bg-red-500' : 'hover:bg-red-500 transition' }}">
-
-                    <span class="{{ $isActive ? 'bg-yellow-400 text-red-600' : 'bg-red-400' }} p-1 rounded text-sm">
-                        {!! $item['icon'] !!}
-                    </span>
-
-                    <span class="{{ $isActive ? 'text-yellow-300 font-semibold' : '' }} text-xs">
-                        {{ $item['label'] }}
-                    </span>
-                </a>
-            @endforeach
-        </nav>
-    </div>
+    @include('partials.app.sidebar')
 
     <!-- Main Section -->
     <div class="flex-1 flex flex-col overflow-hidden">
 
         <!-- Header Nav -->
-        <div class="bg-red-600 text-white px-6 py-3 flex justify-between items-center shadow relative z-10">
-            <div class="w-1/4"></div>
-
-            <div class="w-1/3">
-                <input type="text"
-                    class="live-user-search w-full rounded-full px-4 py-2 text-black focus:outline-none text-sm"
-                    placeholder="Search officials..."
-                    autocomplete="off">
-            </div>
-
-            <div class="w-1/4 flex justify-end items-center gap-5 text-sm">
-                <button type="button" class="hover:opacity-80">&#128276;</button>
-
-                <div class="relative">
-                    <button id="profileDropdownBtn"
-                        type="button"
-                        class="flex items-center gap-2 font-semibold focus:outline-none hover:opacity-80 transition">
-
-                        <span>{{ $fullName }}</span>
-                        <span class="text-[10px]">&#9660;</span>
-                    </button>
-
-                    <div id="profileMenu"
-                        class="absolute right-0 mt-3 w-48 bg-white rounded-xl shadow-2xl py-2 z-[9999] hidden border border-gray-100">
-
-                        <div class="px-4 py-3 border-b border-gray-50">
-                            <p class="text-[10px] text-gray-400 uppercase font-black tracking-widest">
-                                Account Settings
-                            </p>
-                        </div>
-
-                        <a href="{{ route('sk_pres.profile') }}"
-                            class="px-4 py-3 text-gray-700 hover:bg-gray-50 text-xs flex items-center gap-2 transition">
-
-                            <span>&#128100;</span>
-                            View Profile
-                        </a>
-
-                        <form action="{{ route('logout') }}" method="POST">
-                            @csrf
-
-                            <button type="submit"
-                                class="w-full text-left px-4 py-3 text-red-600 hover:bg-red-50 text-xs font-bold flex items-center gap-2 transition">
-
-                                <span>&#128682;</span>
-                                Log Out
-                            </button>
-                        </form>
-                    </div>
-                </div>
-            </div>
-        </div>
+        @include('partials.app.topbar', ['accountButtonId' => 'profileDropdownBtn', 'accountMenuId' => 'profileMenu', 'bindBell' => true, 'search' => ['class' => 'live-user-search', 'placeholder' => 'Search officials...']])
 
         <!-- Scrollable Content Area -->
         <main class="flex-1 overflow-y-auto bg-gray-50 p-8">
@@ -112,6 +25,7 @@
             <!-- Page Title -->
             <div class="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
+                    <span class="sk-eyebrow"><span class="sk-dot"></span>User Management</span>
                     <h1 class="text-4xl font-bold text-gray-900">User Management</h1>
                     <p class="text-gray-600 text-lg">Manage current officials and official history</p>
                 </div>
@@ -121,25 +35,25 @@
 
                         <button id="openNewTermModal"
                             type="button"
-                            class="rounded-lg bg-blue-600 px-4 py-2 text-xs font-bold text-white hover:bg-blue-700 transition flex items-center gap-1">
+                            class="sk-btn sk-btn--secondary">
 
-                            <span>&#128197;</span>
+                            <span><span class="inline-flex align-[-3px]">@include('partials.ui.icon', ['icon' => 'calendar-days', 'iconSize' => 16])</span></span>
                             Start New Term
                         </button>
 
                         <button id="openBulkModal"
                             type="button"
-                            class="rounded-lg bg-green-600 px-4 py-2 text-xs font-bold text-white hover:bg-green-700 transition flex items-center gap-1">
+                            class="sk-btn sk-btn--primary">
 
-                            <span>&#128101;</span>
+                            <span><span class="inline-flex align-[-3px]">@include('partials.ui.icon', ['icon' => 'users', 'iconSize' => 16])</span></span>
                             Add Chairmen
                         </button>
 
                         <button id="openImportModal"
                             type="button"
-                            class="rounded-lg bg-gray-800 px-4 py-2 text-xs font-bold text-white hover:bg-gray-900 transition flex items-center gap-1">
+                            class="sk-btn sk-btn--secondary">
 
-                            <span>&#128229;</span>
+                            <span><span class="inline-flex align-[-3px]">@include('partials.ui.icon', ['icon' => 'download', 'iconSize' => 16])</span></span>
                             Import CSV
                         </button>
                     </div>
@@ -210,13 +124,13 @@
                 <a href="{{ route('sk_pres.user-management',['tab'=>'current']) }}"
                     class="flex-1 text-center rounded-xl px-4 py-3 text-xs font-black uppercase transition {{ ($activeTab ?? 'current') === 'current' ? 'bg-red-600 text-white' : 'text-gray-500 hover:bg-gray-50' }}">
 
-                    &#128101; Current Officials
+                    <span class="inline-flex align-[-3px]">@include('partials.ui.icon', ['icon' => 'users', 'iconSize' => 16])</span> Current Officials
                 </a>
 
                 <a href="{{ route('sk_pres.user-management',['tab'=>'history']) }}"
                     class="flex-1 text-center rounded-xl px-4 py-3 text-xs font-black uppercase transition {{ ($activeTab ?? 'current') === 'history' ? 'bg-gray-800 text-white' : 'text-gray-500 hover:bg-gray-50' }}">
 
-                    &#128220; Official History
+                    <span class="inline-flex align-[-3px]">@include('partials.ui.icon', ['icon' => 'archive', 'iconSize' => 16])</span> Official History
                 </a>
             </div>
 
@@ -225,7 +139,7 @@
                 <div class="mb-6 rounded-2xl border border-yellow-200 bg-yellow-50 px-5 py-4">
 
                     <div class="flex items-start gap-3">
-                        <span class="text-xl">&#9888;</span>
+                        <span class="text-xl"><span class="inline-flex align-[-3px]">@include('partials.ui.icon', ['icon' => 'triangle-alert', 'iconSize' => 16])</span></span>
 
                         <div>
                             <p class="text-sm font-black text-yellow-800">
@@ -256,7 +170,7 @@
 
                         <div class="relative w-full lg:max-w-xl">
                             <span class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300">
-                                &#128269;
+                                <span class="inline-flex align-[-3px]">@include('partials.ui.icon', ['icon' => 'search', 'iconSize' => 16])</span>
                             </span>
 
                             <input type="text"
@@ -329,7 +243,7 @@
                                 </div>
 
                                 <span class="text-gray-400">
-                                    &#9662;
+                                    <span class="inline-flex align-[-3px]">@include('partials.ui.icon', ['icon' => 'chevron-down', 'iconSize' => 16])</span>
                                 </span>
                             </summary>
 
@@ -474,19 +388,19 @@
                                                     </div>
 
                                                     <p class="mt-1 text-xs text-gray-500">
-                                                        &#128231; {{ $groupUser->email }}
+                                                        <span class="inline-flex align-[-3px]">@include('partials.ui.icon', ['icon' => 'mail', 'iconSize' => 16])</span> {{ $groupUser->email }}
                                                     </p>
 
                                                     @if(!$isPresident)
 
                                                         <p class="mt-1 text-xs text-gray-400">
-                                                            &#128205; Barangay {{ $groupUser->barangay_name ?? 'Unassigned' }}
+                                                            <span class="inline-flex align-[-3px]">@include('partials.ui.icon', ['icon' => 'map-pin', 'iconSize' => 16])</span> Barangay {{ $groupUser->barangay_name ?? 'Unassigned' }}
                                                         </p>
 
                                                     @endif
 
                                                     <p class="mt-1 text-[10px] text-gray-400">
-                                                        &#128197; Term: {{ $termLabel }}
+                                                        <span class="inline-flex align-[-3px]">@include('partials.ui.icon', ['icon' => 'calendar-days', 'iconSize' => 16])</span> Term: {{ $termLabel }}
                                                     </p>
 
                                                     <p class="mt-1 text-[10px] text-gray-400">
@@ -729,7 +643,7 @@
                     <div class="relative mt-4">
 
                         <span class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300">
-                            &#128269;
+                            <span class="inline-flex align-[-3px]">@include('partials.ui.icon', ['icon' => 'search', 'iconSize' => 16])</span>
                         </span>
 
                         <input type="text"
@@ -830,7 +744,7 @@
                                     @endif
 
                                     <span class="text-gray-400">
-                                        &#9662;
+                                        <span class="inline-flex align-[-3px]">@include('partials.ui.icon', ['icon' => 'chevron-down', 'iconSize' => 16])</span>
                                     </span>
                                 </div>
                             </summary>
@@ -999,7 +913,7 @@
                                                                         @if(!empty($historyUser->email))
 
                                                                             <span>
-                                                                                &#128231; {{ $historyUser->email }}
+                                                                                <span class="inline-flex align-[-3px]">@include('partials.ui.icon', ['icon' => 'mail', 'iconSize' => 16])</span> {{ $historyUser->email }}
                                                                             </span>
 
                                                                         @endif
@@ -1007,7 +921,7 @@
                                                                         @if(!empty($historyUser->phone_number))
 
                                                                             <span>
-                                                                                &#128222; {{ $historyUser->phone_number }}
+                                                                                <span class="inline-flex align-[-3px]">@include('partials.ui.icon', ['icon' => 'phone', 'iconSize' => 16])</span> {{ $historyUser->phone_number }}
                                                                             </span>
 
                                                                         @endif
@@ -1015,7 +929,7 @@
                                                                         @if(($historyUser->role ?? '') !== 'sk_president')
 
                                                                             <span>
-                                                                                &#128205; Barangay {{ $historyUser->barangay_name ?? 'Unassigned' }}
+                                                                                <span class="inline-flex align-[-3px]">@include('partials.ui.icon', ['icon' => 'map-pin', 'iconSize' => 16])</span> Barangay {{ $historyUser->barangay_name ?? 'Unassigned' }}
                                                                             </span>
 
                                                                         @endif
@@ -1024,7 +938,7 @@
                                                                     <div class="mt-3 flex flex-wrap items-center gap-2 text-[9px] font-bold uppercase tracking-wide text-gray-400">
 
                                                                         <span>
-                                                                            &#128197; {{ $historyTerm }}
+                                                                            <span class="inline-flex align-[-3px]">@include('partials.ui.icon', ['icon' => 'calendar-days', 'iconSize' => 16])</span> {{ $historyTerm }}
                                                                         </span>
 
                                                                         <span>&bull;</span>
@@ -1092,7 +1006,7 @@
                         <div class="rounded-2xl border border-gray-200 bg-white p-8 text-center">
 
                             <div class="text-3xl">
-                                &#128220;
+                                <span class="inline-flex align-[-3px]">@include('partials.ui.icon', ['icon' => 'archive', 'iconSize' => 16])</span>
                             </div>
 
                             <p class="mt-2 text-sm font-bold text-gray-600">
@@ -1558,7 +1472,7 @@
             <a href="{{ route('sk_pres.user-management.csv-template') }}"
                 class="inline-flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-xs font-bold text-red-600 hover:bg-red-100 transition">
 
-                <span>&#128229;</span>
+                <span><span class="inline-flex align-[-3px]">@include('partials.ui.icon', ['icon' => 'download', 'iconSize' => 16])</span></span>
                 Download CSV Template
             </a>
         </div>
@@ -1616,7 +1530,7 @@
             <div class="rounded-2xl border-2 border-dashed border-red-200 bg-red-50/50 p-6 text-center">
 
                 <span class="text-3xl">
-                    &#128194;
+                    <span class="inline-flex align-[-3px]">@include('partials.ui.icon', ['icon' => 'folder-open', 'iconSize' => 16])</span>
                 </span>
 
                 <label for="csv_file"

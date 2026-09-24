@@ -5,235 +5,227 @@
 
 @section('page_css')
 <style>
-    :root {
-        --sk-red: #d32f2f;
-        --sk-light-bg: #f2f6fb;
-        --sk-yellow-bg: #fefad4;
-        --sk-yellow-border: #e9d9ab;
-        --sk-yellow-text: #8f763f;
-    }
-
+    /* Styled with the shared design system tokens (public/css/sk360-ui.css). */
     body {
         margin: 0;
-        background-color: var(--sk-light-bg);
-        font-family: Inter, "Segoe UI", Tahoma, sans-serif;
         min-height: 100vh;
+        background:
+            radial-gradient(60% 50% at 100% 0%, rgba(220, 38, 38, .08), transparent 70%),
+            radial-gradient(50% 40% at 0% 100%, rgba(46, 98, 209, .05), transparent 70%),
+            var(--sk-bg);
     }
+
+    .reset-page, .reset-page * { box-sizing: border-box; }
 
     .reset-page {
         min-height: 100vh;
         display: flex;
         align-items: center;
         justify-content: center;
-        padding: 24px;
+        padding: 32px 20px;
         text-align: center;
     }
 
-    .reset-container {
-        max-width: 450px;
-        width: 100%;
-    }
+    .reset-container { max-width: 460px; width: 100%; }
 
     .auth-card {
-        background: #fff;
-        border-radius: 30px;
-        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+        background: var(--sk-surface);
+        border: 1px solid var(--sk-border);
+        border-radius: 24px;
+        box-shadow: var(--sk-shadow-lg);
         width: 100%;
-        box-sizing: border-box;
-        padding: 40px;
+        padding: 32px;
+        text-align: left;
     }
 
     .sk-logo,
     .success-icon-circle {
-        width: 80px;
-        height: 80px;
+        width: 72px;
+        height: 72px;
         margin: 0 auto 20px;
-        border-radius: 999px;
+        border-radius: 22px;
         display: flex;
         align-items: center;
         justify-content: center;
-        box-shadow: 0 10px 24px rgba(0, 0, 0, 0.08);
-        font-weight: 900;
+        box-shadow: var(--sk-shadow);
     }
 
-    .sk-logo {
-        background: #fff;
-        color: var(--sk-red);
-        font-size: 34px;
-    }
+    .sk-logo { background: #fff; border: 1px solid var(--sk-border); padding: 8px; }
+    .sk-logo img { width: 100%; height: 100%; object-fit: contain; }
 
-    .success-icon-circle {
-        background-color: #ffca28;
-        color: #fff;
-        font-size: 38px;
-    }
+    .success-icon-circle { background: var(--sk-yellow-soft); color: var(--sk-yellow); border: 1px solid #f5e3a8; }
 
     .main-title {
-        color: var(--sk-red);
-        font-size: 1.75rem;
+        color: var(--sk-ink);
+        font-size: 28px;
         font-weight: 800;
+        letter-spacing: -.025em;
         margin: 0 0 8px;
     }
 
-    .sub-text {
-        color: #6b7280;
-        font-size: 0.9rem;
-        margin: 0 0 25px;
-    }
+    .sub-text { color: var(--sk-muted); font-size: 15px; margin: 0 0 24px; }
 
     .method-toggle {
-        background-color: #fce4e4;
-        border-radius: 12px;
-        padding: 6px;
+        background: var(--sk-field);
+        border-radius: 14px;
+        padding: 5px;
         display: flex;
-        margin-bottom: 25px;
+        gap: 4px;
+        margin-bottom: 24px;
     }
 
     .btn-toggle {
         flex: 1;
-        border-radius: 8px;
+        border-radius: 10px;
         padding: 10px;
         border: 0;
-        font-size: 0.9rem;
+        font: inherit;
+        font-size: 14px;
         font-weight: 700;
-        transition: 0.2s;
         cursor: pointer;
         background: transparent;
-        color: var(--sk-red);
+        color: var(--sk-muted);
+        transition: background-color var(--sk-fast) var(--sk-ease), color var(--sk-fast) var(--sk-ease), box-shadow var(--sk-fast) var(--sk-ease);
     }
 
+    .btn-toggle:hover { color: var(--sk-ink); }
+
     .btn-toggle.active {
-        background-color: var(--sk-red);
-        color: #fff;
+        background: var(--sk-surface);
+        color: var(--sk-red-hover);
+        box-shadow: var(--sk-shadow-sm);
     }
 
     .form-label-custom {
-        font-size: 0.85rem;
+        font-size: 14px;
         font-weight: 700;
-        color: #333;
+        color: var(--sk-text);
         display: flex;
         align-items: center;
-        gap: 8px;
-        margin-bottom: 10px;
-        text-align: left;
+        gap: 10px;
+        margin-bottom: 8px;
     }
 
     .label-icon {
-        background-color: #fce4e4;
+        background: var(--sk-red-soft);
         color: var(--sk-red);
-        width: 28px;
-        height: 28px;
-        border-radius: 50%;
+        width: 30px;
+        height: 30px;
+        border-radius: 9px;
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        font-size: 0.8rem;
-        font-weight: 800;
-        flex: 0 0 28px;
+        flex: 0 0 30px;
     }
 
     .form-control-custom {
-        box-sizing: border-box;
         width: 100%;
-        background-color: #f1f3f5;
-        border: 0;
-        border-radius: 10px;
-        padding: 13px 15px;
+        height: 50px;
+        background: var(--sk-field);
+        border: 1px solid var(--sk-border);
+        border-radius: var(--sk-radius-control);
+        padding: 0 16px;
         outline: none;
         font: inherit;
+        font-size: 15px;
+        color: var(--sk-ink);
+        transition: border-color var(--sk-fast) var(--sk-ease), box-shadow var(--sk-fast) var(--sk-ease), background-color var(--sk-fast) var(--sk-ease);
     }
 
     .form-control-custom:focus {
-        box-shadow: 0 0 0 3px rgba(211, 47, 47, 0.16);
+        background: var(--sk-surface);
+        border-color: rgba(220, 38, 38, .5);
+        box-shadow: 0 0 0 4px rgba(220, 38, 38, .1);
     }
 
     .btn-sk-primary {
-        background-color: var(--sk-red);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        background: var(--sk-red);
         border: 0;
-        border-radius: 10px;
-        padding: 13px;
-        font-weight: 700;
+        border-radius: 14px;
+        min-height: 50px;
+        padding: 0 20px;
         width: 100%;
-        margin-top: 20px;
+        margin-top: 22px;
         color: #fff;
         cursor: pointer;
         font: inherit;
+        font-size: 15px;
+        font-weight: 700;
+        box-shadow: var(--sk-shadow-red);
+        transition: background-color var(--sk-fast) var(--sk-ease), transform var(--sk-fast) var(--sk-ease);
     }
 
-    .btn-sk-primary:hover {
-        background-color: #b71c1c;
-    }
+    .btn-sk-primary:hover { background: var(--sk-red-hover); }
+    .btn-sk-primary:active { transform: translateY(1px); }
 
     .notice {
-        border-radius: 10px;
-        padding: 12px;
-        margin-bottom: 16px;
-        font-size: 0.85rem;
-        font-weight: 700;
+        border-radius: 12px;
+        padding: 12px 14px;
+        margin-bottom: 18px;
+        font-size: 14px;
+        font-weight: 600;
     }
 
     .notice.error {
-        background: #fff5f5;
-        color: #d32f2f;
-        border: 1px solid #ffebed;
-        text-align: left;
+        background: var(--sk-red-soft);
+        color: var(--sk-red-deep);
+        border: 1px solid var(--sk-red-line);
     }
 
     .info-badge {
-        background-color: var(--sk-yellow-bg);
-        border: 1px solid var(--sk-yellow-border);
-        color: var(--sk-yellow-text);
-        padding: 8px 15px;
-        border-radius: 8px;
-        font-size: 0.85rem;
+        background: var(--sk-yellow-soft);
+        border: 1px solid #f5e3a8;
+        color: #7d5100;
+        padding: 9px 14px;
+        border-radius: 12px;
+        font-size: 14px;
         font-weight: 700;
         display: inline-flex;
         align-items: center;
         gap: 8px;
-        margin-bottom: 15px;
+        margin-bottom: 18px;
         max-width: 100%;
         overflow-wrap: anywhere;
     }
 
     .expiry-alert {
-        background-color: #fff5f5;
-        border: 1px solid #ffebed;
-        color: #d32f2f;
-        padding: 10px;
-        border-radius: 8px;
-        font-size: 0.8rem;
-        margin: 15px 0 0;
+        background: var(--sk-red-soft);
+        border: 1px solid var(--sk-red-line);
+        color: var(--sk-red-deep);
+        padding: 10px 14px;
+        border-radius: 12px;
+        font-size: 13px;
+        font-weight: 600;
+        margin: 16px 0 0;
     }
 
-    .help-text {
-        color: #6b7280;
-        font-size: 0.8rem;
-        line-height: 1.5;
-        margin: 0;
-    }
+    .help-text { color: var(--sk-muted); font-size: 14px; line-height: 1.6; margin: 0; }
 
     .back-link {
         text-decoration: none;
-        color: #6b7280;
-        font-size: 0.85rem;
-        display: inline-flex;
+        color: var(--sk-muted);
+        font-size: 14px;
+        font-weight: 700;
+        display: flex;
+        width: 100%;
         justify-content: center;
+        align-items: center;
         gap: 6px;
-        margin-top: 16px;
+        margin-top: 18px;
         background: transparent;
         border: 0;
         cursor: pointer;
-        font: inherit;
+        font-family: inherit;
     }
 
-    .back-link.danger {
-        color: var(--sk-red);
-        font-weight: 800;
-    }
+    .back-link:hover { color: var(--sk-ink); }
+    .back-link.danger { color: var(--sk-red-hover); }
 
-    .hidden {
-        display: none;
-    }
+    .hidden { display: none; }
 </style>
 @endsection
 
@@ -250,7 +242,7 @@
 <div class="reset-page">
     <div class="reset-container">
         <div id="request-view" class="{{ $showSuccess ? 'hidden' : '' }}">
-            <div class="sk-logo">SK</div>
+            <div class="sk-logo"><img src="{{ asset('images/logo.png') }}" alt="SK 360 logo"></div>
             <h2 class="main-title">Reset Your Password</h2>
             <p class="sub-text">Choose your preferred reset method</p>
 
@@ -276,7 +268,7 @@
                     @csrf
                     <input type="hidden" name="method" value="email">
                     <label class="form-label-custom">
-                        <span class="label-icon">@</span> Email Address
+                        <span class="label-icon">@include('partials.ui.icon', ['icon' => 'mail', 'iconSize' => 16])</span> Email Address
                     </label>
                     <input type="email" name="email" class="form-control-custom" placeholder="sk360@gmail.com" value="{{ old('email') }}" required>
                     <button type="submit" class="btn-sk-primary">Send Reset Code</button>
@@ -286,7 +278,7 @@
                     @csrf
                     <input type="hidden" name="method" value="phone">
                     <label class="form-label-custom">
-                        <span class="label-icon">P</span> Phone Number
+                        <span class="label-icon">@include('partials.ui.icon', ['icon' => 'phone', 'iconSize' => 16])</span> Phone Number
                     </label>
                     <input type="text" name="phone" class="form-control-custom" placeholder="+639123456789" value="{{ old('phone') }}" required>
                     <button type="submit" class="btn-sk-primary">Send Reset Code</button>
@@ -297,7 +289,7 @@
         </div>
 
         <div id="success-view" class="{{ $showSuccess ? '' : 'hidden' }}">
-            <div class="success-icon-circle">{{ $resetMethod === 'phone' ? '#' : '@' }}</div>
+            <div class="success-icon-circle">@include('partials.ui.icon', ['icon' => $resetMethod === 'phone' ? 'phone' : 'mail', 'iconSize' => 30])</div>
             <h2 class="main-title">Reset Code Sent!</h2>
             <p class="sub-text">
                 {{ $resetMethod === 'phone' ? 'Check your phone for password reset instructions' : 'Check your email for password reset instructions' }}
@@ -323,17 +315,17 @@
                     <form method="POST" action="{{ $showEmailVerify ? route('password.verify-email') : route('password.verify-phone') }}">
                         @csrf
                         <label class="form-label-custom">
-                            <span class="label-icon">#</span> {{ $showEmailVerify ? 'Email Code' : 'SMS Code' }}
+                            <span class="label-icon">@include('partials.ui.icon', ['icon' => 'key-round', 'iconSize' => 16])</span> {{ $showEmailVerify ? 'Email Code' : 'SMS Code' }}
                         </label>
                         <input type="text" name="code" class="form-control-custom" placeholder="6-digit code" maxlength="6" inputmode="numeric" required>
 
                         <label class="form-label-custom" style="margin-top: 16px;">
-                            <span class="label-icon">*</span> New Password
+                            <span class="label-icon">@include('partials.ui.icon', ['icon' => 'lock', 'iconSize' => 16])</span> New Password
                         </label>
                         <input type="password" name="password" class="form-control-custom" placeholder="New password" required>
 
                         <label class="form-label-custom" style="margin-top: 16px;">
-                            <span class="label-icon">*</span> Confirm Password
+                            <span class="label-icon">@include('partials.ui.icon', ['icon' => 'lock', 'iconSize' => 16])</span> Confirm Password
                         </label>
                         <input type="password" name="password_confirmation" class="form-control-custom" placeholder="Confirm password" required>
 

@@ -22,6 +22,7 @@
             <section class="bg-white rounded-[28px] shadow-sm border border-gray-100 p-6 xl:p-8">
                 <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                     <div>
+                        <span class="sk-eyebrow"><span class="sk-dot"></span>Meetings</span>
                         <h1 class="text-[32px] font-bold tracking-tight text-gray-900">Meetings & Video Conference</h1>
                         <p class="mt-2 text-sm text-gray-500">View president-created meetings and join scheduled conferences</p>
                     </div>
@@ -33,13 +34,13 @@
                 </div>
 
                 <div id="scheduleTab" class="mt-8 space-y-6">
-                    <div class="rounded-[24px] border border-gray-100 bg-[#fbfbfd] p-5">
+                    <div class="rounded-[24px] border border-gray-100 bg-[#fbfbfd] p-5" data-sk-tone="blue">
                         <div class="flex items-center justify-between">
                             <div>
                                 <h2 class="text-base font-semibold text-gray-900">Upcoming Meetings</h2>
                                 <p class="text-xs text-gray-500">Scheduled meetings and sessions</p>
                             </div>
-                            <span class="rounded-full bg-red-50 px-3 py-1 text-xs font-semibold text-[#d90f1f]">{{ $upcomingMeetings->count() }} upcoming</span>
+                            <span class="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">{{ $upcomingMeetings->count() }} upcoming</span>
                         </div>
                         <div class="mt-4 space-y-3">
                             @forelse ($upcomingMeetings as $meeting)
@@ -65,7 +66,7 @@
                         </div>
                     </div>
 
-                    <div class="rounded-[24px] border border-gray-100 bg-[#fbfbfd] p-5">
+                    <div class="rounded-[24px] border border-gray-100 bg-[#fbfbfd] p-5" data-sk-tone="gray">
                         <div class="flex items-center justify-between">
                             <div>
                                 <h2 class="text-base font-semibold text-gray-900">Past Meetings</h2>

@@ -16,84 +16,13 @@
 @endphp
 
 <div class="flex h-screen bg-gray-100">
-    <div class="w-64 bg-red-600 text-white flex flex-col p-3 overflow-y-auto">
-        <div class="flex items-center gap-3 mb-4">
-            <img src="{{ asset('images/logo.png') }}" class="w-8 h-8 rounded-full object-cover" alt="logo">
-            <div class="leading-tight">
-                <h2 class="text-lg font-extrabold tracking-wide">SK 360°</h2>
-                <p class="text-[10px] opacity-80">Management System</p>
-            </div>
-        </div>
-
-        <div class="bg-red-500 rounded-lg p-2 flex items-center gap-2 mb-3 shadow text-xs">
-            <div class="bg-yellow-400 text-red-600 p-1 rounded-full text-sm">👤</div>
-            <div>
-                <p class="font-semibold text-xs">SK President</p>
-                <p class="text-xs opacity-80">Active Role</p>
-            </div>
-        </div>
-
-        <nav class="space-y-1 text-xs">
-            @foreach ($menuItems as $item)
-                @php
-                    $isActive = $item['link'] === $currentUrl;
-                @endphp
-                <a href="{{ $item['link'] }}" class="flex items-center gap-2 p-2 rounded-lg {{ $isActive ? 'bg-red-500' : 'hover:bg-red-500 transition' }}">
-                    <span class="{{ $isActive ? 'bg-yellow-400 text-red-600' : 'bg-red-400' }} p-1 rounded text-sm">{{ $item['icon'] }}</span>
-                    <span class="{{ $isActive ? 'text-yellow-300 font-semibold' : '' }} text-xs">{{ $item['label'] }}</span>
-                </a>
-            @endforeach
-        </nav>
-    </div>
+    @include('partials.app.sidebar')
 
     <div class="flex-1 flex flex-col overflow-hidden">
-        <div class="bg-red-600 text-white px-6 py-3 flex justify-between items-center shadow">
-            <input type="text" placeholder="Search..." class="px-4 py-2 rounded-full text-black w-1/3 focus:outline-none">
-
-            <div class="flex items-center gap-3 relative">
-                <div class="relative">
-                    <button id="notifBtn" type="button" class="text-xl hover:bg-red-500 p-2 rounded-lg transition">
-                        🔔
-                    </button>
-
-                    <div id="notifDropdown" class="hidden absolute right-0 mt-3 w-72 bg-white rounded-2xl shadow-xl border z-50 overflow-hidden">
-                        <div class="px-4 py-3 font-semibold border-b text-gray-800">Notifications</div>
-                        <div class="max-h-64 overflow-y-auto">
-                            <div class="px-4 py-3 hover:bg-gray-100 text-sm text-gray-700">
-                                No notifications yet
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="relative">
-                    <button id="userMenuBtn" type="button" class="flex items-center gap-2 hover:bg-red-500 px-3 py-2 rounded-lg transition">
-                        <span class="font-semibold">{{ $fullName }}</span>
-                    </button>
-
-                    <div id="userDropdown" class="hidden absolute right-0 mt-3 w-64 bg-white rounded-2xl shadow-xl border overflow-hidden z-50">
-                        <div class="px-5 py-4 font-semibold text-gray-800 border-b">
-                            My Account
-                        </div>
-
-                        <a href="{{ route('sk_pres.profile') }}" class="flex items-center gap-3 px-5 py-3 hover:bg-gray-100 transition">
-                            <span>👤</span>
-                            <span class="text-gray-700">Profile Settings</span>
-                        </a>
-
-                        <form method="POST" action="{{ route('logout') }}">
-                            @csrf
-                            <button type="submit" class="w-full text-left flex items-center gap-3 px-5 py-3 text-red-500 hover:bg-gray-100 transition">
-                                <span>↩️</span>
-                                <span>Log Out</span>
-                            </button>
-                        </form>
-                    </div>
-                </div>
-            </div>
-        </div>
+        @include('partials.app.topbar')
 
         <div class="flex-1 bg-gray-100 p-8 overflow-y-auto">
+            <span class="sk-eyebrow"><span class="sk-dot"></span>Dashboard</span>
             <h1 class="text-4xl font-bold text-gray-900 mb-2">
                 Welcome back, SK President
             </h1>
@@ -102,46 +31,63 @@
                 Here's an overview of SK activities and submissions as of {{ $overviewDate }}
             </p>
 
-            <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6">
+            @php
+                // Presentation only: an outline icon and tint per card label.
+                $cardStyles = [
+                    'Total Officials' => ['icon' => 'users', 'tone' => ''],
+                    'Active Accounts' => ['icon' => 'circle-check', 'tone' => 'green'],
+                    'SK Chairmen' => ['icon' => 'id-card', 'tone' => ''],
+                    'SK Secretaries' => ['icon' => 'file-text', 'tone' => 'blue'],
+                ];
+            @endphp
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5">
                 @foreach ($cards as $card)
-                    <div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-5">
-                        <div class="flex justify-between items-start mb-4">
+                    @php $style = $cardStyles[$card['label']] ?? ['icon' => 'layout-grid', 'tone' => '']; @endphp
+
+                    <div class="sk-stat">
+                        <div class="sk-stat__top">
                             <div>
-                                <p class="text-sm text-gray-500">{{ $card['label'] }}</p>
-                                <h2 class="text-4xl font-bold text-gray-900 leading-none">{{ $card['value'] }}</h2>
+                                <p class="sk-stat__label">{{ $card['label'] }}</p>
+                                <p class="sk-stat__value">{{ $card['value'] }}</p>
                             </div>
 
-                            <div class="{{ $card['iconWrap'] }} p-3 rounded-xl">
-                                <span class="{{ $card['iconClass'] }} text-xl">{{ $card['icon'] }}</span>
-                            </div>
+                            <span class="sk-icon-tile {{ $style['tone'] ? 'sk-icon-tile--' . $style['tone'] : '' }}">
+                                @include('partials.ui.icon', ['icon' => $style['icon'], 'iconSize' => 21])
+                            </span>
                         </div>
 
-                        <div class="text-sm text-gray-500 leading-5 mb-3">
+                        <div class="sk-stat__meta">
                             <p>{{ $card['subline1'] }}</p>
                             <p>{{ $card['subline2'] }}</p>
                         </div>
 
-                        <p class="text-sm {{ $card['footerClass'] }}">{{ $card['footer'] }}</p>
+                        <p class="sk-stat__footer {{ $card['footerClass'] }}">{{ $card['footer'] }}</p>
                     </div>
                 @endforeach
             </div>
 
-            <div class="mt-8 bg-white rounded-2xl shadow-sm border border-gray-200 p-5">
+            <div class="mt-8 sk-card p-5">
                 <div class="flex flex-col xl:flex-row xl:items-end xl:justify-between gap-4">
-                    <div>
-                        <h2 class="text-lg font-bold text-gray-900">Submission & Budget Filters</h2>
-                        <p class="text-sm text-gray-500">
-                            Filter the submission and financial monitoring data below.
-                        </p>
+                    <div class="flex items-start gap-3">
+                        <span class="sk-icon-tile sk-icon-tile--sm sk-icon-tile--gray">
+                            @include('partials.ui.icon', ['icon' => 'filter', 'iconSize' => 17])
+                        </span>
+                        <div>
+                            <h2 class="sk-section-title !text-[17px]">Submission & Budget Filters</h2>
+                            <p class="sk-section-subtitle">
+                                Filter the submission and financial monitoring data below.
+                            </p>
+                        </div>
                     </div>
 
                     <form method="GET" action="{{ route('sk_pres.dashboard') }}" class="flex flex-col sm:flex-row gap-3 sm:items-end">
                         <div>
-                            <label for="barangay_id" class="block text-xs font-semibold text-gray-500 mb-1">
+                            <label for="barangay_id" class="block sk-overline mb-1.5">
                                 Barangay
                             </label>
 
-                            <select id="barangay_id" name="barangay_id" class="w-full sm:w-56 border border-gray-300 rounded-xl px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-red-500">
+                            <select id="barangay_id" name="barangay_id" class="w-full sm:w-56 h-11 border border-gray-200 rounded-xl px-3 text-sm font-semibold bg-white">
                                 <option value="">All Barangays</option>
 
                                 @foreach ($barangays as $barangay)
@@ -153,11 +99,11 @@
                         </div>
 
                         <div>
-                            <label for="fiscal_year" class="block text-xs font-semibold text-gray-500 mb-1">
+                            <label for="fiscal_year" class="block sk-overline mb-1.5">
                                 Fiscal Year
                             </label>
 
-                            <select id="fiscal_year" name="fiscal_year" class="w-full sm:w-48 border border-gray-300 rounded-xl px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-red-500">
+                            <select id="fiscal_year" name="fiscal_year" class="w-full sm:w-48 h-11 border border-gray-200 rounded-xl px-3 text-sm font-semibold bg-white">
                                 <option value="" {{ !$selectedYear ? 'selected' : '' }}>
                                     Automatic
                                 </option>
@@ -170,12 +116,12 @@
                             </select>
                         </div>
 
-                        <button type="submit" class="bg-red-600 hover:bg-red-700 text-white px-5 py-2 rounded-xl text-sm font-semibold transition">
+                        <button type="submit" class="sk-btn sk-btn--primary">
                             Apply
                         </button>
 
                         @if ($selectedBarangay || $selectedYear)
-                            <a href="{{ route('sk_pres.dashboard') }}" class="border border-gray-300 hover:bg-gray-50 text-gray-600 px-5 py-2 rounded-xl text-sm font-semibold text-center transition">
+                            <a href="{{ route('sk_pres.dashboard') }}" class="sk-btn sk-btn--secondary">
                                 Reset
                             </a>
                         @endif
@@ -224,61 +170,55 @@
                     <div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-5">
                         <div class="flex justify-between items-start mb-4">
                             <div>
-                                <p class="text-sm text-gray-500">Submission Rate</p>
+                                <p class="sk-stat__label">Submission Rate</p>
                                 <h2 class="text-4xl font-bold text-gray-900">
                                     {{ number_format($submissionKpis['submission_rate'], 1) }}%
                                 </h2>
                             </div>
 
-                            <div class="bg-green-100 p-3 rounded-xl">
-                                <span class="text-green-600 text-xl">✓</span>
-                            </div>
+                            <span class="sk-icon-tile sk-icon-tile--green">@include('partials.ui.icon', ['icon' => 'circle-check', 'iconSize' => 21])</span>
                         </div>
 
                         <p class="text-sm text-gray-500">
                             {{ $submissionKpis['submitted'] }} of {{ $submissionKpis['required'] }} required submissions received
                         </p>
 
-                        <div class="mt-4 h-2 rounded-full bg-gray-100 overflow-hidden">
-                            <div class="h-full bg-green-500 rounded-full" style="width: {{ min($submissionKpis['submission_rate'], 100) }}%"></div>
+                        <div class="mt-4 sk-progress sk-progress--green">
+                            <div class="h-full rounded-full" style="background: var(--sk-green); width: {{ min($submissionKpis['submission_rate'], 100) }}%"></div>
                         </div>
                     </div>
 
                     <div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-5">
                         <div class="flex justify-between items-start mb-4">
                             <div>
-                                <p class="text-sm text-gray-500">On-Time Submission Rate</p>
+                                <p class="sk-stat__label">On-Time Submission Rate</p>
                                 <h2 class="text-4xl font-bold text-gray-900">
                                     {{ number_format($submissionKpis['on_time_rate'], 1) }}%
                                 </h2>
                             </div>
 
-                            <div class="bg-blue-100 p-3 rounded-xl">
-                                <span class="text-blue-600 text-xl">⏱</span>
-                            </div>
+                            <span class="sk-icon-tile sk-icon-tile--blue">@include('partials.ui.icon', ['icon' => 'clock', 'iconSize' => 21])</span>
                         </div>
 
                         <p class="text-sm text-gray-500">
                             {{ $submissionKpis['on_time'] }} of {{ $submissionKpis['submitted'] }} submissions received on or before deadline
                         </p>
 
-                        <div class="mt-4 h-2 rounded-full bg-gray-100 overflow-hidden">
-                            <div class="h-full bg-blue-500 rounded-full" style="width: {{ min($submissionKpis['on_time_rate'], 100) }}%"></div>
+                        <div class="mt-4 sk-progress sk-progress--blue">
+                            <div class="h-full rounded-full" style="background: var(--sk-blue); width: {{ min($submissionKpis['on_time_rate'], 100) }}%"></div>
                         </div>
                     </div>
 
                     <div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-5">
                         <div class="flex justify-between items-start mb-4">
                             <div>
-                                <p class="text-sm text-gray-500">Pending Reports</p>
+                                <p class="sk-stat__label">Pending Reports</p>
                                 <h2 class="text-4xl font-bold text-gray-900">
                                     {{ $submissionKpis['pending'] }}
                                 </h2>
                             </div>
 
-                            <div class="bg-yellow-100 p-3 rounded-xl">
-                                <span class="text-yellow-600 text-xl">⌛</span>
-                            </div>
+                            <span class="sk-icon-tile sk-icon-tile--yellow">@include('partials.ui.icon', ['icon' => 'hourglass', 'iconSize' => 21])</span>
                         </div>
 
                         <p class="text-sm text-gray-500">
@@ -428,7 +368,7 @@
     const chartGridColor = 'rgba(148, 163, 184, 0.18)';
     const chartTextColor = '#64748b';
 
-    Chart.defaults.font.family = 'Inter, system-ui, sans-serif';
+    Chart.defaults.font.family = 'Manrope, system-ui, sans-serif';
     Chart.defaults.color = chartTextColor;
     Chart.defaults.plugins.legend.labels.usePointStyle = true;
 
@@ -599,7 +539,7 @@
         'budgetUtilizationChart',
         chartData.budgetUtilization.labels,
         chartData.budgetUtilization.values,
-        '#ef4444',
+        '#dc2626',
         'percent'
     );
 
@@ -610,12 +550,12 @@
             {
                 label: 'Accomplishment',
                 data: chartData.barangaySubmissions.accomplishment,
-                backgroundColor: '#f59e0b'
+                backgroundColor: '#d4a020'
             },
             {
                 label: 'Budget',
                 data: chartData.barangaySubmissions.budget,
-                backgroundColor: '#3b82f6'
+                backgroundColor: '#2e62d1'
             }
         ]
     );
@@ -624,7 +564,7 @@
         'annualBudgetChart',
         chartData.annualBudget.labels,
         chartData.annualBudget.values,
-        '#3b82f6',
+        '#2e62d1',
         'money'
     );
 
@@ -635,20 +575,20 @@
             {
                 label: 'Events',
                 data: chartData.engagementMetrics.events,
-                borderColor: '#f59e0b',
-                backgroundColor: '#f59e0b'
+                borderColor: '#d4a020',
+                backgroundColor: '#d4a020'
             },
             {
                 label: 'Meetings',
                 data: chartData.engagementMetrics.meetings,
-                borderColor: '#2563eb',
-                backgroundColor: '#2563eb'
+                borderColor: '#2e62d1',
+                backgroundColor: '#2e62d1'
             },
             {
                 label: 'Reports',
                 data: chartData.engagementMetrics.reports,
-                borderColor: '#ef4444',
-                backgroundColor: '#ef4444'
+                borderColor: '#dc2626',
+                backgroundColor: '#dc2626'
             }
         ]
     );

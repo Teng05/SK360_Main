@@ -8,64 +8,14 @@
 
 @section('content')
 <div class="flex h-screen bg-gray-100">
-    <div class="w-64 bg-red-600 text-white flex flex-col p-3 overflow-y-auto">
-        <div class="flex items-center gap-2 mb-3">
-            <img src="{{ asset('logo.png') }}" class="w-7 h-7" alt="logo">
-            <h2 class="text-base font-bold">SK 360&deg;</h2>
-        </div>
-
-        <div class="bg-red-500 rounded-lg p-2 flex items-center gap-2 mb-3 shadow text-xs">
-            <div class="bg-yellow-400 text-red-600 p-1 rounded-full text-sm">&#128100;</div>
-            <div>
-                <p class="font-semibold text-xs">{{ $fullName }}</p>
-                <p class="text-xs opacity-80">SK President</p>
-            </div>
-        </div>
-
-        <nav class="space-y-1 text-xs">
-            @foreach ($menuItems as $item)
-                @php $isActive = $item['link'] === $currentUrl; @endphp
-                <a href="{{ $item['link'] }}" class="flex items-center gap-2 p-2 rounded-lg {{ $isActive ? 'bg-red-500' : 'hover:bg-red-500 transition' }}">
-                    <span class="{{ $isActive ? 'bg-yellow-400 text-red-600' : 'bg-red-400' }} p-1 rounded text-sm">{!! $item['icon'] !!}</span>
-                    <span class="{{ $isActive ? 'text-yellow-300 font-semibold' : '' }} text-xs">{{ $item['label'] }}</span>
-                </a>
-            @endforeach
-        </nav>
-    </div>
+    @include('partials.app.sidebar')
 
     <div class="flex-1 flex flex-col">
-        <div class="bg-red-600 text-white px-6 py-3 flex justify-between items-center shadow relative">
-            <div class="w-1/4"></div>
-            <div class="w-1/3">
-                <input type="text" placeholder="Search" class="w-full rounded-full px-4 py-2 text-black focus:outline-none text-sm">
-            </div>
-            <div class="w-1/4 flex justify-end items-center gap-5 text-sm">
-                <button class="hover:opacity-80">&#128276;</button>
-                <div class="relative">
-                    <button id="profileDropdownBtn" type="button" class="flex items-center gap-2 font-semibold focus:outline-none hover:opacity-80 transition">
-                        <span>{{ $fullName }}</span>
-                        <span class="text-[10px]">&#9660;</span>
-                    </button>
-                    <div id="profileMenu" class="absolute right-0 mt-3 w-48 bg-white rounded-xl shadow-2xl py-2 z-[9999] hidden border border-gray-100">
-                        <div class="px-4 py-3 border-b border-gray-50">
-                            <p class="text-[10px] text-gray-400 uppercase font-black tracking-widest">Account Settings</p>
-                        </div>
-                        <a href="{{ route('sk_pres.profile') }}" class="block px-4 py-3 text-gray-700 hover:bg-gray-50 text-xs flex items-center gap-2 transition">
-                            <span>&#128100;</span> View Profile
-                        </a>
-                        <form action="{{ route('logout') }}" method="POST">
-                            @csrf
-                            <button type="submit" class="w-full text-left px-4 py-3 text-red-600 hover:bg-red-50 text-xs font-bold flex items-center gap-2 transition">
-                                <span>&#128682;</span> Log Out
-                            </button>
-                        </form>
-                    </div>
-                </div>
-            </div>
-        </div>
+        @include('partials.app.topbar', ['accountButtonId' => 'profileDropdownBtn', 'accountMenuId' => 'profileMenu', 'bindBell' => true, 'search' => ['placeholder' => 'Search']])
 
         <main class="flex-1 overflow-y-auto bg-gray-50 p-8">
             <div class="mb-6">
+                <span class="sk-eyebrow"><span class="sk-dot"></span>Chat</span>
                 <h1 class="text-3xl font-bold text-gray-900">Real-Time Chat</h1>
                 <p class="text-gray-500">Formal communication channel for SK federation</p>
             </div>
@@ -74,7 +24,7 @@
                 <div class="min-w-0 rounded-3xl border border-gray-100 bg-white shadow-sm lg:w-[320px]">
                     <div class="border-b border-gray-100 p-4">
                         <div class="relative">
-                            <span class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300">&#128269;</span>
+                            <span class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300"><span class="inline-flex align-[-3px]">@include('partials.ui.icon', ['icon' => 'search', 'iconSize' => 16])</span></span>
                             <input id="roomSearch" type="text" placeholder="Search users or groups..." class="w-full rounded-xl bg-gray-50 py-3 pl-10 pr-4 text-sm text-gray-700 outline-none ring-1 ring-transparent focus:ring-red-200">
                         </div>
                         <button id="createGroupBtn" type="button" class="mt-3 w-full rounded-xl bg-red-500 px-4 py-3 text-sm font-bold text-white transition hover:bg-red-600">
@@ -91,8 +41,8 @@
                             <p id="activeRoomMeta" class="text-xs text-gray-400">Search for a user or create a group to start chatting</p>
                         </div>
                         <div class="flex items-center gap-2 text-gray-400">
-                            <button type="button" class="rounded-lg border border-gray-200 px-2 py-1 text-xs">&#128249;</button>
-                            <button type="button" class="rounded-lg border border-gray-200 px-2 py-1 text-xs">&#128222;</button>
+                            <button type="button" class="rounded-lg border border-gray-200 px-2 py-1 text-xs"><span class="inline-flex align-[-3px]">@include('partials.ui.icon', ['icon' => 'video', 'iconSize' => 16])</span></button>
+                            <button type="button" class="rounded-lg border border-gray-200 px-2 py-1 text-xs"><span class="inline-flex align-[-3px]">@include('partials.ui.icon', ['icon' => 'phone', 'iconSize' => 16])</span></button>
                         </div>
                     </div>
 
@@ -102,7 +52,7 @@
 
                     <div class="border-t border-gray-100 p-4">
                         <form id="messageForm" class="flex items-center gap-3">
-                            <button type="button" class="rounded-lg border border-gray-200 px-3 py-2 text-gray-400">&#128206;</button>
+                            <button type="button" class="rounded-lg border border-gray-200 px-3 py-2 text-gray-400"><span class="inline-flex align-[-3px]">@include('partials.ui.icon', ['icon' => 'paperclip', 'iconSize' => 16])</span></button>
                             <input id="messageInput" type="text" placeholder="Type your message..." class="flex-1 rounded-xl bg-gray-50 px-4 py-3 text-sm text-gray-700 outline-none ring-1 ring-transparent focus:ring-red-200" disabled>
                             <button id="sendMessageBtn" type="submit" class="rounded-lg bg-red-500 px-4 py-3 text-white hover:bg-red-600 transition disabled:cursor-not-allowed disabled:opacity-50" disabled>&#10148;</button>
                         </form>

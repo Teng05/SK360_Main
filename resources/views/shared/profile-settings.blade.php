@@ -14,62 +14,10 @@
 </head>
 <body class="bg-gray-50 font-sans" x-data="{ activeTab: 'personal', isEditing: false, showPassModal: false }">
 <div class="flex h-screen overflow-hidden">
-    <div class="w-64 bg-red-600 text-white flex flex-col p-3 shadow-xl z-20">
-        <div class="flex items-center gap-3 mb-4">
-    <img src="{{ asset('images/logo.png') }}" class="w-8 h-8 rounded-full object-cover"  alt="logo">
-    <div class="leading-tight">
-        <h2 class="text-lg font-extrabold tracking-wide">SK 360°</h2>
-        <p class="text-[10px] opacity-80">Management System</p>
-    </div>
-</div>
-        <div class="bg-red-500 rounded-lg p-2 flex items-center gap-2 mb-3 shadow text-xs">
-            <div class="bg-yellow-400 text-red-600 p-1 rounded-full font-bold px-2">&#128100;</div>
-            <div>
-                <p class="font-semibold">{{ $userName }}</p>
-                <p class="opacity-80 text-[10px]">{{ $roleLabel }}</p>
-            </div>
-        </div>
-        <nav class="space-y-1 text-xs">
-            @foreach ($menuItems as $item)
-                @php $isActive = $currentUrl === $item['link']; @endphp
-                <a href="{{ $item['link'] }}" class="flex items-center gap-2 p-2 rounded-lg transition {{ $isActive ? 'bg-red-500 text-yellow-300 font-bold border-l-4 border-yellow-300' : 'hover:bg-red-500' }}">
-                    <span class="{{ $isActive ? 'bg-yellow-400 text-red-600' : 'bg-red-400' }} p-1 rounded">{!! $item['icon'] !!}</span>
-                    <span>{{ $item['label'] }}</span>
-                </a>
-            @endforeach
-        </nav>
-    </div>
+    @include('partials.app.sidebar')
 
     <div class="flex-1 flex flex-col min-w-0 overflow-hidden">
-        <div class="bg-red-600 text-white px-6 py-3 flex justify-between items-center shadow relative z-10">
-            <div class="w-1/4"></div>
-            <div class="w-1/3">
-                <input type="text" placeholder="Search settings..." class="w-full px-4 py-2 rounded-full text-black text-sm outline-none">
-            </div>
-            <div class="w-1/4 flex justify-end items-center gap-5 text-sm">
-                <button class="hover:opacity-80">&#128276;</button>
-                <div class="relative">
-                    <button id="profileDropdownBtn" type="button" class="flex items-center gap-2 font-semibold focus:outline-none hover:opacity-80 transition">
-                        <span>{{ $userName }}</span>
-                        <span class="text-[10px]">&#9660;</span>
-                    </button>
-                    <div id="profileMenu" class="absolute right-0 mt-3 w-48 bg-white rounded-xl shadow-2xl py-2 z-[9999] hidden border border-gray-100">
-                        <div class="px-4 py-3 border-b border-gray-50">
-                            <p class="text-[10px] text-gray-400 uppercase font-black tracking-widest">Account Settings</p>
-                        </div>
-                        <a href="{{ $profileRoute }}" class="block px-4 py-3 text-gray-700 hover:bg-gray-50 text-xs flex items-center gap-2 transition">
-                            <span>&#128100;</span> View Profile
-                        </a>
-                        <form action="{{ route('logout') }}" method="POST">
-                            @csrf
-                            <button type="submit" class="w-full text-left px-4 py-3 text-red-600 hover:bg-red-50 text-xs font-bold flex items-center gap-2 transition">
-                                <span>&#128682;</span> Log Out
-                            </button>
-                        </form>
-                    </div>
-                </div>
-            </div>
-        </div>
+        @include('partials.app.topbar', ['accountButtonId' => 'profileDropdownBtn', 'accountMenuId' => 'profileMenu', 'bindBell' => true, 'search' => ['placeholder' => 'Search settings...']])
 
         <main class="flex-1 overflow-y-auto p-8 bg-gray-50">
             <div class="max-w-5xl mx-auto">
@@ -88,6 +36,7 @@
                 @endif
 
                 <header class="mb-6">
+                    <span class="sk-eyebrow"><span class="sk-dot"></span>Profile</span>
                     <h1 class="text-2xl font-bold text-gray-800">Profile Settings</h1>
                     <p class="text-sm text-gray-500">{{ $pageDescription }}</p>
                 </header>

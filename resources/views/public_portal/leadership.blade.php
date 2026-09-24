@@ -5,74 +5,30 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Leadership | SK360 Public Portal</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    @include('partials.public.assets')
 </head>
 
-<body class="bg-gray-50 text-gray-800">
+<body class="sk-app sk-portal text-gray-800">
 
 {{-- HEADER --}}
-<header class="sticky top-0 z-40 bg-red-600 text-white shadow">
-    <div class="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
-
-        <a href="{{ route('public.home') }}"
-            class="flex items-center gap-3">
-
-            <img src="{{ asset('images/logo.png') }}"
-                class="w-10 h-10 rounded-full object-cover"
-                alt="SK360 Logo">
-
-            <div>
-                <h1 class="text-xl font-black">
-                    SK 360°
-                </h1>
-
-                <p class="text-[10px] opacity-80 uppercase tracking-widest">
-                    Public Information Portal
-                </p>
-            </div>
-        </a>
-
-        <a href="{{ route('public.home') }}"
-            class="text-xs font-bold hover:text-yellow-300 transition">
-            ← Public Portal
-        </a>
-    </div>
-</header>
+@include('partials.public.header')
 
 <main>
 
     {{-- PAGE HEADER --}}
-    <section class="bg-gradient-to-br from-red-600 to-red-700 text-white">
+    <x-public-hero eyebrow="Public Directory" title="Barangay SK Leadership">
+        View current and previous Sangguniang Kabataan officials
+        who served each barangay in the City of Lipa.
 
-        <div class="max-w-4xl mx-auto px-6 py-12">
-
-            <p class="text-xs font-black uppercase tracking-[0.2em] text-red-100">
-                Public Directory
-            </p>
-
-            <h2 class="text-4xl font-black mt-2">
-                Barangay SK Leadership
-            </h2>
-
-            <p class="text-red-100 text-sm mt-3 max-w-2xl leading-relaxed">
-                View current and previous Sangguniang Kabataan officials
-                who served each barangay in the City of Lipa.
-            </p>
-
+        <x-slot:extra>
             @if($currentTerm)
-
-                <div class="inline-flex items-center gap-2 mt-5 bg-white/10 border border-white/20 rounded-full px-4 py-2">
-
-                    <span class="w-2 h-2 rounded-full bg-green-300"></span>
-
-                    <span class="text-xs font-bold">
-                        Current Administration:
-                        {{ $currentTerm->start_year }}–{{ $currentTerm->end_year }}
-                    </span>
+                <div class="sk-badge sk-badge--green sk-badge--dot mt-5 !px-4 !py-2 !text-[13px]">
+                    Current Administration:
+                    {{ $currentTerm->start_year }}–{{ $currentTerm->end_year }}
                 </div>
-
             @endif
-        </div>
-    </section>
+        </x-slot:extra>
+    </x-public-hero>
 
     {{-- BARANGAY SELECTOR --}}
     <section class="max-w-4xl mx-auto px-6 pt-8">
@@ -146,7 +102,7 @@
             <div class="bg-white border border-gray-100 rounded-2xl shadow-sm px-6 py-14 text-center">
 
                 <div class="w-16 h-16 mx-auto bg-red-50 text-red-600 rounded-full flex items-center justify-center text-3xl mb-4">
-                    👥
+                    @include('partials.ui.icon', ['icon' => 'users', 'iconSize' => 18])
                 </div>
 
                 <h3 class="font-black text-gray-700 text-lg">
@@ -173,7 +129,7 @@
                 ]) }}"
                     class="flex-1 text-center rounded-xl px-4 py-3 text-xs font-black uppercase transition {{ ($activeTab ?? 'current') === 'current' ? 'bg-red-600 text-white' : 'text-gray-500 hover:bg-gray-50' }}">
 
-                    👥 Current Leadership
+                    <span class="inline-flex align-[-2px]">@include('partials.ui.icon', ['icon' => 'users', 'iconSize' => 14])</span> Current Leadership
                 </a>
 
                 <a href="{{ route('public.leadership',[
@@ -182,7 +138,7 @@
                 ]) }}"
                     class="flex-1 text-center rounded-xl px-4 py-3 text-xs font-black uppercase transition {{ ($activeTab ?? 'current') === 'history' ? 'bg-gray-800 text-white' : 'text-gray-500 hover:bg-gray-50' }}">
 
-                    📜 Leadership History
+                    <span class="inline-flex align-[-2px]">@include('partials.ui.icon', ['icon' => 'archive', 'iconSize' => 14])</span> Leadership History
                 </a>
             </div>
         </section>
@@ -239,8 +195,8 @@
 
                     <div class="bg-white border border-yellow-200 rounded-2xl shadow-sm px-6 py-12 text-center">
 
-                        <div class="text-4xl mb-4">
-                            🏛️
+                        <div class="sk-icon-tile sk-icon-tile--gray mx-auto mb-3" style="width:56px;height:56px;border-radius:18px">
+                            @include('partials.ui.icon', ['icon' => 'landmark', 'iconSize' => 24])
                         </div>
 
                         <h3 class="font-black text-gray-700 text-lg">
@@ -422,8 +378,8 @@
 
                             <div class="bg-white border border-gray-100 rounded-2xl shadow-sm px-6 py-10 text-center">
 
-                                <div class="text-3xl mb-3">
-                                    👥
+                                <div class="sk-icon-tile sk-icon-tile--gray mx-auto mb-3" style="width:56px;height:56px;border-radius:18px">
+                                    @include('partials.ui.icon', ['icon' => 'users', 'iconSize' => 24])
                                 </div>
 
                                 <h4 class="font-black text-gray-700">
@@ -527,8 +483,8 @@
 
                     <div class="bg-white border border-dashed border-gray-200 rounded-2xl shadow-sm px-6 py-14 text-center">
 
-                        <div class="text-4xl mb-4">
-                            📜
+                        <div class="sk-icon-tile sk-icon-tile--gray mx-auto mb-3" style="width:56px;height:56px;border-radius:18px">
+                            @include('partials.ui.icon', ['icon' => 'archive', 'iconSize' => 24])
                         </div>
 
                         <h3 class="font-black text-gray-700 text-lg">
@@ -771,8 +727,8 @@
 
                             <div class="bg-white border border-dashed border-gray-200 rounded-2xl px-6 py-10 text-center">
 
-                                <div class="text-3xl mb-3">
-                                    👥
+                                <div class="sk-icon-tile sk-icon-tile--gray mx-auto mb-3" style="width:56px;height:56px;border-radius:18px">
+                                    @include('partials.ui.icon', ['icon' => 'users', 'iconSize' => 24])
                                 </div>
 
                                 <h4 class="font-black text-gray-700">
@@ -815,16 +771,11 @@
     title="Back to top"
     class="hidden fixed bottom-6 right-6 z-50 w-12 h-12 rounded-full bg-red-600 text-white shadow-xl hover:bg-red-700 transition items-center justify-center text-xl">
 
-    ↑
+    @include('partials.ui.icon', ['icon' => 'arrow-up', 'iconSize' => 20])
 </button>
 
 {{-- FOOTER --}}
-<footer class="bg-gray-900 text-gray-400">
-
-    <div class="max-w-6xl mx-auto px-6 py-6 text-center text-xs">
-        &copy; {{ date('Y') }} SK360 • Sangguniang Kabataan Federation of Lipa City
-    </div>
-</footer>
+@include('partials.public.footer')
 
 <script>
 /*

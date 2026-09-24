@@ -11,140 +11,13 @@
 <div class="flex h-screen bg-gray-100">
 
     <!-- Sidebar -->
-    <div class="w-64 bg-red-600 text-white flex flex-col p-3 overflow-y-auto shrink-0">
-
-        <div class="flex items-center gap-3 mb-4">
-
-            <img src="{{ asset('images/logo.png') }}"
-                class="w-8 h-8 rounded-full object-cover"
-                alt="logo">
-
-            <div class="leading-tight">
-                <h2 class="text-lg font-extrabold tracking-wide">
-                    SK 360°
-                </h2>
-
-                <p class="text-[10px] opacity-80">
-                    Management System
-                </p>
-            </div>
-        </div>
-
-        <div class="bg-red-500 rounded-lg p-2 flex items-center gap-2 mb-3 shadow text-xs">
-
-            <div class="bg-yellow-400 text-red-600 p-1 rounded-full text-sm">
-                &#128100;
-            </div>
-
-            <div>
-                <p class="font-semibold text-xs">
-                    {{ $fullName }}
-                </p>
-
-                <p class="text-xs opacity-80">
-                    SK President
-                </p>
-            </div>
-        </div>
-
-        <nav class="space-y-1 text-xs">
-
-            @foreach($menuItems as $item)
-
-                @php
-                    $isActive=$item['link'] === $currentUrl;
-                @endphp
-
-                <a href="{{ $item['link'] }}"
-                    class="flex items-center gap-2 p-2 rounded-lg {{ $isActive ? 'bg-red-500' : 'hover:bg-red-500 transition' }}">
-
-                    <span class="{{ $isActive ? 'bg-yellow-400 text-red-600' : 'bg-red-400' }} p-1 rounded text-sm">
-                        {!! $item['icon'] !!}
-                    </span>
-
-                    <span class="{{ $isActive ? 'text-yellow-300 font-semibold' : '' }} text-xs">
-                        {{ $item['label'] }}
-                    </span>
-                </a>
-
-            @endforeach
-        </nav>
-    </div>
+    @include('partials.app.sidebar')
 
     <!-- Main -->
     <div class="flex-1 flex flex-col overflow-hidden">
 
         <!-- Header -->
-        <div class="bg-red-600 text-white px-6 py-3 flex justify-between items-center shadow relative z-20">
-
-            <div class="w-1/4"></div>
-
-            <div class="w-1/3">
-
-                <input type="text"
-                    id="leadershipSearch"
-                    placeholder="Search name, barangay, position..."
-                    class="w-full px-4 py-2 rounded-full text-black focus:outline-none text-sm"
-                    autocomplete="off">
-            </div>
-
-            <div class="w-1/4 flex justify-end items-center gap-5 text-sm">
-
-                <button type="button"
-                    class="hover:opacity-80">
-                    &#128276;
-                </button>
-
-                <div class="relative">
-
-                    <button id="profileDropdownBtn"
-                        type="button"
-                        class="flex items-center gap-2 font-semibold focus:outline-none hover:opacity-80 transition">
-
-                        <span>{{ $fullName }}</span>
-
-                        <span class="text-[10px]">
-                            &#9660;
-                        </span>
-                    </button>
-
-                    <div id="profileMenu"
-                        class="absolute right-0 mt-3 w-48 bg-white rounded-xl shadow-2xl py-2 z-[9999] hidden border border-gray-100">
-
-                        <div class="px-4 py-3 border-b border-gray-50">
-
-                            <p class="text-[10px] text-gray-400 uppercase font-black tracking-widest">
-                                Account Settings
-                            </p>
-                        </div>
-
-                        <a href="{{ route('sk_pres.profile') }}"
-                            class="px-4 py-3 text-gray-700 hover:bg-gray-50 text-xs flex items-center gap-2 transition">
-
-                            <span>&#128100;</span>
-
-                            View Profile
-                        </a>
-
-                        <form action="{{ route('logout') }}"
-                            method="POST">
-
-                            @csrf
-
-                            <button type="submit"
-                                class="w-full text-left px-4 py-3 text-red-600 hover:bg-red-50 text-xs font-bold flex items-center gap-2 transition">
-
-                                <span>
-                                    &#128682;
-                                </span>
-
-                                Log Out
-                            </button>
-                        </form>
-                    </div>
-                </div>
-            </div>
-        </div>
+        @include('partials.app.topbar', ['accountButtonId' => 'profileDropdownBtn', 'accountMenuId' => 'profileMenu', 'bindBell' => true, 'search' => ['id' => 'leadershipSearch', 'placeholder' => 'Search name, barangay, position...']])
 
         <main class="p-8 overflow-y-auto h-full bg-gray-50">
 
@@ -153,6 +26,7 @@
 
                 <div>
 
+                    <span class="sk-eyebrow"><span class="sk-dot"></span>Leadership</span>
                     <div class="flex items-center gap-2">
 
                         <h1 class="text-3xl font-black text-gray-800">
@@ -218,7 +92,7 @@
                 <div class="flex items-center gap-4">
 
                     <div class="bg-white/20 p-3 rounded-xl text-2xl">
-                        &#128197;
+                        <span class="inline-flex align-[-3px]">@include('partials.ui.icon', ['icon' => 'calendar-days', 'iconSize' => 16])</span>
                     </div>
 
                     <div>
@@ -360,12 +234,12 @@
                                 <div class="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-[10px] text-gray-500">
 
                                     <span>
-                                        &#128231;
+                                        <span class="inline-flex align-[-3px]">@include('partials.ui.icon', ['icon' => 'mail', 'iconSize' => 16])</span>
                                         {{ $president['email'] ?: 'No email provided' }}
                                     </span>
 
                                     <span>
-                                        &#128222;
+                                        <span class="inline-flex align-[-3px]">@include('partials.ui.icon', ['icon' => 'phone', 'iconSize' => 16])</span>
                                         {{ $president['phone'] ?: 'No phone provided' }}
                                     </span>
                                 </div>
@@ -435,7 +309,7 @@
                                 <div class="flex items-center gap-3">
 
                                     <div class="rounded-xl bg-red-50 p-2.5 text-red-500">
-                                        &#128205;
+                                        <span class="inline-flex align-[-3px]">@include('partials.ui.icon', ['icon' => 'map-pin', 'iconSize' => 16])</span>
                                     </div>
 
                                     <div>
@@ -461,7 +335,7 @@
                                     </span>
 
                                     <span class="text-gray-400">
-                                        &#9662;
+                                        <span class="inline-flex align-[-3px]">@include('partials.ui.icon', ['icon' => 'chevron-down', 'iconSize' => 16])</span>
                                     </span>
                                 </div>
                             </div>
@@ -557,12 +431,12 @@
                                                         <div class="mt-2 space-y-1 text-[10px] text-gray-500">
 
                                                             <p class="truncate">
-                                                                &#128231;
+                                                                <span class="inline-flex align-[-3px]">@include('partials.ui.icon', ['icon' => 'mail', 'iconSize' => 16])</span>
                                                                 {{ $member['email'] ?: 'No email provided' }}
                                                             </p>
 
                                                             <p>
-                                                                &#128222;
+                                                                <span class="inline-flex align-[-3px]">@include('partials.ui.icon', ['icon' => 'phone', 'iconSize' => 16])</span>
                                                                 {{ $member['phone'] ?: 'No phone provided' }}
                                                             </p>
                                                         </div>
@@ -639,12 +513,12 @@
                                                     </p>
 
                                                     <p class="text-[9px] text-gray-400 mt-1 truncate">
-                                                        &#128231;
+                                                        <span class="inline-flex align-[-3px]">@include('partials.ui.icon', ['icon' => 'mail', 'iconSize' => 16])</span>
                                                         {{ $councilor['email'] ?: 'No email provided' }}
                                                     </p>
 
                                                     <p class="text-[9px] text-gray-400 mt-1">
-                                                        &#128222;
+                                                        <span class="inline-flex align-[-3px]">@include('partials.ui.icon', ['icon' => 'phone', 'iconSize' => 16])</span>
                                                         {{ $councilor['phone'] ?: 'No phone provided' }}
                                                     </p>
                                                 </div>
@@ -687,7 +561,7 @@
                 class="hidden mt-5 rounded-2xl border border-gray-200 bg-white p-8 text-center">
 
                 <div class="text-3xl mb-2">
-                    &#128269;
+                    <span class="inline-flex align-[-3px]">@include('partials.ui.icon', ['icon' => 'search', 'iconSize' => 16])</span>
                 </div>
 
                 <p class="text-sm font-bold text-gray-600">
