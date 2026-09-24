@@ -14,6 +14,7 @@ class AnnouncementController extends Controller
     public function index(Request $request): View
     {
         $visitorToken=$this->visitorToken();
+        $currentTermId=$this->currentTermId();
 
         $search=trim((string)$request->query('q',''));
         $sort=$request->query('sort','latest');
@@ -28,13 +29,29 @@ class AnnouncementController extends Controller
             ->where('a.visibility','public')
             ->select(
                 'a.announcement_id',
+                'a.term_id',
                 'a.title',
                 'a.content',
                 'a.created_at',
                 'u.role',
                 'b.barangay_name',
-                DB::raw("CONCAT(COALESCE(u.first_name,''),' ',COALESCE(u.last_name,'')) as author_name")
+                DB::raw(
+                    "CONCAT(
+                        COALESCE(u.first_name,''),
+                        ' ',
+                        COALESCE(u.last_name,'')
+                    ) as author_name"
+                )
             );
+
+        if($currentTermId){
+            $query->where(
+                'a.term_id',
+                $currentTermId
+            );
+        }else{
+            $query->whereRaw('1 = 0');
+        }
 
         if($search!==''){
             $query->where(function($q) use($search){
@@ -59,73 +76,133 @@ class AnnouncementController extends Controller
 
         $announcements->getCollection()->transform(function($post) use($visitorToken){
             $officialLikes=DB::table('wall_post_likes')
-                ->where('announcement_id',$post->announcement_id)
+                ->where(
+                    'announcement_id',
+                    $post->announcement_id
+                )
                 ->count();
 
             $publicLikes=DB::table('public_wall_post_likes')
-                ->where('announcement_id',$post->announcement_id)
+                ->where(
+                    'announcement_id',
+                    $post->announcement_id
+                )
                 ->count();
 
-            $post->likes_count=$officialLikes+$publicLikes;
+            $post->likes_count=
+                $officialLikes+
+                $publicLikes;
 
             if(auth()->check()){
-                $post->liked_by_visitor=DB::table('wall_post_likes')
-                    ->where('announcement_id',$post->announcement_id)
-                    ->where('user_id',auth()->user()->user_id)
-                    ->exists();
+                $post->liked_by_visitor=
+                    DB::table('wall_post_likes')
+                        ->where(
+                            'announcement_id',
+                            $post->announcement_id
+                        )
+                        ->where(
+                            'user_id',
+                            auth()->user()->user_id
+                        )
+                        ->exists();
             }else{
-                $post->liked_by_visitor=DB::table('public_wall_post_likes')
-                    ->where('announcement_id',$post->announcement_id)
-                    ->where('visitor_token',$visitorToken)
-                    ->exists();
+                $post->liked_by_visitor=
+                    DB::table('public_wall_post_likes')
+                        ->where(
+                            'announcement_id',
+                            $post->announcement_id
+                        )
+                        ->where(
+                            'visitor_token',
+                            $visitorToken
+                        )
+                        ->exists();
             }
 
-            $post->views_count=DB::table('announcement_views')
-                ->where('announcement_id',$post->announcement_id)
-                ->count();
+            $post->views_count=
+                DB::table('announcement_views')
+                    ->where(
+                        'announcement_id',
+                        $post->announcement_id
+                    )
+                    ->count();
 
-            $post->feedback_count=DB::table('announcement_feedback')
-                ->where('announcement_id',$post->announcement_id)
-                ->where('status','posted')
-                ->count();
+            $post->feedback_count=
+                DB::table('announcement_feedback')
+                    ->where(
+                        'announcement_id',
+                        $post->announcement_id
+                    )
+                    ->where(
+                        'status',
+                        'posted'
+                    )
+                    ->count();
 
-            $post->author_name=trim((string)$post->author_name) ?: 'SK Federation';
+            $post->author_name=
+                trim(
+                    (string)$post->author_name
+                ) ?: 'SK Federation';
 
-            $post->role_label=match($post->role){
-                'sk_president'=>'SK President',
-                'sk_chairman'=>'SK Chairman',
-                'sk_secretary'=>'SK Secretary',
-                default=>'SK Official',
-            };
+            $post->role_label=
+                match($post->role){
+                    'sk_president'=>'SK President',
+                    'sk_chairman'=>'SK Chairman',
+                    'sk_secretary'=>'SK Secretary',
+                    default=>'SK Official',
+                };
 
             return $post;
         });
 
-        return view('public_portal.announcements',[
-            'announcements'=>$announcements,
-            'search'=>$search,
-            'sort'=>$sort,
-        ]);
+        return view(
+            'public_portal.announcements',
+            [
+                'announcements'=>$announcements,
+                'search'=>$search,
+                'sort'=>$sort,
+            ]
+        );
+    }
+
+    protected function currentTermId(): ?int
+    {
+        $termId=DB::table('administration_terms')
+            ->where('status','current')
+            ->orderByDesc('term_id')
+            ->value('term_id');
+
+        return $termId
+            ? (int)$termId
+            : null;
     }
 
     protected function visitorToken(): string
     {
-        $token=(string)request()->cookie('sk360_public_visitor','');
+        $token=(string)request()->cookie(
+            'sk360_public_visitor',
+            ''
+        );
 
         if($token===''){
             $token=(string)Str::uuid();
 
-            Cookie::queue(cookie(
-                'sk360_public_visitor',
-                $token,
-                60*24*365,
-                '/',
-                null,
-                (bool)config('session.secure',false),
-                true,
-                false,
-                'Lax'
-            ));
+            Cookie::queue(
+                cookie(
+                    'sk360_public_visitor',
+                    $token,
+                    60*24*365,
+                    '/',
+                    null,
+                    (bool)config(
+                        'session.secure',
+                        false
+                    ),
+                    true,
+                    false,
+                    'Lax'
+                )
+            );
         }
 
         return $token;

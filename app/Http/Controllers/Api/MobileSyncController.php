@@ -493,6 +493,7 @@ class MobileSyncController extends Controller
         };
 
         $announcementData = [
+            ...$this->mobileTermData('announcements'),
             'user_id' => $request->user()->user_id,
             'title' => $title,
             'content' => $validated['post_content'],
@@ -668,6 +669,7 @@ class MobileSyncController extends Controller
         }
 
         $eventId = DB::table('events')->insertGetId([
+            ...$this->mobileTermData('events'),
             'created_by' => $request->user()->user_id,
             'title' => $validated['title'],
             'description' => $validated['description'] ?? null,
@@ -746,6 +748,7 @@ class MobileSyncController extends Controller
         ]);
 
         $meetingId = DB::table('meetings')->insertGetId([
+            ...$this->mobileTermData('meetings'),
             'title' => $validated['title'],
             'agenda' => $validated['agenda'] ?? null,
             'meeting_date' => $validated['meeting_date'],
@@ -1279,6 +1282,7 @@ class MobileSyncController extends Controller
         ]);
 
         $slotId = DB::table('submission_slots')->insertGetId([
+            ...$this->mobileTermData('submission_slots'),
             'submission_type' => $validated['submission_type'],
             'title' => $validated['submission_title'],
             'description' => $validated['description'] ?? null,
@@ -2124,6 +2128,7 @@ class MobileSyncController extends Controller
         $reportType = $validated['report_type'] ?? 'monthly';
 
         $data = [
+            ...$this->mobileTermData('accomplishment_reports', $slot->term_id ?? null),
             'user_id' => $user->user_id,
             'barangay_id' => $user->barangay_id,
             'slot_id' => $slot->slot_id,
@@ -2153,6 +2158,7 @@ class MobileSyncController extends Controller
         $year = (int) ($validated['reporting_year'] ?? now()->year);
 
         $data = [
+            ...$this->mobileTermData('budget_reports', $slot->term_id ?? null),
             'user_id' => $user->user_id,
             'barangay_id' => $user->barangay_id,
             'slot_id' => $slot->slot_id,
@@ -2182,6 +2188,19 @@ class MobileSyncController extends Controller
         }
 
         return $this->saveSlotReport('budget_reports', 'budget_report_id', $data);
+    }
+
+    // New web pages filter by term; keep mobile-created records visible there.
+    protected function mobileTermData(string $table, ?int $termId = null): array
+    {
+        if (! Schema::hasColumn($table, 'term_id')) {
+            return [];
+        }
+
+        $termId ??= $this->currentTermId();
+        abort_unless($termId, 422, 'There is no active administration term.');
+
+        return ['term_id' => $termId];
     }
 
     // Reuse the existing report ID when a barangay submits to the same slot again.

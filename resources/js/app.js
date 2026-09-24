@@ -1,2 +1,2 @@
 import './bootstrap';
-import './sk-pres-react';
+import './sk-pres-react.jsx';

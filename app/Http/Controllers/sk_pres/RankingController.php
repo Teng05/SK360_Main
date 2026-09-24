@@ -7,22 +7,23 @@ namespace App\Http\Controllers\sk_pres;
 use App\Http\Controllers\Concerns\BuildsRankingsData;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 class RankingController extends Controller
 {
     use BuildsRankingsData;
 
-    public function index(Request $request): View
+    public function index(): View
     {
         abort_unless(auth()->check() && auth()->user()->role === 'sk_president', 403);
 
         $user = auth()->user();
         $fullName = trim(($user->first_name ?? '') . ' ' . ($user->last_name ?? '')) ?: 'User';
-        $periods = $this->rankingPeriods();
-        $selectedPeriod = $periods->contains($request->query('period')) ? $request->query('period') : $periods->first();
-        $leaderboard = $this->rankingsLeaderboard($selectedPeriod);
+        $leaderboard = $this->rankingsLeaderboard();
+
+        $rankingsLiveRoute = request()->filled('period')
+            ? route('sk_pres.rankings.live', ['period' => request('period')])
+            : route('sk_pres.rankings.live');
 
         return view('sk_pres.rankings', [
             'fullName' => $fullName,
@@ -31,26 +32,25 @@ class RankingController extends Controller
             'currentUrl' => url()->current(),
             'topRankings' => $this->topRankings($leaderboard),
             'leaderboard' => $leaderboard,
-            'latestPeriod' => $selectedPeriod,
-            'rankingPeriods' => $periods,
-            'currentPeriod' => $periods->first(),
+            'latestPeriod' => $this->latestRankingPeriod(),
+            'rankingPeriods' => $this->rankingPeriodOptions(),
+            'selectedPeriod' => $this->selectedRankingPeriodValue(),
             'pointSystem' => $this->rankingPointSystem(),
             'profileRoute' => route('sk_pres.profile'),
-            'rankingsLiveRoute' => route('sk_pres.rankings.live'),
+            'rankingsLiveRoute' => $rankingsLiveRoute,
         ]);
     }
 
-    public function live(Request $request): JsonResponse
+    public function live(): JsonResponse
     {
         abort_unless(auth()->check() && auth()->user()->role === 'sk_president', 403);
 
-        $period = $request->query('period');
-        $leaderboard = $this->rankingsLeaderboard($period);
+        $leaderboard = $this->rankingsLeaderboard();
 
         return response()->json([
             'topRankings' => $this->topRankings($leaderboard)->values(),
             'leaderboard' => $leaderboard->values(),
-            'latestPeriod' => $period ?: $this->latestRankingPeriod(),
+            'latestPeriod' => $this->latestRankingPeriod(),
             'pointSystem' => $this->rankingPointSystem(),
             'updatedAt' => now()->format('M d, Y h:i A'),
         ]);
@@ -68,7 +68,6 @@ class RankingController extends Controller
             ['link' => route('sk_pres.chat'), 'icon' => '&#128172;', 'label' => 'Chat'],
             ['link' => route('sk_pres.meetings'), 'icon' => '&#128222;', 'label' => 'Meetings'],
             ['link' => route('sk_pres.rankings'), 'icon' => '&#127942;', 'label' => 'Rankings'],
-            
             ['link' => route('sk_pres.leadership'), 'icon' => '&#128101;', 'label' => 'Leadership'],
             ['link' => route('sk_pres.archive'), 'icon' => '&#128450;&#65039;', 'label' => 'Archive'],
             ['link' => route('sk_pres.user-management'), 'icon' => '&#128100;', 'label' => 'User Management'],

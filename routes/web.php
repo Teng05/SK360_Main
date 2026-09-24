@@ -10,7 +10,7 @@ use App\Http\Controllers\sk_pres\ModuleController;
 use App\Http\Controllers\sk_pres\PlaceholderController;
 use App\Http\Controllers\sk_pres\ChatController as SkPresidentChatController;
 use App\Http\Controllers\sk_pres\RankingController as SkPresidentRankingController;
-use App\Http\Controllers\sk_pres\LeadershipController as SkPresidentLeadershipController; 
+use App\Http\Controllers\sk_pres\LeadershipController as SkPresidentLeadershipController;
 use App\Http\Controllers\sk_pres\ArchiveController as SkPresidentArchiveController;
 use App\Http\Controllers\sk_pres\UserManagementController as SkPresidentUserManagementController;
 
@@ -23,6 +23,7 @@ use App\Http\Controllers\sk_chairman\MeetingsController as SkChairmanMeetingsCon
 use App\Http\Controllers\sk_chairman\ReportController as SkChairmanReportController;
 use App\Http\Controllers\sk_chairman\BudgetController as SkChairmanBudgetController;
 use App\Http\Controllers\sk_chairman\LeadershipController as SkChairmanLeadershipController;
+
 use App\Http\Controllers\sk_secretary\RankingController as SkSecretaryRankingController;
 use App\Http\Controllers\sk_secretary\HomeController as SkSecretaryHomeController;
 use App\Http\Controllers\sk_secretary\AnnouncementController as SkSecretaryAnnouncementController;
@@ -38,6 +39,7 @@ use App\Http\Controllers\public_portal\AnnouncementInteractionController as Publ
 use App\Http\Controllers\public_portal\AnnouncementController as PublicAnnouncementController;
 use App\Http\Controllers\public_portal\CalendarController as PublicCalendarController;
 use App\Http\Controllers\public_portal\LeadershipController as PublicLeadershipController;
+use App\Http\Controllers\public_portal\BudgetController as PublicBudgetController;
 
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\NotificationController;
@@ -53,6 +55,7 @@ use Illuminate\Support\Facades\Route;
 | PUBLIC ROUTES
 |--------------------------------------------------------------------------
 */
+
 Route::get('/', function(){
     if(auth()->check()){
         return redirect()->to(match(auth()->user()->role){
@@ -69,9 +72,15 @@ Route::get('/', function(){
 Route::get('/mobile/meetings/{meeting}/call', [MobileApiController::class, 'mobileMeetingCall'])
     ->middleware('signed')
     ->name('mobile.meetings.call');
+
 Route::post('/mobile/meetings/{meeting}/agora-token', [MobileApiController::class, 'mobileMeetingToken'])
     ->middleware('signed')
     ->name('mobile.meetings.agora.token');
+
+// Keep signed document previews available to the existing mobile app.
+Route::get('/mobile-documents/{sourceType}/{sourceId}', [SkPresidentArchiveController::class, 'mobileView'])
+    ->middleware('signed')
+    ->name('mobile.document.view');
 
 Route::controller(AuthController::class)->group(function () {
     Route::get('/login', 'showLogin')->name('login');
@@ -94,13 +103,9 @@ Route::middleware('auth')->group(function(){
     Route::post('/notifications/{notification}/read',[NotificationController::class,'markRead'])->name('notifications.read');
     Route::post('/wall/posts',[WallPostController::class,'store'])->name('wall.posts.store');
     Route::post('/wall/posts/{announcement}/like',[WallPostController::class,'toggleLike'])->name('wall.posts.like');
+    Route::post('/meetings/{meeting}/call-attendance/join',[MeetingsController::class,'joinCallAttendance'])->name('meetings.call-attendance.join');
+    Route::post('/meetings/{meeting}/call-attendance/leave',[MeetingsController::class,'leaveCallAttendance'])->name('meetings.call-attendance.leave');
 });
-
-// Short-lived signed links used by the mobile app to view generated documents.
-Route::get('/mobile-documents/{sourceType}/{sourceId}', [SkPresidentArchiveController::class, 'mobileView'])
-    ->middleware('signed')
-    ->name('mobile.document.view');
-
 
 
 /*
@@ -108,6 +113,7 @@ Route::get('/mobile-documents/{sourceType}/{sourceId}', [SkPresidentArchiveContr
 | SK PRESIDENT
 |--------------------------------------------------------------------------
 */
+
 Route::middleware('auth')->prefix('sk_pres')->name('sk_pres.')->group(function(){
 
     Route::get('/home',[HomeController::class,'index'])->name('home');
@@ -115,15 +121,15 @@ Route::middleware('auth')->prefix('sk_pres')->name('sk_pres.')->group(function()
 
     Route::get('/consolidation',[ConsolidationController::class,'index'])->name('consolidation');
     Route::get('/consolidation/download',[ConsolidationController::class,'download'])->name('consolidation.download');
+    Route::post('/consolidation/quality-review',[ConsolidationController::class,'reviewQuality'])->name('consolidation.quality-review');
 
     Route::get('/module',[ModuleController::class,'index'])->name('module');
-    Route::get('/module/{slotId}/submissions-page',[ModuleController::class,'submissionsPage'])->name('module.submissions-page');
-    Route::get('/module/{slotId}/submissions',[ModuleController::class,'submissions'])->name('module.submissions');
-    Route::post('/module/{slotId}/toggle',[ModuleController::class,'toggle'])->name('module.toggle');
     Route::get('/module/live',[ModuleController::class,'live'])->name('module.live');
     Route::post('/module/live',[ModuleController::class,'storeLive'])->name('module.live.store');
+    Route::patch('/module/live/{slotId}/close',[ModuleController::class,'closeLive'])->name('module.live.close');
     Route::delete('/module/live/{slotId}',[ModuleController::class,'destroyLive'])->name('module.live.destroy');
     Route::post('/module',[ModuleController::class,'store'])->name('module.store');
+    Route::patch('/module/{slotId}/close',[ModuleController::class,'close'])->name('module.close');
     Route::post('/module/{slotId}/delete',[ModuleController::class,'destroy'])->name('module.destroy');
 
     Route::get('/announcements',[AnnouncementController::class,'index'])->name('announcements');
@@ -139,7 +145,8 @@ Route::middleware('auth')->prefix('sk_pres')->name('sk_pres.')->group(function()
 
     Route::get('/meetings',[MeetingsController::class,'index'])->name('meetings');
     Route::post('/meetings',[MeetingsController::class,'store'])->name('meetings.store');
-    Route::patch('/meetings/{meeting}/end',[MeetingsController::class,'end'])->name('meetings.end');
+    Route::post('/meetings/{meeting}/finish',[MeetingsController::class,'finish'])->name('meetings.finish');
+    Route::post('/meetings/{meeting}/attendance',[MeetingsController::class,'recordAttendance'])->name('meetings.attendance');
     Route::get('/meetings/{meeting}/call',[MeetingsController::class,'call'])->name('meetings.call');
     Route::post('/meetings/{meeting}/agora-token',[MeetingsController::class,'token'])->name('meetings.agora.token');
     Route::get('/video',fn()=>redirect()->route('sk_pres.meetings'))->name('video');
@@ -154,9 +161,9 @@ Route::middleware('auth')->prefix('sk_pres')->name('sk_pres.')->group(function()
     | DOCUMENT / REPORT ARCHIVE
     |--------------------------------------------------------------------------
     */
+
     Route::get('/archive',[SkPresidentArchiveController::class,'index'])->name('archive');
     Route::get('/archive/download/bulk',[SkPresidentArchiveController::class,'bulkDownload'])->name('archive.bulk-download');
-    Route::get('/archive/view/{sourceType}/{sourceId}',[SkPresidentArchiveController::class,'view'])->name('archive.view');
     Route::get('/archive/download/{sourceType}/{sourceId}',[SkPresidentArchiveController::class,'download'])->name('archive.download');
 
     /*
@@ -164,6 +171,7 @@ Route::middleware('auth')->prefix('sk_pres')->name('sk_pres.')->group(function()
     | USER MANAGEMENT
     |--------------------------------------------------------------------------
     */
+
     Route::get('/user-management',[SkPresidentUserManagementController::class,'index'])->name('user-management');
     Route::post('/user-management/officials',[SkPresidentUserManagementController::class,'storeOfficial'])->name('user-management.store-official');
     Route::post('/user-management/bulk-officials',[SkPresidentUserManagementController::class,'storeBulkOfficials'])->name('user-management.store-bulk-officials');
@@ -176,11 +184,13 @@ Route::middleware('auth')->prefix('sk_pres')->name('sk_pres.')->group(function()
     Route::delete('/user-management/{userId}',[SkPresidentUserManagementController::class,'destroy'])->name('user-management.destroy');
     Route::post('/user-management/start-new-term',[SkPresidentUserManagementController::class,'startNewTerm'])->name('user-management.start-new-term');
     Route::post('/user-management/history/{officialTermId}/reappoint',[SkPresidentUserManagementController::class,'reappoint'])->name('user-management.reappoint');
+
     /*
     |--------------------------------------------------------------------------
     | PROFILE
     |--------------------------------------------------------------------------
     */
+
     Route::get('/profile',fn(ProfileSettingsController $c)=>$c->show('sk_president'))
         ->name('profile');
 
@@ -192,12 +202,12 @@ Route::middleware('auth')->prefix('sk_pres')->name('sk_pres.')->group(function()
 });
 
 
-
 /*
 |--------------------------------------------------------------------------
 | SK CHAIRMAN
 |--------------------------------------------------------------------------
 */
+
 Route::middleware('auth')->prefix('sk_chairman')->name('sk_chairman.')->group(function () {
 
     Route::get('/home', [SkChairmanHomeController::class, 'index'])->name('home');
@@ -251,12 +261,12 @@ Route::middleware('auth')->prefix('sk_chairman')->name('sk_chairman.')->group(fu
 });
 
 
-
 /*
 |--------------------------------------------------------------------------
 | SK SECRETARY
 |--------------------------------------------------------------------------
 */
+
 Route::middleware('auth')->prefix('sk_secretary')->name('sk_secretary.')->group(function () {
 
     Route::get('/home', [SkSecretaryHomeController::class, 'index'])->name('home');
@@ -284,6 +294,7 @@ Route::middleware('auth')->prefix('sk_secretary')->name('sk_secretary.')->group(
 
     Route::get('/rankings', [SkSecretaryRankingController::class, 'index'])->name('rankings');
     Route::get('/rankings/live', [SkSecretaryRankingController::class, 'live'])->name('rankings.live');
+
     Route::get('/leadership', [SkSecretaryLeadershipController::class, 'index'])->name('leadership');
 
     Route::get('/profile', fn (ProfileSettingsController $c) => $c->show('sk_secretary'))->name('profile');
@@ -297,6 +308,7 @@ Route::middleware('auth')->prefix('sk_secretary')->name('sk_secretary.')->group(
 | PUBLIC PORTAL
 |--------------------------------------------------------------------------
 */
+
 Route::prefix('public-portal')->name('public.')->group(function(){
 
     Route::get('/',[PublicHomeController::class,'index'])->name('home');
@@ -304,6 +316,7 @@ Route::prefix('public-portal')->name('public.')->group(function(){
     Route::get('/announcements',[PublicAnnouncementController::class,'index'])->name('announcements');
     Route::get('/calendar',[PublicCalendarController::class,'index'])->name('calendar');
     Route::get('/leadership',[PublicLeadershipController::class,'index'])->name('leadership');
+    Route::get('/annual-budgets',[PublicBudgetController::class,'index'])->name('budgets');
 
     Route::post('/announcements/{announcementId}/like',[PublicAnnouncementInteractionController::class,'toggleLike'])->middleware('throttle:30,1')->name('announcements.like');
     Route::post('/announcements/{announcementId}/view',[PublicAnnouncementInteractionController::class,'trackView'])->middleware('throttle:120,1')->name('announcements.view');

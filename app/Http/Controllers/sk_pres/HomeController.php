@@ -30,7 +30,6 @@ class HomeController extends Controller
             ['link' => route('sk_pres.chat'), 'icon' => '&#128172;', 'label' => 'Chat'],
             ['link' => route('sk_pres.meetings'), 'icon' => '&#128222;', 'label' => 'Meetings'],
             ['link' => route('sk_pres.rankings'), 'icon' => '&#127942;', 'label' => 'Rankings'],
-            
             ['link' => route('sk_pres.leadership'), 'icon' => '&#128101;', 'label' => 'Leadership'],
             ['link' => route('sk_pres.archive'), 'icon' => '&#128450;&#65039;', 'label' => 'Archive'],
             ['link' => route('sk_pres.user-management'), 'icon' => '&#128100;', 'label' => 'User Management'],
@@ -51,7 +50,14 @@ class HomeController extends Controller
 
     protected function upcomingEvents()
     {
+        $currentTermId = $this->currentTermId();
+
+        if (!$currentTermId) {
+            return collect();
+        }
+
         return DB::table('events')
+            ->where('term_id', $currentTermId)
             ->where('visibility', 'public')
             ->where('end_datetime', '>=', now())
             ->orderBy('start_datetime')
@@ -78,16 +84,36 @@ class HomeController extends Controller
 
     protected function summaryCards(): array
     {
-        $accomplishmentReports = DB::table('accomplishment_reports')->count();
-        $budgetReports = DB::table('budget_reports')->count();
+        $currentTermId = $this->currentTermId();
+
+        if (!$currentTermId) {
+            return [
+                ['value' => '0', 'label' => 'Reports Submitted', 'classes' => 'bg-red-500 text-white'],
+                ['value' => '0%', 'label' => 'Community Engagement', 'classes' => 'bg-blue-500 text-white'],
+                ['value' => '0', 'label' => 'Pending Reviews', 'classes' => 'bg-yellow-500 text-white'],
+                ['value' => '0', 'label' => 'Upcoming Events', 'classes' => 'bg-green-500 text-white'],
+            ];
+        }
+
+        $accomplishmentReports = DB::table('accomplishment_reports')
+            ->where('term_id', $currentTermId)
+            ->count();
+
+        $budgetReports = DB::table('budget_reports')
+            ->where('term_id', $currentTermId)
+            ->count();
+
         $reportsSubmitted = $accomplishmentReports + $budgetReports;
 
         $barangayCount = DB::table('barangays')->count();
+
         $submittedBarangays = DB::table('accomplishment_reports')
+            ->where('term_id', $currentTermId)
             ->whereNotNull('barangay_id')
             ->pluck('barangay_id')
             ->merge(
                 DB::table('budget_reports')
+                    ->where('term_id', $currentTermId)
                     ->whereNotNull('barangay_id')
                     ->pluck('barangay_id')
             )
@@ -99,13 +125,16 @@ class HomeController extends Controller
             : 0;
 
         $pendingReviews = DB::table('accomplishment_reports')
+            ->where('term_id', $currentTermId)
             ->where('status', 'submitted')
             ->count()
             + DB::table('budget_reports')
+                ->where('term_id', $currentTermId)
                 ->where('status', 'submitted')
                 ->count();
 
         $upcomingEvents = DB::table('events')
+            ->where('term_id', $currentTermId)
             ->where('visibility', 'public')
             ->where('end_datetime', '>=', now())
             ->count();
@@ -116,5 +145,15 @@ class HomeController extends Controller
             ['value' => (string) $pendingReviews, 'label' => 'Pending Reviews', 'classes' => 'bg-yellow-500 text-white'],
             ['value' => (string) $upcomingEvents, 'label' => 'Upcoming Events', 'classes' => 'bg-green-500 text-white'],
         ];
+    }
+
+    protected function currentTermId(): ?int
+    {
+        $termId = DB::table('administration_terms')
+            ->where('status', 'current')
+            ->orderByDesc('term_id')
+            ->value('term_id');
+
+        return $termId ? (int) $termId : null;
     }
 }

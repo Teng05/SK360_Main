@@ -3,7 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
     <title>SK360 Public Portal</title>
+
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
 
@@ -11,14 +13,19 @@
 
 {{-- HEADER --}}
 <header class="sticky top-0 z-40 bg-red-600 text-white shadow">
+
     <div class="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
 
         <div class="flex items-center gap-3">
-            <img src="{{ asset('images/sk logo.png') }}"
+
+            <img
+                src="{{ asset('images/logo.png') }}"
                 class="w-10 h-10 rounded-full object-cover"
-                alt="SK360 Logo">
+                alt="SK360 Logo"
+            >
 
             <div>
+
                 <h1 class="text-xl font-black">
                     SK 360°
                 </h1>
@@ -26,15 +33,20 @@
                 <p class="text-[10px] opacity-80 uppercase tracking-widest">
                     Public Information Portal
                 </p>
+
             </div>
+
         </div>
 
-        <a href="{{ url('/') }}"
-            class="text-xs font-bold hover:text-yellow-300 transition">
+        <a
+            href="{{ url('/') }}"
+            class="text-xs font-bold hover:text-yellow-300 transition"
+        >
             ← Main Website
         </a>
 
     </div>
+
 </header>
 
 <main>
@@ -55,24 +67,38 @@
         <p class="max-w-2xl mx-auto text-red-100 leading-relaxed">
             Access official public information from the Sangguniang Kabataan
             Federation of Lipa City. Stay informed about announcements,
-            upcoming activities, and current barangay SK leadership.
+            upcoming activities, current barangay SK leadership, and
+            Annual Budget information.
         </p>
 
         <div class="flex flex-wrap justify-center gap-3 mt-8">
 
-            <a href="{{ route('public.announcements') }}"
-                class="bg-white text-red-600 px-6 py-3 rounded-xl font-black text-sm hover:bg-red-50 transition">
+            <a
+                href="{{ route('public.announcements') }}"
+                class="bg-white text-red-600 px-6 py-3 rounded-xl font-black text-sm hover:bg-red-50 transition"
+            >
                 📢 Announcements
             </a>
 
-            <a href="{{ route('public.calendar') }}"
-                class="bg-white text-red-600 px-6 py-3 rounded-xl font-black text-sm hover:bg-red-50 transition">
+            <a
+                href="{{ route('public.calendar') }}"
+                class="bg-white text-red-600 px-6 py-3 rounded-xl font-black text-sm hover:bg-red-50 transition"
+            >
                 📅 Calendar
             </a>
 
-            <a href="{{ route('public.leadership') }}"
-                class="bg-white text-red-600 px-6 py-3 rounded-xl font-black text-sm hover:bg-red-50 transition">
+            <a
+                href="{{ route('public.leadership') }}"
+                class="bg-white text-red-600 px-6 py-3 rounded-xl font-black text-sm hover:bg-red-50 transition"
+            >
                 👥 Leadership
+            </a>
+
+            <a
+                href="{{ route('public.budgets') }}"
+                class="bg-white text-red-600 px-6 py-3 rounded-xl font-black text-sm hover:bg-red-50 transition"
+            >
+                💰 Annual Budget
             </a>
 
         </div>
@@ -149,8 +175,10 @@
 
                             </div>
 
-                            <a href="{{ route('public.announcements') }}"
-                                class="text-xs font-black text-red-600 hover:text-red-700 whitespace-nowrap">
+                            <a
+                                href="{{ route('public.announcements') }}"
+                                class="text-xs font-black text-red-600 hover:text-red-700 whitespace-nowrap"
+                            >
                                 View →
                             </a>
 
@@ -186,9 +214,11 @@
                     </div>
 
                     @if($item->description)
+
                         <p class="text-sm text-gray-600 leading-relaxed">
                             {{ \Illuminate\Support\Str::limit($item->description,180) }}
                         </p>
+
                     @endif
 
                     <div class="space-y-1 mt-4 text-xs text-gray-500">
@@ -212,8 +242,10 @@
 
                     <div class="border-t border-gray-100 mt-5 pt-4 text-right">
 
-                        <a href="{{ route('public.calendar') }}"
-                            class="text-xs font-black text-red-600 hover:text-red-700">
+                        <a
+                            href="{{ route('public.calendar') }}"
+                            class="text-xs font-black text-red-600 hover:text-red-700"
+                        >
                             View Calendar →
                         </a>
 
@@ -266,8 +298,9 @@
 
                 <p class="text-sm text-gray-500 leading-relaxed mt-2">
                     The SK360 Public Portal provides community members with
-                    access to public announcements, activity schedules, and
-                    current SK leadership information without requiring an account.
+                    access to public announcements, activity schedules,
+                    current SK leadership information, and Annual Budget
+                    records without requiring an account.
                 </p>
 
             </div>
@@ -281,10 +314,12 @@
 </main>
 
 {{-- BACK TO TOP --}}
-<button id="backToTopBtn"
+<button
+    id="backToTopBtn"
     type="button"
     title="Back to top"
-    class="hidden fixed bottom-6 right-6 z-50 w-12 h-12 rounded-full bg-red-600 text-white shadow-xl hover:bg-red-700 transition items-center justify-center text-xl">
+    class="hidden fixed bottom-6 right-6 z-50 w-12 h-12 rounded-full bg-red-600 text-white shadow-xl hover:bg-red-700 transition items-center justify-center text-xl"
+>
     ↑
 </button>
 
@@ -298,22 +333,22 @@
 </footer>
 
 <script>
-const backToTopBtn=document.getElementById('backToTopBtn');
+const backToTopBtn = document.getElementById('backToTopBtn');
 
-window.addEventListener('scroll',()=>{
-    if(window.scrollY>400){
+window.addEventListener('scroll', () => {
+    if (window.scrollY > 400) {
         backToTopBtn.classList.remove('hidden');
         backToTopBtn.classList.add('flex');
-    }else{
+    } else {
         backToTopBtn.classList.add('hidden');
         backToTopBtn.classList.remove('flex');
     }
 });
 
-backToTopBtn.addEventListener('click',()=>{
+backToTopBtn.addEventListener('click', () => {
     window.scrollTo({
-        top:0,
-        behavior:'smooth'
+        top: 0,
+        behavior: 'smooth'
     });
 });
 </script>

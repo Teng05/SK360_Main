@@ -13,85 +13,99 @@ class WallPostController extends Controller
 {
     public function store(Request $request): RedirectResponse
     {
-        abort_unless(auth()->check(), 403);
+        abort_unless(auth()->check(),403);
 
-        $validated = $request->validate([
-            'post_content' => ['required', 'string', 'max:5000'],
-            'post_category' => ['nullable', 'string', 'max:50'],
+        $currentTermId=$this->currentTermId();
+
+        if(!$currentTermId){
+            return back()->with('wall_status','There is no active administration term.');
+        }
+
+        $validated=$request->validate([
+            'post_content'=>['required','string','max:5000'],
+            'post_category'=>['nullable','in:update,announcement,event,accomplishment'],
         ]);
 
-        $category = strtolower($validated['post_category'] ?? 'update');
-        $title = match ($category) {
-            'announcement' => 'Announcement',
-            'event' => 'Event Update',
-            'accomplishment' => 'Accomplishment',
-            default => 'Community Update',
+        $category=strtolower($validated['post_category'] ?? 'update');
+
+        $title=match($category){
+            'announcement'=>'Announcement',
+            'event'=>'Event Update',
+            'accomplishment'=>'Accomplishment',
+            default=>'Community Update',
         };
 
-        $announcementId = DB::table('announcements')->insertGetId([
-            'user_id' => auth()->user()->user_id,
-            'title' => $title,
-            'content' => $validated['post_content'],
-            'visibility' => 'public',
-            'created_at' => now(),
-            'updated_at' => now(),
-        ], 'announcement_id');
+        $announcementId=DB::table('announcements')->insertGetId([
+            'term_id'=>$currentTermId,
+            'user_id'=>auth()->user()->user_id,
+            'title'=>$title,
+            'content'=>$validated['post_content'],
+            'visibility'=>'public',
+            'created_at'=>now(),
+            'updated_at'=>now(),
+        ],'announcement_id');
 
-        $user = auth()->user();
-        if (! empty($user->barangay_id)) {
+        $user=auth()->user();
+
+        if(!empty($user->barangay_id)){
             app(RankingPointsService::class)->award(
-                (int) $user->barangay_id,
+                (int)$user->barangay_id,
                 RankingPointsService::COMMUNITY_ENGAGEMENT,
                 'wall_post',
                 $announcementId,
-                (int) $user->user_id
+                (int)$user->user_id
             );
-
-            if ($category === 'event') {
-                app(RankingPointsService::class)->award(
-                    (int) $user->barangay_id,
-                    RankingPointsService::EVENT_PARTICIPATION,
-                    'wall_post',
-                    $announcementId,
-                    (int) $user->user_id
-                );
-            }
         }
 
-        return back()->with('wall_status', 'Post published to everyone.');
+        return back()->with('wall_status','Post published to everyone.');
     }
 
     public function toggleLike(int $announcementId): RedirectResponse
     {
-        abort_unless(auth()->check(), 403);
+        abort_unless(auth()->check(),403);
 
-        $postExists = DB::table('announcements')
-            ->where('announcement_id', $announcementId)
-            ->where('visibility', 'public')
+        $currentTermId=$this->currentTermId();
+
+        abort_unless($currentTermId,404);
+
+        $postExists=DB::table('announcements')
+            ->where('announcement_id',$announcementId)
+            ->where('term_id',$currentTermId)
+            ->where('visibility','public')
             ->exists();
 
-        abort_unless($postExists, 404);
+        abort_unless($postExists,404);
 
-        $existing = DB::table('wall_post_likes')
-            ->where('announcement_id', $announcementId)
-            ->where('user_id', auth()->user()->user_id)
+        $existing=DB::table('wall_post_likes')
+            ->where('announcement_id',$announcementId)
+            ->where('user_id',auth()->user()->user_id)
             ->first();
 
-        if ($existing) {
+        if($existing){
             DB::table('wall_post_likes')
-                ->where('announcement_id', $announcementId)
-                ->where('user_id', auth()->user()->user_id)
+                ->where('announcement_id',$announcementId)
+                ->where('user_id',auth()->user()->user_id)
                 ->delete();
 
             return back();
         }
 
         DB::table('wall_post_likes')->insert([
-            'announcement_id' => $announcementId,
-            'user_id' => auth()->user()->user_id,
-            'created_at' => now(),
+            'announcement_id'=>$announcementId,
+            'user_id'=>auth()->user()->user_id,
+            'created_at'=>now(),
         ]);
 
         return back();
+    }
+
+    protected function currentTermId(): ?int
+    {
+        $termId=DB::table('administration_terms')
+            ->where('status','current')
+            ->orderByDesc('term_id')
+            ->value('term_id');
+
+        return $termId ? (int)$termId : null;
     }
 }

@@ -7,22 +7,23 @@ namespace App\Http\Controllers\sk_secretary;
 use App\Http\Controllers\Concerns\BuildsRankingsData;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 class RankingController extends Controller
 {
     use BuildsRankingsData;
 
-    public function index(Request $request): View
+    public function index(): View
     {
         abort_unless(auth()->check() && auth()->user()->role === 'sk_secretary', 403);
 
         $user = auth()->user();
         $fullName = trim(($user->first_name ?? '') . ' ' . ($user->last_name ?? '')) ?: 'User';
-        $periods = $this->rankingPeriods();
-        $selectedPeriod = $periods->contains($request->query('period')) ? $request->query('period') : $periods->first();
-        $leaderboard = $this->rankingsLeaderboard($selectedPeriod);
+        $leaderboard = $this->rankingsLeaderboard();
+
+        $rankingsLiveRoute = request()->filled('period')
+            ? route('sk_secretary.rankings.live', ['period' => request('period')])
+            : route('sk_secretary.rankings.live');
 
         return view('sk_secretary.rankings', [
             'fullName' => $fullName,
@@ -31,26 +32,25 @@ class RankingController extends Controller
             'currentUrl' => url()->current(),
             'topRankings' => $this->topRankings($leaderboard),
             'leaderboard' => $leaderboard,
-            'latestPeriod' => $selectedPeriod,
-            'rankingPeriods' => $periods,
-            'currentPeriod' => $periods->first(),
+            'latestPeriod' => $this->latestRankingPeriod(),
+            'rankingPeriods' => $this->rankingPeriodOptions(),
+            'selectedPeriod' => $this->selectedRankingPeriodValue(),
             'pointSystem' => $this->rankingPointSystem(),
             'profileRoute' => route('sk_secretary.profile'),
-            'rankingsLiveRoute' => route('sk_secretary.rankings.live'),
+            'rankingsLiveRoute' => $rankingsLiveRoute,
         ]);
     }
 
-    public function live(Request $request): JsonResponse
+    public function live(): JsonResponse
     {
         abort_unless(auth()->check() && auth()->user()->role === 'sk_secretary', 403);
 
-        $period = $request->query('period');
-        $leaderboard = $this->rankingsLeaderboard($period);
+        $leaderboard = $this->rankingsLeaderboard();
 
         return response()->json([
             'topRankings' => $this->topRankings($leaderboard)->values(),
             'leaderboard' => $leaderboard->values(),
-            'latestPeriod' => $period ?: $this->latestRankingPeriod(),
+            'latestPeriod' => $this->latestRankingPeriod(),
             'pointSystem' => $this->rankingPointSystem(),
             'updatedAt' => now()->format('M d, Y h:i A'),
         ]);
@@ -59,15 +59,15 @@ class RankingController extends Controller
     protected function menuItems(): array
     {
         return [
-            ['link' => route('sk_secretary.home'), 'icon' => '🏠', 'label' => 'Home'],
-            ['link' => route('sk_secretary.reports'), 'icon' => '📊', 'label' => 'Reports'],
-            ['link' => route('sk_secretary.budget'), 'icon' => '💰', 'label' => 'Budget'],
-            ['link' => route('sk_secretary.announcements'), 'icon' => '📢', 'label' => 'Announcements'],
-            ['link' => route('sk_secretary.calendar'), 'icon' => '📅', 'label' => 'Calendar'],
-            ['link' => route('sk_secretary.chat'), 'icon' => '💬', 'label' => 'Chat'],
-            ['link' => route('sk_secretary.meetings'), 'icon' => '📞', 'label' => 'Meetings'],
-            ['link' => route('sk_secretary.rankings'), 'icon' => '🏆', 'label' => 'Rankings'],
-            ['link' => route('sk_secretary.leadership'), 'icon' => '👥', 'label' => 'Leadership'],
+            ['link' => route('sk_secretary.home'), 'icon' => '&#127968;', 'label' => 'Home'],
+            ['link' => route('sk_secretary.reports'), 'icon' => '&#128203;', 'label' => 'Reports'],
+            ['link' => route('sk_secretary.budget'), 'icon' => '&#128176;', 'label' => 'Budget'],
+            ['link' => route('sk_secretary.announcements'), 'icon' => '&#128226;', 'label' => 'Announcements'],
+            ['link' => route('sk_secretary.calendar'), 'icon' => '&#128197;', 'label' => 'Calendar'],
+            ['link' => route('sk_secretary.chat'), 'icon' => '&#128172;', 'label' => 'Chat'],
+            ['link' => route('sk_secretary.meetings'), 'icon' => '&#128222;', 'label' => 'Meetings'],
+            ['link' => route('sk_secretary.rankings'), 'icon' => '&#127942;', 'label' => 'Rankings'],
+            ['link' => route('sk_secretary.leadership'), 'icon' => '&#128101;', 'label' => 'Leadership'],
         ];
     }
 }

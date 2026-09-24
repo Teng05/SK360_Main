@@ -10,76 +10,6 @@
 
 @section('content')
 
-<!-- ADD COUNCILOR MODAL -->
-<div id="addCouncilorModal" class="hidden fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4">
-    <div class="bg-white rounded-3xl w-full max-w-md overflow-hidden shadow-2xl">
-        <div class="bg-red-600 p-6 text-white">
-            <h2 class="text-xl font-black uppercase tracking-tighter">Add Councilor</h2>
-            <p class="text-[10px] opacity-80 uppercase font-bold">Add an SK Councilor to your barangay.</p>
-        </div>
-
-        <form method="POST" action="{{ route('sk_chairman.leadership.store') }}" class="p-6 space-y-4">
-            @csrf
-
-            @if($errors->councilorAdd->any())
-                <div class="rounded-xl bg-red-50 border border-red-200 p-3 text-xs text-red-600">
-                    @foreach($errors->councilorAdd->all() as $error)
-                        <p>{{ $error }}</p>
-                    @endforeach
-                </div>
-            @endif
-
-            <div class="space-y-1">
-                <label class="text-[10px] font-black text-gray-400 uppercase">Full Name</label>
-                <input type="text" name="name" value="{{ old('name') }}" required
-                    class="w-full border-b-2 border-gray-100 focus:border-red-500 outline-none py-1 text-sm font-bold">
-            </div>
-
-            <div class="grid grid-cols-2 gap-4">
-                <div class="space-y-1">
-                    <label class="text-[10px] font-black text-gray-400 uppercase">Email</label>
-                    <input type="email" name="email" value="{{ old('email') }}"
-                        class="w-full border-b-2 border-gray-100 focus:border-red-500 outline-none py-1 text-sm font-bold">
-                </div>
-
-                <div class="space-y-1">
-                    <label class="text-[10px] font-black text-gray-400 uppercase">Phone</label>
-                    <input type="text" name="phone" value="{{ old('phone') }}"
-                        class="w-full border-b-2 border-gray-100 focus:border-red-500 outline-none py-1 text-sm font-bold">
-                </div>
-            </div>
-
-            <div class="rounded-2xl bg-red-50 px-4 py-3 text-xs font-bold text-red-700">
-                Position: SK Councilor
-            </div>
-
-            <div class="rounded-xl bg-green-50 border border-green-100 px-4 py-3">
-                <p class="text-[10px] font-black text-green-600 uppercase">Administration Term</p>
-
-                @if($currentAdministration)
-                    <p class="mt-1 text-sm font-black text-green-700">
-                        {{ $currentAdministration->start_year }} - {{ $currentAdministration->end_year }}
-                    </p>
-                @else
-                    <p class="mt-1 text-xs font-bold text-red-600">No active administration term</p>
-                @endif
-            </div>
-
-            <div class="flex gap-3 pt-4">
-                <button type="button" onclick="toggleModal('addCouncilorModal')"
-                    class="flex-1 py-3 text-xs font-black uppercase text-gray-400">
-                    Cancel
-                </button>
-
-                <button type="submit"
-                    class="flex-1 bg-red-600 py-3 rounded-xl text-xs font-black uppercase text-white shadow-lg">
-                    Save Councilor
-                </button>
-            </div>
-        </form>
-    </div>
-</div>
-
 <!-- BULK COUNCILOR VALUES -->
 @php
     $oldCouncilors=old('councilors',[
@@ -94,12 +24,12 @@
     $bulkNextIndex=empty($bulkIndexes) ? 0 : max($bulkIndexes)+1;
 @endphp
 
-<!-- BULK ADD COUNCILORS MODAL -->
+<!-- ADD COUNCILORS MODAL -->
 <div id="bulkCouncilorModal" class="hidden fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4">
     <div class="bg-white rounded-3xl w-full max-w-5xl max-h-[90vh] overflow-y-auto shadow-2xl">
         <div class="bg-red-600 p-6 text-white flex justify-between items-center">
             <div>
-                <h2 class="text-xl font-black uppercase tracking-tighter">Bulk Add Councilors</h2>
+                <h2 class="text-xl font-black uppercase tracking-tighter">Add Councilors</h2>
                 <p class="text-[10px] opacity-80 uppercase font-bold">Add multiple SK Councilors at once.</p>
             </div>
 
@@ -111,7 +41,7 @@
 
             @if($errors->bulkCouncilors->any())
                 <div class="mb-4 rounded-xl bg-red-50 border border-red-200 p-3 text-xs text-red-600">
-                    <p class="font-black mb-1">Bulk Add Failed</p>
+                    <p class="font-black mb-1">Add Councilors Failed</p>
 
                     @foreach($errors->bulkCouncilors->all() as $error)
                         <p>{{ $error }}</p>
@@ -952,18 +882,7 @@
                         onclick="toggleModal('bulkCouncilorModal')"
                         class="bg-gray-800 hover:bg-gray-900 text-white px-5 py-3 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-lg transition-all">
 
-                        &#128101; Bulk Add
-                    </button>
-
-                    <button type="button"
-                        onclick="toggleModal('addCouncilorModal')"
-                        class="bg-red-600 hover:bg-red-700 text-white px-5 py-3 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-lg transition-all">
-
-                        <span class="text-base">
-                            +
-                        </span>
-
-                        Single Add
+                        &#128101; Add Councilors
                     </button>
                 </div>
             </div>
@@ -1756,7 +1675,6 @@ document.addEventListener('DOMContentLoaded',()=>{
     |--------------------------------------------------------------------------
     */
     [
-        'addCouncilorModal',
         'bulkCouncilorModal',
         'addSecretaryModal',
         'editSecretaryModal',
@@ -1781,12 +1699,7 @@ document.addEventListener('DOMContentLoaded',()=>{
     | OPEN CORRECT MODAL AFTER VALIDATION ERROR
     |--------------------------------------------------------------------------
     */
-    @if($errors->councilorAdd->any())
-
-        document.getElementById('addCouncilorModal')
-            ?.classList.remove('hidden');
-
-    @elseif($errors->bulkCouncilors->any())
+    @if($errors->bulkCouncilors->any())
 
         document.getElementById('bulkCouncilorModal')
             ?.classList.remove('hidden');

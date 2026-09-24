@@ -18,7 +18,7 @@ class AnnouncementInteractionController extends Controller
 {
     public function toggleLike(Request $request,int $announcementId): JsonResponse|RedirectResponse
     {
-        $this->ensurePublicAnnouncement($announcementId);
+        $this->ensureAccessibleAnnouncement($request,$announcementId);
 
         if(auth()->check()){
             $userId=(int)auth()->user()->user_id;
@@ -84,9 +84,9 @@ class AnnouncementInteractionController extends Controller
 
     public function trackView(Request $request,int $announcementId): JsonResponse
     {
-        $this->ensurePublicAnnouncement($announcementId);
+        $this->ensureAccessibleAnnouncement($request,$announcementId);
 
-        $visitorToken=$this->visitorToken($request);
+        $visitorToken=$this->viewerToken($request);
 
         DB::table('announcement_views')->insertOrIgnore([
             'announcement_id'=>$announcementId,
@@ -101,33 +101,48 @@ class AnnouncementInteractionController extends Controller
         ]);
     }
 
-    public function feedbackList(int $announcementId): JsonResponse
+    public function feedbackList(Request $request,int $announcementId): JsonResponse
     {
-        $this->ensurePublicAnnouncement($announcementId);
+        $this->ensureAccessibleAnnouncement($request,$announcementId);
 
         $total=DB::table('announcement_feedback')
             ->where('announcement_id',$announcementId)
             ->where('status','posted')
             ->count();
 
-        $feedbacks=DB::table('announcement_feedback')
-            ->where('announcement_id',$announcementId)
-            ->where('status','posted')
+        $feedbacks=DB::table('announcement_feedback as af')
+            ->leftJoin('users as u','af.user_id','=','u.user_id')
+            ->leftJoin('barangays as b','u.barangay_id','=','b.barangay_id')
+            ->where('af.announcement_id',$announcementId)
+            ->where('af.status','posted')
             ->select(
-                'feedback_id',
-                'name',
-                'comment',
-                'created_at'
+                'af.feedback_id',
+                'af.user_id',
+                'af.name',
+                'af.comment',
+                'af.created_at',
+                'u.role',
+                'b.barangay_name'
             )
-            ->orderByDesc('created_at')
+            ->orderByDesc('af.created_at')
             ->limit(50)
             ->get()
             ->map(function($feedback){
+                $roleLabel=match($feedback->role){
+                    'sk_president'=>'SK President',
+                    'sk_chairman'=>'SK Chairman',
+                    'sk_secretary'=>'SK Secretary',
+                    default=>null,
+                };
+
                 return [
                     'feedback_id'=>$feedback->feedback_id,
                     'name'=>$feedback->name,
                     'comment'=>$feedback->comment,
                     'created_at_human'=>Carbon::parse($feedback->created_at)->diffForHumans(),
+                    'is_official'=>!empty($feedback->user_id) && $roleLabel!==null,
+                    'role_label'=>$roleLabel,
+                    'barangay_name'=>$feedback->barangay_name,
                 ];
             });
 
@@ -139,7 +154,53 @@ class AnnouncementInteractionController extends Controller
 
     public function submitFeedback(Request $request,int $announcementId): JsonResponse
     {
-        $this->ensurePublicAnnouncement($announcementId);
+        $this->ensureAccessibleAnnouncement($request,$announcementId);
+
+        if($this->isOfficial($request)){
+            $validated=$request->validate([
+                'comment'=>['required','string','max:1000'],
+            ]);
+
+            $user=$request->user();
+
+            $name=trim(
+                ($user->first_name ?? '').
+                ' '.
+                ($user->last_name ?? '')
+            ) ?: 'SK Official';
+
+            $email=strtolower(
+                trim(
+                    (string)$user->email
+                )
+            );
+
+            $comment=trim(
+                $validated['comment']
+            );
+
+            $feedbackId=DB::table('announcement_feedback')
+                ->insertGetId([
+                    'announcement_id'=>$announcementId,
+                    'user_id'=>$user->user_id,
+                    'name'=>$name,
+                    'email'=>$email,
+                    'comment'=>$comment,
+                    'status'=>'posted',
+                    'verified_at'=>now(),
+                    'created_at'=>now(),
+                ],'feedback_id');
+
+            return response()->json([
+                'message'=>'Your comment has been posted.',
+                'feedback_id'=>$feedbackId,
+                'posted'=>true,
+                'feedback_count'=>DB::table('announcement_feedback')
+                    ->where('announcement_id',$announcementId)
+                    ->where('status','posted')
+                    ->count(),
+            ],201);
+        }
 
         $validated=$request->validate([
             'name'=>['required','string','max:150'],
@@ -147,11 +208,24 @@ class AnnouncementInteractionController extends Controller
             'comment'=>['required','string','max:1000'],
         ]);
 
-        $validated['name']=trim($validated['name']);
-        $validated['email']=strtolower(trim($validated['email']));
-        $validated['comment']=trim($validated['comment']);
+        $validated['name']=trim(
+            $validated['name']
+        );
 
-        $otp=(string)random_int(100000,999999);
+        $validated['email']=strtolower(
+            trim(
+                $validated['email']
+            )
+        );
+
+        $validated['comment']=trim(
+            $validated['comment']
+        );
+
+        $otp=(string)random_int(
+            100000,
+            999999
+        );
 
         DB::beginTransaction();
 
@@ -159,6 +233,7 @@ class AnnouncementInteractionController extends Controller
             $feedbackId=DB::table('announcement_feedback')
                 ->insertGetId([
                     'announcement_id'=>$announcementId,
+                    'user_id'=>null,
                     'name'=>$validated['name'],
                     'email'=>$validated['email'],
                     'comment'=>$validated['comment'],
@@ -195,7 +270,9 @@ class AnnouncementInteractionController extends Controller
             return response()->json([
                 'message'=>'Verification code sent.',
                 'feedback_id'=>$feedbackId,
-                'masked_email'=>$this->maskEmail($validated['email']),
+                'masked_email'=>$this->maskEmail(
+                    $validated['email']
+                ),
                 'resend_after'=>60,
             ]);
 
@@ -203,7 +280,8 @@ class AnnouncementInteractionController extends Controller
             DB::rollBack();
 
             Log::error(
-                'Public feedback submission error: '.$e->getMessage()
+                'Public feedback submission error: '.
+                $e->getMessage()
             );
 
             return response()->json([
@@ -228,6 +306,11 @@ class AnnouncementInteractionController extends Controller
                 'message'=>'Feedback request not found or already verified.',
             ],404);
         }
+
+        $this->ensureAccessibleAnnouncement(
+            $request,
+            (int)$feedback->announcement_id
+        );
 
         $verification=DB::table('feedback_verifications')
             ->where('feedback_id',$feedbackId)
@@ -255,7 +338,10 @@ class AnnouncementInteractionController extends Controller
             ],429);
         }
 
-        if(!Hash::check($validated['otp'],$verification->otp_hash)){
+        if(!Hash::check(
+            $validated['otp'],
+            $verification->otp_hash
+        )){
             $attempts=(int)$verification->attempts+1;
 
             DB::table('feedback_verifications')
@@ -268,7 +354,10 @@ class AnnouncementInteractionController extends Controller
                 'message'=>$attempts>=5
                     ? 'Too many incorrect attempts. Please request a new code.'
                     : 'Incorrect verification code.',
-                'attempts_remaining'=>max(0,5-$attempts),
+                'attempts_remaining'=>max(
+                    0,
+                    5-$attempts
+                ),
             ],422);
         }
 
@@ -290,7 +379,7 @@ class AnnouncementInteractionController extends Controller
         ]);
     }
 
-    public function resendFeedback(int $feedbackId): JsonResponse
+    public function resendFeedback(Request $request,int $feedbackId): JsonResponse
     {
         $feedback=DB::table('announcement_feedback')
             ->where('feedback_id',$feedbackId)
@@ -303,27 +392,41 @@ class AnnouncementInteractionController extends Controller
             ],404);
         }
 
+        $this->ensureAccessibleAnnouncement(
+            $request,
+            (int)$feedback->announcement_id
+        );
+
         $verification=DB::table('feedback_verifications')
             ->where('feedback_id',$feedbackId)
             ->first();
 
         if($verification && $verification->created_at){
-            $nextAllowed=Carbon::parse($verification->created_at)
-                ->addSeconds(60);
+            $nextAllowed=Carbon::parse(
+                $verification->created_at
+            )->addSeconds(60);
 
             if(now()->lt($nextAllowed)){
                 $retryAfter=(int)ceil(
-                    now()->diffInSeconds($nextAllowed)
+                    now()->diffInSeconds(
+                        $nextAllowed
+                    )
                 );
 
                 return response()->json([
                     'message'=>'Please wait before requesting another verification code.',
-                    'retry_after'=>max(1,$retryAfter),
+                    'retry_after'=>max(
+                        1,
+                        $retryAfter
+                    ),
                 ],429);
             }
         }
 
-        $otp=(string)random_int(100000,999999);
+        $otp=(string)random_int(
+            100000,
+            999999
+        );
 
         DB::beginTransaction();
 
@@ -360,7 +463,9 @@ class AnnouncementInteractionController extends Controller
 
             return response()->json([
                 'message'=>'A new verification code has been sent.',
-                'masked_email'=>$this->maskEmail($feedback->email),
+                'masked_email'=>$this->maskEmail(
+                    $feedback->email
+                ),
                 'resend_after'=>60,
             ]);
 
@@ -368,7 +473,8 @@ class AnnouncementInteractionController extends Controller
             DB::rollBack();
 
             Log::error(
-                'Public feedback resend error: '.$e->getMessage()
+                'Public feedback resend error: '.
+                $e->getMessage()
             );
 
             return response()->json([
@@ -377,14 +483,88 @@ class AnnouncementInteractionController extends Controller
         }
     }
 
-    protected function ensurePublicAnnouncement(int $announcementId): void
-    {
-        $exists=DB::table('announcements')
-            ->where('announcement_id',$announcementId)
-            ->where('visibility','public')
-            ->exists();
+    protected function ensureAccessibleAnnouncement(
+        Request $request,
+        int $announcementId
+    ): void {
+        $currentTermId=$this->currentTermId();
 
-        abort_unless($exists,404);
+        abort_unless(
+            $currentTermId,
+            404
+        );
+
+        $announcement=DB::table('announcements')
+            ->where(
+                'announcement_id',
+                $announcementId
+            )
+            ->first([
+                'announcement_id',
+                'term_id',
+                'visibility',
+            ]);
+
+        abort_unless(
+            $announcement,
+            404
+        );
+
+        abort_unless(
+            (int)$announcement->term_id===$currentTermId,
+            404
+        );
+
+        if($announcement->visibility==='public'){
+            return;
+        }
+
+        abort_unless(
+            $announcement->visibility==='officials_only'
+            &&
+            $this->isOfficial($request),
+            404
+        );
+    }
+
+    protected function currentTermId(): ?int
+    {
+        $termId=DB::table('administration_terms')
+            ->where('status','current')
+            ->orderByDesc('term_id')
+            ->value('term_id');
+
+        return $termId
+            ? (int)$termId
+            : null;
+    }
+
+    protected function isOfficial(Request $request): bool
+    {
+        return $request->user()
+            &&
+            in_array(
+                $request->user()->role,
+                [
+                    'sk_president',
+                    'sk_chairman',
+                    'sk_secretary',
+                ],
+                true
+            );
+    }
+
+    protected function viewerToken(Request $request): string
+    {
+        if($this->isOfficial($request)){
+            return
+                'official-'.
+                (int)$request->user()->user_id;
+        }
+
+        return $this->visitorToken(
+            $request
+        );
     }
 
     protected function visitorToken(Request $request): string
@@ -403,7 +583,10 @@ class AnnouncementInteractionController extends Controller
                 60*24*365,
                 '/',
                 null,
-                (bool)config('session.secure',false),
+                (bool)config(
+                    'session.secure',
+                    false
+                ),
                 true,
                 false,
                 'Lax'
@@ -416,11 +599,17 @@ class AnnouncementInteractionController extends Controller
     protected function likesCount(int $announcementId): int
     {
         $official=DB::table('wall_post_likes')
-            ->where('announcement_id',$announcementId)
+            ->where(
+                'announcement_id',
+                $announcementId
+            )
             ->count();
 
         $public=DB::table('public_wall_post_likes')
-            ->where('announcement_id',$announcementId)
+            ->where(
+                'announcement_id',
+                $announcementId
+            )
             ->count();
 
         return $official+$public;
@@ -429,7 +618,11 @@ class AnnouncementInteractionController extends Controller
     protected function maskEmail(string $email): string
     {
         [$name,$domain]=array_pad(
-            explode('@',$email,2),
+            explode(
+                '@',
+                $email,
+                2
+            ),
             2,
             ''
         );
@@ -437,13 +630,20 @@ class AnnouncementInteractionController extends Controller
         $visible=substr(
             $name,
             0,
-            min(2,strlen($name))
+            min(
+                2,
+                strlen($name)
+            )
         );
 
-        return $visible
+        return
+            $visible
             .str_repeat(
                 '*',
-                max(2,strlen($name)-strlen($visible))
+                max(
+                    2,
+                    strlen($name)-strlen($visible)
+                )
             )
             .'@'.$domain;
     }

@@ -24,36 +24,71 @@ class ArchiveController extends Controller
         $user = auth()->user();
         $fullName = trim(($user->first_name ?? '') . ' ' . ($user->last_name ?? '')) ?: 'User';
         $barangays = Barangay::query()->orderBy('barangay_name')->get(['barangay_id', 'barangay_name']);
-        $filters = $this->filters($request, $barangays);
-        $allDocuments = $this->documents($filters['barangay_id']);
+        $administrationTerms = $this->administrationTerms();
+        $filters = $this->filters($request, $barangays, $administrationTerms);
+        $allDocuments = $this->documents($filters['barangay_id'], $filters['term_id']);
         $documents = $this->applyFilters($allDocuments, $filters);
 
         return view('sk_pres.archive', [
             'fullName' => $fullName,
             'menuItems' => $this->menuItems(),
             'currentUrl' => url()->current(),
-            'archiveCards' => $this->archiveCards($filters['barangay_id']),
+            'archiveCards' => $this->archiveCards($filters['barangay_id'], $filters['term_id']),
             'documents' => $documents,
             'documentCount' => $documents->count(),
             'filterYears' => $this->filterYears($allDocuments),
             'typeOptions' => $this->typeOptions(),
             'barangays' => $barangays,
+            'administrationTerms' => $administrationTerms,
             'filters' => $filters,
         ]);
     }
 
-    protected function archiveCards(?int $barangayId = null): array
+    protected function archiveCards(?int $barangayId = null, ?int $termId = null): array
     {
+        $completedTermIds = $this->completedTermIds($termId);
+
+        if ($completedTermIds->isEmpty()) {
+            return [
+                ['icon' => '&#128196;', 'label' => 'Accomplishment Reports', 'count' => 0],
+                ['icon' => '&#128176;', 'label' => 'Budget Documents', 'count' => 0],
+                ['icon' => '&#128221;', 'label' => 'Meeting Minutes', 'count' => 0],
+                ['icon' => '&#127881;', 'label' => 'Event Records', 'count' => 0],
+                ['icon' => '&#128203;', 'label' => 'Policies & Guidelines', 'count' => 0],
+                ['icon' => '&#128218;', 'label' => 'Training Materials', 'count' => 0],
+            ];
+        }
+
         $accomplishmentCount = DB::table('accomplishment_reports')
+            ->whereIn('term_id', $completedTermIds)
             ->when($barangayId, fn ($query) => $query->where('barangay_id', $barangayId))
             ->count();
+
         $budgetCount = DB::table('budget_reports')
+            ->whereIn('term_id', $completedTermIds)
             ->when($barangayId, fn ($query) => $query->where('barangay_id', $barangayId))
             ->count();
-        $meetingCount = DB::table('events')->where('event_type', 'meeting')->count();
-        $eventRecordCount = DB::table('events')->whereIn('event_type', ['program', 'other'])->count();
-        $policyCount = DB::table('announcements')->count();
-        $trainingCount = DB::table('submission_slots')->count();
+
+        $meetingCount = DB::table('meetings')
+            ->whereIn('term_id', $completedTermIds)
+            ->count()
+            + DB::table('events')
+                ->whereIn('term_id', $completedTermIds)
+                ->where('event_type', 'meeting')
+                ->count();
+
+        $eventRecordCount = DB::table('events')
+            ->whereIn('term_id', $completedTermIds)
+            ->whereIn('event_type', ['program', 'other'])
+            ->count();
+
+        $policyCount = DB::table('announcements')
+            ->whereIn('term_id', $completedTermIds)
+            ->count();
+
+        $trainingCount = DB::table('submission_slots')
+            ->whereIn('term_id', $completedTermIds)
+            ->count();
 
         return [
             ['icon' => '&#128196;', 'label' => 'Accomplishment Reports', 'count' => $accomplishmentCount],
@@ -65,14 +100,22 @@ class ArchiveController extends Controller
         ];
     }
 
-    protected function documents(?int $barangayId = null): Collection
+    protected function documents(?int $barangayId = null, ?int $termId = null): Collection
     {
+        $completedTermIds = $this->completedTermIds($termId);
+
+        if ($completedTermIds->isEmpty()) {
+            return collect();
+        }
+
         $accomplishmentReports = DB::table('accomplishment_reports as ar')
             ->leftJoin('barangays as b', 'ar.barangay_id', '=', 'b.barangay_id')
+            ->whereIn('ar.term_id', $completedTermIds)
             ->when($barangayId, fn ($query) => $query->where('ar.barangay_id', $barangayId))
             ->select(
                 DB::raw("'accomplishment_report' as source_type"),
                 'ar.report_id as source_id',
+                'ar.term_id',
                 'ar.title',
                 DB::raw("UPPER(ar.report_type) as badge"),
                 DB::raw("'Report' as category"),
@@ -94,10 +137,12 @@ class ArchiveController extends Controller
 
         $budgetReports = DB::table('budget_reports as br')
             ->leftJoin('barangays as b', 'br.barangay_id', '=', 'b.barangay_id')
+            ->whereIn('br.term_id', $completedTermIds)
             ->when($barangayId, fn ($query) => $query->where('br.barangay_id', $barangayId))
             ->select(
                 DB::raw("'budget_report' as source_type"),
                 'br.budget_report_id as source_id',
+                'br.term_id',
                 'br.title',
                 DB::raw("REPLACE(UPPER(br.document_type), '_', ' ') as badge"),
                 DB::raw("'Budget' as category"),
@@ -117,10 +162,36 @@ class ArchiveController extends Controller
                 return $row;
             });
 
+        $meetings = DB::table('meetings')
+            ->whereIn('term_id', $completedTermIds)
+            ->select(
+                DB::raw("'meeting' as source_type"),
+                'meeting_id as source_id',
+                'term_id',
+                'title',
+                DB::raw("'MEETING' as badge"),
+                DB::raw("'Minutes' as category"),
+                DB::raw("'minutes' as type_key"),
+                DB::raw("NULL as barangay_id"),
+                DB::raw("'Federation' as owner"),
+                DB::raw("NULL as file_path"),
+                DB::raw("NULL as generated_path"),
+                'created_at as document_date'
+            )
+            ->get()
+            ->map(function ($row) {
+                $row->icon = '&#128196;';
+                $row->size = 'Record';
+
+                return $row;
+            });
+
         $events = DB::table('events')
+            ->whereIn('term_id', $completedTermIds)
             ->select(
                 DB::raw("'event' as source_type"),
                 'event_id as source_id',
+                'term_id',
                 'title',
                 DB::raw("REPLACE(UPPER(event_type), '_', ' ') as badge"),
                 DB::raw("CASE WHEN event_type = 'meeting' THEN 'Minutes' ELSE 'Event' END as category"),
@@ -140,9 +211,11 @@ class ArchiveController extends Controller
             });
 
         $announcements = DB::table('announcements')
+            ->whereIn('term_id', $completedTermIds)
             ->select(
                 DB::raw("'announcement' as source_type"),
                 'announcement_id as source_id',
+                'term_id',
                 'title',
                 DB::raw("'PUBLIC' as badge"),
                 DB::raw("'Policy' as category"),
@@ -161,15 +234,21 @@ class ArchiveController extends Controller
                 return $row;
             });
 
+        $administrationLabels = $this->administrationTerms()
+            ->keyBy('term_id')
+            ->map(fn ($term) => $term->start_year.'-'.$term->end_year);
+
         return $accomplishmentReports
             ->merge($budgetReports)
+            ->merge($meetings)
             ->merge($events)
             ->merge($announcements)
             ->sortByDesc('document_date')
             ->values()
-            ->map(function ($row) {
+            ->map(function ($row) use ($administrationLabels) {
                 $row->formatted_date = $row->document_date ? date('Y-m-d', strtotime((string) $row->document_date)) : 'N/A';
                 $row->document_year = $row->document_date ? date('Y', strtotime((string) $row->document_date)) : null;
+                $row->administration_label = $administrationLabels->get($row->term_id, 'Unknown Administration');
                 $row->downloadable = $this->isDownloadable($row);
 
                 return $row;
@@ -182,7 +261,7 @@ class ArchiveController extends Controller
 
         $document = $this->downloadableDocument($sourceType, $sourceId);
 
-        if (! $document) {
+        if (!$document) {
             return redirect()->route('sk_pres.archive')->with('archive_error', 'This archive document is not available for download.');
         }
 
@@ -220,7 +299,8 @@ class ArchiveController extends Controller
 
     public function mobileView(string $sourceType, int $sourceId)
     {
-        $document = $this->downloadableDocument($sourceType, $sourceId);
+        // Signed mobile links also preview reports from the current term.
+        $document = $this->downloadableDocument($sourceType, $sourceId, false);
 
         abort_unless($document, 404);
 
@@ -247,13 +327,14 @@ class ArchiveController extends Controller
     {
         abort_unless(auth()->check() && auth()->user()->role === 'sk_president', 403);
 
-        if (! class_exists(ZipArchive::class)) {
+        if (!class_exists(ZipArchive::class)) {
             return redirect()->route('sk_pres.archive', $request->query())->with('archive_error', 'Bulk download requires the PHP zip extension.');
         }
 
         $barangays = Barangay::query()->orderBy('barangay_name')->get(['barangay_id', 'barangay_name']);
-        $filters = $this->filters($request, $barangays);
-        $allDocuments = $this->documents($filters['barangay_id']);
+        $administrationTerms = $this->administrationTerms();
+        $filters = $this->filters($request, $barangays, $administrationTerms);
+        $allDocuments = $this->documents($filters['barangay_id'], $filters['term_id']);
         $documents = $this->applyFilters($allDocuments, $filters)
             ->filter(fn ($document) => $this->isDownloadable($document))
             ->values();
@@ -265,20 +346,26 @@ class ArchiveController extends Controller
         return $this->downloadZip($documents, 'sk-president-archive');
     }
 
-    protected function filters(Request $request, Collection $barangays): array
+    protected function filters(Request $request, Collection $barangays, Collection $administrationTerms): array
     {
         $year = (string) $request->query('year', '');
         $type = (string) $request->query('type', '');
         $barangayId = (int) $request->query('barangay_id', 0);
+        $termId = (int) $request->query('term_id', 0);
 
-        if ($barangayId <= 0 || ! $barangays->contains('barangay_id', $barangayId)) {
+        if ($barangayId <= 0 || !$barangays->contains('barangay_id', $barangayId)) {
             $barangayId = null;
+        }
+
+        if ($termId <= 0 || !$administrationTerms->contains('term_id', $termId)) {
+            $termId = null;
         }
 
         return [
             'year' => preg_match('/^\d{4}$/', $year) ? $year : '',
             'type' => array_key_exists($type, $this->typeOptions()) ? $type : '',
             'barangay_id' => $barangayId,
+            'term_id' => $termId,
         ];
     }
 
@@ -311,15 +398,25 @@ class ArchiveController extends Controller
         ];
     }
 
-    protected function downloadableDocument(string $sourceType, int $sourceId): ?object
+    protected function downloadableDocument(string $sourceType, int $sourceId, bool $completedOnly = true): ?object
     {
+        $completedTermIds = $completedOnly ? $this->completedTermIds() : collect();
+
+        if ($completedOnly && $completedTermIds->isEmpty()) {
+            return null;
+        }
+
         if ($sourceType === 'accomplishment_report') {
-            return DB::table('accomplishment_reports')->where('report_id', $sourceId)->first();
+            return DB::table('accomplishment_reports')
+                ->when($completedOnly, fn ($query) => $query->whereIn('term_id', $completedTermIds))
+                ->where('report_id', $sourceId)
+                ->first();
         }
 
         if ($sourceType === 'budget_report') {
             return DB::table('budget_reports as br')
                 ->leftJoin('barangays as b', 'br.barangay_id', '=', 'b.barangay_id')
+                ->when($completedOnly, fn ($query) => $query->whereIn('br.term_id', $completedTermIds))
                 ->where('br.budget_report_id', $sourceId)
                 ->select('br.*', 'b.barangay_name')
                 ->first();
@@ -336,7 +433,7 @@ class ArchiveController extends Controller
             return response()->download($filePath, $document->uploaded_file_name ?: basename($filePath));
         }
 
-        if (isset($document->template_data) && ! empty($document->template_data)) {
+        if (isset($document->template_data) && !empty($document->template_data)) {
             $data = json_decode($document->template_data, true) ?: [];
             $paper = ($data['report_type'] ?? 'quarterly') === 'monthly' ? 'portrait' : 'landscape';
 
@@ -364,7 +461,7 @@ class ArchiveController extends Controller
                 continue;
             }
 
-            if ($document->source_type === 'budget_report' && ! empty($document->template_data)) {
+            if ($document->source_type === 'budget_report' && !empty($document->template_data)) {
                 $data = json_decode($document->template_data, true) ?: [];
                 $paper = ($data['report_type'] ?? 'quarterly') === 'monthly' ? 'portrait' : 'landscape';
                 $pdf = Pdf::loadView('shared.budget-template-download', [
@@ -387,12 +484,12 @@ class ArchiveController extends Controller
             return true;
         }
 
-        return ($document->source_type ?? null) === 'budget_report' && ! empty($document->template_data);
+        return ($document->source_type ?? null) === 'budget_report' && !empty($document->template_data);
     }
 
     protected function publicFilePath(?string $path): ?string
     {
-        if (! $path) {
+        if (!$path) {
             return null;
         }
 
@@ -400,7 +497,7 @@ class ArchiveController extends Controller
         $publicRoot = realpath(public_path());
         $realPath = realpath($fullPath);
 
-        if (! $publicRoot || ! $realPath || ! Str::startsWith($realPath, $publicRoot) || ! File::isFile($realPath)) {
+        if (!$publicRoot || !$realPath || !Str::startsWith($realPath, $publicRoot) || !File::isFile($realPath)) {
             return null;
         }
 
@@ -419,11 +516,40 @@ class ArchiveController extends Controller
 
     protected function inferFileSize(?string $path): string
     {
-        if (! $path) {
+        if (!$path) {
             return 'N/A';
         }
 
         return Str::endsWith(strtolower($path), '.pdf') ? 'PDF' : 'File';
+    }
+
+    protected function administrationTerms(): Collection
+    {
+        return DB::table('administration_terms')
+            ->where('status', 'completed')
+            ->orderByDesc('start_year')
+            ->orderByDesc('term_id')
+            ->get([
+                'term_id',
+                'start_year',
+                'end_year',
+            ]);
+    }
+
+    protected function completedTermIds(?int $termId = null): Collection
+    {
+        $query = DB::table('administration_terms')
+            ->where('status', 'completed');
+
+        if ($termId) {
+            $query->where('term_id', $termId);
+        }
+
+        return $query
+            ->orderByDesc('term_id')
+            ->pluck('term_id')
+            ->map(fn ($termId) => (int) $termId)
+            ->values();
     }
 
     protected function menuItems(): array
@@ -438,7 +564,6 @@ class ArchiveController extends Controller
             ['link' => route('sk_pres.chat'), 'icon' => '&#128172;', 'label' => 'Chat'],
             ['link' => route('sk_pres.meetings'), 'icon' => '&#128222;', 'label' => 'Meetings'],
             ['link' => route('sk_pres.rankings'), 'icon' => '&#127942;', 'label' => 'Rankings'],
-            
             ['link' => route('sk_pres.leadership'), 'icon' => '&#128101;', 'label' => 'Leadership'],
             ['link' => route('sk_pres.archive'), 'icon' => '&#128450;&#65039;', 'label' => 'Archive'],
             ['link' => route('sk_pres.user-management'), 'icon' => '&#128100;', 'label' => 'User Management'],

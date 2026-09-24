@@ -24,18 +24,26 @@ class LeadershipController extends Controller
         $barangayName=$user->barangay->barangay_name ?? 'Barangay';
         $currentAdministration=$this->currentAdministrationTerm();
 
-        $secretaryModel=User::query()
-            ->where('barangay_id',$barangayId)
-            ->where('role','sk_secretary')
-            ->whereNull('archived_at')
-            ->orderByDesc('created_at')
-            ->first();
+        $secretaryModel=null;
+        $hasCurrentSecretary=false;
 
-        $hasCurrentSecretary=User::query()
-            ->where('barangay_id',$barangayId)
-            ->where('role','sk_secretary')
-            ->whereNull('archived_at')
-            ->exists();
+        if($currentAdministration){
+            $secretaryModel=User::query()
+                ->join('official_terms as ot','users.user_id','=','ot.user_id')
+                ->where('users.barangay_id',$barangayId)
+                ->where('users.role','sk_secretary')
+                ->where('ot.term_id',$currentAdministration->term_id)
+                ->where('ot.barangay_id',$barangayId)
+                ->where('ot.role','sk_secretary')
+                ->whereIn('ot.status',['pending','current'])
+                ->whereNull('users.archived_at')
+                ->select('users.*')
+                ->orderByRaw("CASE WHEN ot.status='current' THEN 0 ELSE 1 END")
+                ->orderByDesc('ot.official_term_id')
+                ->first();
+
+            $hasCurrentSecretary=(bool)$secretaryModel;
+        }
 
         $secretaryIsReappointment=false;
 
@@ -52,13 +60,10 @@ class LeadershipController extends Controller
             'name'=>trim(($secretaryModel->first_name ?? '').' '.($secretaryModel->last_name ?? '')),
             'first_name'=>$secretaryModel->first_name,
             'last_name'=>$secretaryModel->last_name,
-            'profile_pic_url'=>$secretaryModel->profile_pic
-                ? asset(str_starts_with($secretaryModel->profile_pic, 'uploads/') ? $secretaryModel->profile_pic : 'uploads/profile_pics/'.$secretaryModel->profile_pic)
-                : null,
             'position'=>'SK Secretary',
             'email'=>$secretaryModel->email,
             'phone'=>$secretaryModel->phone_number,
-            'term'=>$this->officialTermLabel($secretaryModel),
+            'term'=>$this->officialTermLabel($secretaryModel,$currentAdministration?->term_id),
             'status'=>$secretaryModel->status,
             'is_verified'=>(int)$secretaryModel->is_verified,
             'is_reappointment'=>$secretaryIsReappointment,
@@ -114,10 +119,7 @@ class LeadershipController extends Controller
             'position'=>'SK Chairman',
             'email'=>$user->email,
             'phone'=>$user->phone_number,
-            'profile_pic_url'=>$user->profile_pic
-                ? asset(str_starts_with($user->profile_pic, 'uploads/') ? $user->profile_pic : 'uploads/profile_pics/'.$user->profile_pic)
-                : null,
-            'term'=>$this->officialTermLabel($user),
+            'term'=>$this->officialTermLabel($user,$currentAdministration?->term_id),
             'status'=>$user->status,
             'is_verified'=>(int)$user->is_verified,
             'source'=>'user',
@@ -493,10 +495,11 @@ class LeadershipController extends Controller
             'secretary_phone'=>['nullable','string','max:20','unique:users,phone_number'],
         ]);
 
-        $existing=User::query()
+        $existing=DB::table('official_terms')
+            ->where('term_id',$currentTerm->term_id)
             ->where('barangay_id',$chairman->barangay_id)
             ->where('role','sk_secretary')
-            ->whereNull('archived_at')
+            ->whereIn('status',['pending','current'])
             ->exists();
 
         if($existing){
@@ -634,8 +637,16 @@ class LeadershipController extends Controller
             );
         }
 
+        $currentTerm=$this->currentAdministrationTerm();
+
+        if(!$currentTerm){
+            return back()->with('warning','There is no active administration term.');
+        }
+
         $pendingAssignment=DB::table('official_terms')
             ->where('user_id',$secretary->user_id)
+            ->where('term_id',$currentTerm->term_id)
+            ->where('barangay_id',auth()->user()->barangay_id)
             ->where('role','sk_secretary')
             ->where('status','pending')
             ->exists();
@@ -689,14 +700,25 @@ class LeadershipController extends Controller
         }
 
         if($secretary->status === 'inactive'){
+            $currentTerm=$this->currentAdministrationTerm();
+
+            if(!$currentTerm){
+                return back()->with('warning','There is no active administration term.');
+            }
+
             $anotherSecretary=User::query()
-                ->where('barangay_id',auth()->user()->barangay_id)
-                ->where('role','sk_secretary')
-                ->where('user_id','!=',$secretary->user_id)
-                ->whereNull('archived_at')
+                ->join('official_terms as ot','users.user_id','=','ot.user_id')
+                ->where('users.barangay_id',auth()->user()->barangay_id)
+                ->where('users.role','sk_secretary')
+                ->where('users.user_id','!=',$secretary->user_id)
+                ->where('ot.term_id',$currentTerm->term_id)
+                ->where('ot.barangay_id',auth()->user()->barangay_id)
+                ->where('ot.role','sk_secretary')
+                ->whereIn('ot.status',['pending','current'])
+                ->whereNull('users.archived_at')
                 ->where(function($query){
-                    $query->where('status','active')
-                        ->orWhere('is_verified',0);
+                    $query->where('users.status','active')
+                        ->orWhere('users.is_verified',0);
                 })
                 ->exists();
 
@@ -1220,11 +1242,21 @@ class LeadershipController extends Controller
 
     protected function secretaryForChairman(int $userId): User
     {
+        $currentTerm=$this->currentAdministrationTerm();
+
+        abort_unless($currentTerm,404);
+
         return User::query()
-            ->where('user_id',$userId)
-            ->where('barangay_id',auth()->user()->barangay_id)
-            ->where('role','sk_secretary')
-            ->whereNull('archived_at')
+            ->join('official_terms as ot','users.user_id','=','ot.user_id')
+            ->where('users.user_id',$userId)
+            ->where('users.barangay_id',auth()->user()->barangay_id)
+            ->where('users.role','sk_secretary')
+            ->where('ot.term_id',$currentTerm->term_id)
+            ->where('ot.barangay_id',auth()->user()->barangay_id)
+            ->where('ot.role','sk_secretary')
+            ->whereIn('ot.status',['pending','current'])
+            ->whereNull('users.archived_at')
+            ->select('users.*')
             ->firstOrFail();
     }
 
@@ -1253,11 +1285,12 @@ class LeadershipController extends Controller
         }
     }
 
-    protected function officialTermLabel(User $user): string
+    protected function officialTermLabel(User $user,?int $termId=null): string
     {
         $term=DB::table('official_terms as ot')
             ->join('administration_terms as t','ot.term_id','=','t.term_id')
             ->where('ot.user_id',$user->user_id)
+            ->when($termId,fn($query)=>$query->where('ot.term_id',$termId))
             ->whereIn('ot.status',['pending','current'])
             ->orderByDesc('ot.official_term_id')
             ->select('t.start_year','t.end_year')

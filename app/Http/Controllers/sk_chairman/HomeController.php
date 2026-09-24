@@ -61,8 +61,15 @@ class HomeController extends Controller
 
     protected function upcomingEvents()
     {
+        $currentTermId = $this->currentTermId();
+
+        if (!$currentTermId) {
+            return collect();
+        }
+
         return DB::table('events')
-            ->where('visibility', 'public')
+            ->where('term_id', $currentTermId)
+            ->whereIn('visibility', ['public', 'officials_only', 'chairman_only'])
             ->where('end_datetime', '>=', now())
             ->orderBy('start_datetime')
             ->limit(5)
@@ -92,7 +99,14 @@ class HomeController extends Controller
             return 0;
         }
 
+        $currentTermId = $this->currentTermId();
+
+        if (!$currentTermId) {
+            return 0;
+        }
+
         return DB::table('accomplishment_reports')
+            ->where('term_id', $currentTermId)
             ->where('barangay_id', $barangayId)
             ->count();
     }
@@ -103,7 +117,14 @@ class HomeController extends Controller
             return 0;
         }
 
+        $currentTermId = $this->currentTermId();
+
+        if (!$currentTermId) {
+            return 0;
+        }
+
         return DB::table('budget_reports')
+            ->where('term_id', $currentTermId)
             ->where('barangay_id', $barangayId)
             ->count();
     }
@@ -114,16 +135,24 @@ class HomeController extends Controller
             return 0;
         }
 
+        $currentTermId = $this->currentTermId();
+
+        if (!$currentTermId) {
+            return 0;
+        }
+
         return DB::table('submission_slots')
+            ->where('term_id', $currentTermId)
             ->where('status', 'open')
             ->whereIn('role', $roles)
             ->get()
-            ->filter(function ($slot) use ($barangayId) {
+            ->filter(function ($slot) use ($barangayId, $currentTermId) {
                 $table = $slot->submission_type === 'budget_report'
                     ? 'budget_reports'
                     : 'accomplishment_reports';
 
                 return !DB::table($table)
+                    ->where('term_id', $currentTermId)
                     ->where('barangay_id', $barangayId)
                     ->where('slot_id', $slot->slot_id)
                     ->exists();
@@ -137,7 +166,14 @@ class HomeController extends Controller
             return null;
         }
 
+        $currentTermId = $this->currentTermId();
+
+        if (!$currentTermId) {
+            return null;
+        }
+
         $latestPeriod = DB::table('rankings')
+            ->where('term_id', $currentTermId)
             ->orderByDesc('created_at')
             ->value('reporting_period');
 
@@ -146,6 +182,7 @@ class HomeController extends Controller
         }
 
         $barangayIds = DB::table('rankings')
+            ->where('term_id', $currentTermId)
             ->where('reporting_period', $latestPeriod)
             ->orderByDesc('total_points')
             ->orderBy('barangay_id')
@@ -155,6 +192,16 @@ class HomeController extends Controller
         $index = $barangayIds->search($barangayId);
 
         return $index === false ? null : $index + 1;
+    }
+
+    protected function currentTermId(): ?int
+    {
+        $termId = DB::table('administration_terms')
+            ->where('status', 'current')
+            ->orderByDesc('term_id')
+            ->value('term_id');
+
+        return $termId ? (int) $termId : null;
     }
 
     protected function formatRank(?int $rank): string

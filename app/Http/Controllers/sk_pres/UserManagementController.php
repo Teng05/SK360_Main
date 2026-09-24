@@ -928,6 +928,14 @@ class UserManagementController extends Controller
                     'start_year'=>$unlinkedCouncil.' current Treasurer/Councilor record(s) are not connected to the current administration term yet.',
                 ],'newTerm');
             }
+
+            $unassignedTermRecords=$this->unassignedTermOwnedRecords();
+
+            if(!empty($unassignedTermRecords)){
+                return back()->withInput()->withErrors([
+                    'start_year'=>'Some system records are not connected to an administration term yet: '.implode(', ',$unassignedTermRecords).'. Fix these records before starting a new administration.',
+                ],'newTerm');
+            }
         }
 
         $existingPendingPresident=DB::table('official_terms')
@@ -966,6 +974,13 @@ class UserManagementController extends Controller
                 }
 
                 if(!empty($userIds)){
+                    $endingEmails=DB::table('users')
+                        ->whereIn('user_id',$userIds)
+                        ->pluck('email')
+                        ->filter()
+                        ->values()
+                        ->all();
+
                     DB::table('users')
                         ->whereIn('user_id',$userIds)
                         ->whereIn('role',['sk_chairman','sk_secretary'])
@@ -973,6 +988,12 @@ class UserManagementController extends Controller
                             'status'=>'inactive',
                             'archived_at'=>now(),
                         ]);
+
+                    if(!empty($endingEmails)){
+                        DB::table('password_reset_tokens')
+                            ->whereIn('email',$endingEmails)
+                            ->delete();
+                    }
                 }
 
                 DB::table('sk_council')
@@ -981,6 +1002,13 @@ class UserManagementController extends Controller
                     ->update([
                         'status'=>'completed',
                         'completed_at'=>now(),
+                    ]);
+
+                DB::table('submission_slots')
+                    ->where('term_id',$currentTerm->term_id)
+                    ->where('status','open')
+                    ->update([
+                        'status'=>'closed',
                     ]);
 
                 DB::table('official_terms')
@@ -995,6 +1023,7 @@ class UserManagementController extends Controller
 
                 DB::table('administration_terms')
                     ->where('term_id',$currentTerm->term_id)
+                    ->where('status','current')
                     ->update([
                         'status'=>'completed',
                         'completed_at'=>now(),
@@ -1853,6 +1882,35 @@ class UserManagementController extends Controller
                 'ot.official_term_id'
             )
             ->first();
+    }
+
+
+    protected function unassignedTermOwnedRecords(): array
+    {
+        $tables=[
+            'submission_slots'=>'Submission Slots',
+            'accomplishment_reports'=>'Accomplishment Reports',
+            'budget_reports'=>'Budget Reports',
+            'announcements'=>'Announcements',
+            'events'=>'Events',
+            'meetings'=>'Meetings',
+            'ranking_point_logs'=>'Ranking Point Logs',
+            'rankings'=>'Rankings',
+        ];
+
+        $unassigned=[];
+
+        foreach($tables as $table=>$label){
+            $count=DB::table($table)
+                ->whereNull('term_id')
+                ->count();
+
+            if($count > 0){
+                $unassigned[]=$label.' ('.$count.')';
+            }
+        }
+
+        return $unassigned;
     }
 
     /*

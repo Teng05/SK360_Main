@@ -74,7 +74,7 @@
                             class="rounded-lg bg-green-600 px-4 py-2 text-xs font-bold text-white hover:bg-green-700 transition flex items-center gap-1">
 
                             <span>&#128101;</span>
-                            Bulk Add
+                            Add Chairmen
                         </button>
 
                         <button id="openImportModal"
@@ -83,14 +83,6 @@
 
                             <span>&#128229;</span>
                             Import CSV
-                        </button>
-
-                        <button id="openOfficialModal"
-                            type="button"
-                            class="rounded-lg bg-red-500 px-4 py-2 text-xs font-bold text-white hover:bg-red-600 transition flex items-center gap-1">
-
-                            <span>&#10133;</span>
-                            Single Add
                         </button>
                     </div>
                 @endif
@@ -409,7 +401,6 @@
                                                         @if($isPending)
 
                                                             <span class="rounded-full bg-yellow-100 text-yellow-700 px-2 py-0.5 text-[9px] font-bold uppercase">
-
                                                                 {{ $isReappointment ? 'Reappointment Pending' : 'Pending' }}
                                                             </span>
 
@@ -422,7 +413,6 @@
                                                         @else
 
                                                             <span class="rounded-full {{ ($groupUser->status ?? '') === 'active' ? 'bg-green-100 text-green-600' : 'bg-gray-200 text-gray-600' }} px-2 py-0.5 text-[9px] font-bold uppercase">
-
                                                                 {{ $groupUser->status ?? 'inactive' }}
                                                             </span>
 
@@ -1287,165 +1277,6 @@
     </div>
 </div>
 
-<!-- Modal: Add SK Chairman -->
-<div id="officialModal"
-    class="fixed inset-0 z-50 hidden items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-
-    <div class="w-full max-w-xl rounded-3xl bg-white p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
-
-        <div class="mb-6 flex items-center justify-between">
-
-            <div>
-                <h2 class="text-2xl font-black text-gray-900">
-                    Add SK Chairman
-                </h2>
-
-                <p class="text-xs text-gray-500">
-                    Create a new SK Chairman account for a barangay.
-                </p>
-            </div>
-
-            <button id="closeOfficialModal"
-                type="button"
-                class="text-2xl text-gray-400 hover:text-red-500 transition">
-
-                &times;
-            </button>
-        </div>
-
-        @if($errors->singleAdd->any())
-
-            <div class="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-xs text-red-600">
-
-                @foreach($errors->singleAdd->all() as $error)
-                    <p>{{ $error }}</p>
-                @endforeach
-            </div>
-
-        @endif
-
-        <form
-            action="{{ route('sk_pres.user-management.store-official') }}"
-            method="POST"
-            class="space-y-4">
-
-            @csrf
-
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-
-                <div>
-                    <label class="mb-1.5 block text-xs font-black uppercase text-gray-500">
-                        First Name
-                    </label>
-
-                    <input type="text"
-                        name="first_name"
-                        value="{{ old('first_name') }}"
-                        class="w-full rounded-xl border border-red-100 bg-red-50/50 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-300"
-                        required>
-                </div>
-
-                <div>
-                    <label class="mb-1.5 block text-xs font-black uppercase text-gray-500">
-                        Last Name
-                    </label>
-
-                    <input type="text"
-                        name="last_name"
-                        value="{{ old('last_name') }}"
-                        class="w-full rounded-xl border border-red-100 bg-red-50/50 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-300"
-                        required>
-                </div>
-            </div>
-
-            <div>
-                <label class="mb-1.5 block text-xs font-black uppercase text-gray-500">
-                    Email Address
-                </label>
-
-                <input type="email"
-                    name="email"
-                    value="{{ old('email') }}"
-                    class="w-full rounded-xl border border-red-100 bg-red-50/50 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-300"
-                    required>
-            </div>
-
-            <div>
-                <label class="mb-1.5 block text-xs font-black uppercase text-gray-500">
-                    Barangay
-                </label>
-
-                <select name="barangay_id"
-                    class="w-full rounded-xl border border-red-100 bg-red-50/50 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-300"
-                    required>
-
-                    <option value="">
-                        Select barangay
-                    </option>
-
-                    @foreach($barangays as $barangay)
-
-                        <option value="{{ $barangay->barangay_id }}"
-                            {{ (string)old('barangay_id') === (string)$barangay->barangay_id ? 'selected' : '' }}>
-
-                            {{ $barangay->barangay_name }}
-                        </option>
-
-                    @endforeach
-                </select>
-            </div>
-
-            <div>
-                <label class="mb-1.5 block text-xs font-black uppercase text-gray-500">
-                    Phone Number
-                </label>
-
-                <input type="text"
-                    name="phone_number"
-                    value="{{ old('phone_number') }}"
-                    class="w-full rounded-xl border border-red-100 bg-red-50/50 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-300"
-                    placeholder="09xxxxxxxxx (Optional)">
-            </div>
-
-            <div>
-                <label class="mb-1.5 block text-xs font-black uppercase text-gray-500">
-                    Administration Term
-                </label>
-
-                <div class="w-full rounded-xl border border-green-100 bg-green-50 px-4 py-3">
-
-                    @if($currentAdministration)
-
-                        <p class="text-sm font-black text-green-700">
-                            {{ $currentAdministration->start_year }} - {{ $currentAdministration->end_year }}
-                        </p>
-
-                        <p class="mt-1 text-[10px] text-green-600">
-                            Current administration term
-                        </p>
-
-                    @else
-
-                        <p class="text-sm font-bold text-red-600">
-                            No active administration term
-                        </p>
-
-                    @endif
-                </div>
-            </div>
-
-            <div class="pt-2">
-
-                <button type="submit"
-                    class="w-full rounded-xl bg-red-600 px-4 py-3 text-sm font-bold text-white hover:bg-red-700 transition shadow-md hover:shadow-lg">
-
-                    Create Chairman Account
-                </button>
-            </div>
-        </form>
-    </div>
-</div>
-
 <!-- Modal: Edit User Details -->
 <div id="editUserModal"
     class="fixed inset-0 z-50 hidden items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
@@ -1761,7 +1592,7 @@
     </div>
 </div>
 
-<!-- Prepare old Bulk Add values -->
+<!-- Prepare Add Chairmen values -->
 @php
     $oldOfficials=old('officials',[
         [
@@ -1776,7 +1607,7 @@
     $bulkNextIndex=empty($bulkIndexes) ? 0 : max($bulkIndexes)+1;
 @endphp
 
-<!-- Modal: Bulk Add SK Chairmen -->
+<!-- Modal: Add SK Chairmen -->
 <div id="bulkModal"
     class="fixed inset-0 z-50 hidden items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
 
@@ -1786,7 +1617,7 @@
 
             <div>
                 <h2 class="text-2xl font-black text-gray-900">
-                    Bulk Add SK Chairmen
+                    Add SK Chairmen
                 </h2>
 
                 <p class="text-xs text-gray-500">
@@ -1807,7 +1638,7 @@
             <div class="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3">
 
                 <p class="text-xs font-black text-red-700">
-                    Bulk Add Failed
+                    Add Chairmen Failed
                 </p>
 
                 <p class="mt-1 text-[11px] text-red-600">
@@ -1971,10 +1802,6 @@ document.addEventListener('DOMContentLoaded',()=>{
     const presidentModeInputs=document.querySelectorAll('input[name="president_mode"]');
     const newPresidentFields=document.getElementById('newPresidentFields');
 
-    const openOfficialModal=document.getElementById('openOfficialModal');
-    const officialModal=document.getElementById('officialModal');
-    const closeOfficialModal=document.getElementById('closeOfficialModal');
-
     const openImportModal=document.getElementById('openImportModal');
     const importModal=document.getElementById('importModal');
     const closeImportModal=document.getElementById('closeImportModal');
@@ -2061,18 +1888,6 @@ document.addEventListener('DOMContentLoaded',()=>{
     });
 
     syncPresidentFields();
-
-    if(openOfficialModal){
-        openOfficialModal.addEventListener('click',()=>{
-            showModal(officialModal);
-        });
-    }
-
-    if(closeOfficialModal){
-        closeOfficialModal.addEventListener('click',()=>{
-            hideModal(officialModal);
-        });
-    }
 
     if(openImportModal){
         openImportModal.addEventListener('click',()=>{
@@ -2208,7 +2023,6 @@ document.addEventListener('DOMContentLoaded',()=>{
     // Close Modals on Backdrop
     [
         newTermModal,
-        officialModal,
         importModal,
         editUserModal,
         bulkModal
@@ -2228,14 +2042,13 @@ document.addEventListener('DOMContentLoaded',()=>{
     window.addEventListener('keydown',(e)=>{
         if(e.key==='Escape'){
             hideModal(newTermModal);
-            hideModal(officialModal);
             hideModal(importModal);
             hideModal(editUserModal);
             hideModal(bulkModal);
         }
     });
 
-    // Bulk Add Rows
+    // Add Chairmen Rows
     let bulkRowIndex={{ $bulkNextIndex }};
 
     if(addBulkRow && bulkRows){
@@ -2590,10 +2403,6 @@ document.addEventListener('DOMContentLoaded',()=>{
     @elseif($errors->bulkAdd->any())
 
         showModal(bulkModal);
-
-    @elseif($errors->singleAdd->any())
-
-        showModal(officialModal);
 
     @elseif($errors->editUser->any())
 
