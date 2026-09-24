@@ -10,33 +10,14 @@
     <style>
         [x-cloak] { display: none !important; }
         .tab-active { border-bottom: 2px solid #ef4444; color: #ef4444; }
-        {!! file_get_contents(resource_path('css/responsive.css')) !!}
     </style>
 </head>
 <body class="bg-gray-50 font-sans" x-data="{ activeTab: 'personal', isEditing: false, showPassModal: false }">
 <div class="flex h-screen overflow-hidden">
-    <div class="w-64 bg-red-600 text-white flex flex-col p-3 shadow-xl z-20">
-        <div class="flex items-center gap-3 mb-4">
-    <img src="{{ asset('images/sk logo.png') }}" class="w-8 h-8 rounded-full object-cover"  alt="logo">
-    <div class="leading-tight">
-        <h2 class="text-lg font-extrabold tracking-wide">SK 360°</h2>
-        <p class="text-[10px] opacity-80">Management System</p>
-    </div>
-</div>
-        @include('shared.sidebar-user-card')
-        <nav class="space-y-1 text-xs">
-            @foreach ($menuItems as $item)
-                @php $isActive = $currentUrl === $item['link']; @endphp
-                <a href="{{ $item['link'] }}" class="flex items-center gap-2 p-2 rounded-lg transition {{ $isActive ? 'bg-red-500 text-yellow-300 font-bold border-l-4 border-yellow-300' : 'hover:bg-red-500' }}">
-                    <span class="{{ $isActive ? 'bg-yellow-400 text-red-600' : 'bg-red-400' }} p-1 rounded">{!! $item['icon'] !!}</span>
-                    <span>{{ $item['label'] }}</span>
-                </a>
-            @endforeach
-        </nav>
-    </div>
+    @include('partials.app.sidebar')
 
     <div class="flex-1 flex flex-col min-w-0 overflow-hidden">
-        @include('shared.topbar', ['legacyAccountMenu' => true])
+        @include('partials.app.topbar', ['accountButtonId' => 'profileDropdownBtn', 'accountMenuId' => 'profileMenu', 'bindBell' => true, 'search' => ['placeholder' => 'Search settings...']])
 
         <main class="flex-1 overflow-y-auto p-8 bg-gray-50">
             <div class="max-w-5xl mx-auto">
@@ -55,6 +36,7 @@
                 @endif
 
                 <header class="mb-6">
+                    <span class="sk-eyebrow"><span class="sk-dot"></span>Profile</span>
                     <h1 class="text-2xl font-bold text-gray-800">Profile Settings</h1>
                     <p class="text-sm text-gray-500">{{ $pageDescription }}</p>
                 </header>
@@ -63,7 +45,7 @@
                     <div class="flex items-center gap-6">
                         <div class="w-24 h-24 bg-red-600 rounded-2xl flex items-center justify-center text-white text-4xl font-bold border-4 border-white shadow-md overflow-hidden">
                             @if ($hasProfilePicColumn && !empty($user->profile_pic ?? null))
-                                <img src="{{ asset(str_starts_with($user->profile_pic, 'uploads/') ? $user->profile_pic : 'uploads/profile_pics/' . $user->profile_pic) }}" class="w-full h-full object-cover" alt="Profile picture">
+                                <img src="{{ asset('uploads/profile_pics/' . $user->profile_pic) }}" class="w-full h-full object-cover" alt="Profile picture">
                             @else
                                 {{ strtoupper(substr($user->first_name ?? 'U', 0, 1)) }}
                             @endif
@@ -74,16 +56,6 @@
                             <div class="mt-2 inline-flex items-center gap-1.5 px-3 py-1 bg-green-100 text-green-700 rounded-full text-[10px] font-black">
                                 <span class="w-1.5 h-1.5 bg-green-500 rounded-full"></span> VERIFIED
                             </div>
-                            @if ($hasProfilePicColumn)
-                                <form action="{{ $updateRoute }}" method="POST" enctype="multipart/form-data" class="mt-3 flex flex-wrap items-center gap-2">
-                                    @csrf
-                                    <input type="hidden" name="first_name" value="{{ $user->first_name }}">
-                                    <input type="hidden" name="last_name" value="{{ $user->last_name }}">
-                                    <input type="file" name="profile_pic" accept="image/jpeg,image/png,image/webp" required class="max-w-56 text-xs">
-                                    <button class="rounded-lg bg-red-600 px-3 py-2 text-xs font-bold text-white hover:bg-red-700">Upload photo</button>
-                                </form>
-                                <p class="mt-1 text-[10px] text-gray-400">JPG, PNG, or WebP; up to 5 MB.</p>
-                            @endif
                         </div>
                     </div>
                 </div>
@@ -192,53 +164,6 @@
 </div>
 
 <script>
-const profileSidebar = document.querySelector('[class~="w-64"][class~="bg-red-600"]');
-
-if (profileSidebar) {
-    const mobileToggle = document.createElement('button');
-    mobileToggle.type = 'button';
-    mobileToggle.className = 'mobile-sidebar-toggle';
-    mobileToggle.setAttribute('aria-label', 'Open navigation menu');
-    mobileToggle.setAttribute('aria-expanded', 'false');
-    mobileToggle.textContent = '\u2630';
-
-    const mobileBackdrop = document.createElement('div');
-    mobileBackdrop.className = 'mobile-sidebar-backdrop';
-
-    const profileTopbar = document.querySelector('[class~="bg-red-600"][class~="px-6"][class~="py-3"][class~="justify-between"]');
-
-    function closeProfileSidebar() {
-        profileSidebar.classList.remove('mobile-sidebar-open');
-        mobileBackdrop.classList.remove('is-visible');
-        mobileToggle.setAttribute('aria-expanded', 'false');
-        mobileToggle.setAttribute('aria-label', 'Open navigation menu');
-        mobileToggle.textContent = '\u2630';
-    }
-
-    function openProfileSidebar() {
-        profileSidebar.classList.add('mobile-sidebar-open');
-        mobileBackdrop.classList.add('is-visible');
-        mobileToggle.setAttribute('aria-expanded', 'true');
-        mobileToggle.setAttribute('aria-label', 'Close navigation menu');
-        mobileToggle.textContent = '\u00d7';
-    }
-
-    mobileToggle.addEventListener('click', () => {
-        profileSidebar.classList.contains('mobile-sidebar-open')
-            ? closeProfileSidebar()
-            : openProfileSidebar();
-    });
-    mobileBackdrop.addEventListener('click', closeProfileSidebar);
-    profileSidebar.querySelectorAll('a').forEach((link) => link.addEventListener('click', closeProfileSidebar));
-
-    if (profileTopbar) {
-        profileTopbar.prepend(mobileToggle);
-    } else {
-        document.body.append(mobileToggle);
-    }
-    document.body.append(mobileBackdrop);
-}
-
 const dropdownBtn = document.getElementById('profileDropdownBtn');
 const profileMenu = document.getElementById('profileMenu');
 

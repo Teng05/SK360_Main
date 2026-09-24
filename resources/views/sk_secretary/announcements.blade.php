@@ -24,9 +24,9 @@
         <main class="flex-1 overflow-y-auto bg-gray-50">
             <div class="max-w-5xl mx-auto px-8 py-8">
                 <div class="mb-8">
-                    <p class="text-xs font-black uppercase tracking-[0.2em] text-red-600">
+                    <span class="sk-eyebrow"><span class="sk-dot"></span>
                         SK 360° Community Feed
-                    </p>
+                    </span>
 
                     <h1 class="text-3xl font-black text-gray-900 mt-2">
                         Announcements
@@ -49,7 +49,7 @@
 
                             <div class="relative">
                                 <span class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">
-                                    🔍
+                                    <span class="inline-flex align-[-3px]">@include('partials.ui.icon', ['icon' => 'search', 'iconSize' => 16])</span>
                                 </span>
 
                                 <input type="text"
@@ -162,11 +162,11 @@
 
                                     @if($announcement->visibility==='officials_only')
                                         <span class="shrink-0 rounded-full bg-amber-100 px-3 py-1 text-[9px] font-black uppercase text-amber-700">
-                                            🔒 Officials Only
+                                            <span class="inline-flex align-[-3px]">@include('partials.ui.icon', ['icon' => 'lock', 'iconSize' => 16])</span> Officials Only
                                         </span>
                                     @else
                                         <span class="shrink-0 rounded-full bg-green-100 px-3 py-1 text-[9px] font-black uppercase text-green-700">
-                                            🌐 Public
+                                            <span class="inline-flex align-[-3px]">@include('partials.ui.icon', ['icon' => 'globe', 'iconSize' => 16])</span> Public
                                         </span>
                                     @endif
                                 </div>
@@ -207,7 +207,7 @@
                                             data-feedback-submit-url="{{ route('public.announcements.feedback',$announcement->announcement_id) }}">
 
                                         <span class="text-base">
-                                            💬
+                                            <span class="inline-flex align-[-3px]">@include('partials.ui.icon', ['icon' => 'message-circle', 'iconSize' => 16])</span>
                                         </span>
 
                                         <strong data-feedback-count>
@@ -220,7 +220,7 @@
                                     </button>
 
                                     <div class="flex items-center gap-1">
-                                        <span>👁</span>
+                                        <span><span class="inline-flex align-[-3px]">@include('partials.ui.icon', ['icon' => 'eye', 'iconSize' => 16])</span></span>
 
                                         <strong data-view-count>
                                             {{ $announcement->views_count }}
@@ -236,7 +236,7 @@
                     @empty
                         <div class="bg-white rounded-2xl border border-dashed border-gray-200 p-12 text-center">
                             <div class="text-4xl mb-3">
-                                📢
+                                <span class="inline-flex align-[-3px]">@include('partials.ui.icon', ['icon' => 'megaphone', 'iconSize' => 16])</span>
                             </div>
 
                             <p class="font-black text-gray-700">

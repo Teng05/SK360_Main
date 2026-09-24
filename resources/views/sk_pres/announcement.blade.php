@@ -16,126 +16,18 @@
 @endphp
 
 <div class="flex h-screen overflow-hidden bg-gray-100">
-    <div class="w-64 bg-red-600 text-white flex flex-col p-3 overflow-y-auto">
-        <div class="flex items-center gap-3 mb-4">
-            <img src="{{ asset('images/logo.png') }}" class="w-8 h-8 rounded-full object-cover" alt="logo">
-
-            <div class="leading-tight">
-                <h2 class="text-lg font-extrabold tracking-wide">SK 360°</h2>
-                <p class="text-[10px] opacity-80">Management System</p>
-            </div>
-        </div>
-
-        <div class="bg-red-500 rounded-lg p-2 flex items-center gap-2 mb-3 shadow text-xs">
-            <div class="bg-yellow-400 text-red-600 p-1 rounded-full text-sm">
-                👤
-            </div>
-
-            <div>
-                <p class="font-semibold text-xs">SK President</p>
-                <p class="text-xs opacity-80">Active Role</p>
-            </div>
-        </div>
-
-        <nav class="space-y-1 text-xs">
-            @foreach ($menuItems as $item)
-                @php
-                    $isActive=$item['link']===$currentUrl;
-                @endphp
-
-                <a href="{{ $item['link'] }}"
-                   class="flex items-center gap-2 p-2 rounded-lg {{ $isActive ? 'bg-red-500' : 'hover:bg-red-500 transition' }}">
-
-                    <span class="{{ $isActive ? 'bg-yellow-400 text-red-600' : 'bg-red-400' }} p-1 rounded text-sm">
-                        {{ $item['icon'] }}
-                    </span>
-
-                    <span class="{{ $isActive ? 'text-yellow-300 font-semibold' : '' }} text-xs">
-                        {{ $item['label'] }}
-                    </span>
-                </a>
-            @endforeach
-        </nav>
-    </div>
+    @include('partials.app.sidebar')
 
     <div class="flex-1 flex flex-col overflow-hidden">
-        <div class="bg-red-600 text-white px-6 py-3 flex justify-between items-center shadow">
-            <input type="text"
-                   placeholder="Search..."
-                   class="px-4 py-2 rounded-full text-black w-1/3 focus:outline-none">
-
-            <div class="flex items-center gap-3 relative">
-                <div class="relative">
-                    <button id="notifBtn"
-                            type="button"
-                            class="text-xl hover:bg-red-500 p-2 rounded-lg transition">
-                        🔔
-                    </button>
-
-                    <div id="notifDropdown"
-                         class="hidden absolute right-0 mt-3 w-72 bg-white rounded-2xl shadow-xl border z-50 overflow-hidden">
-
-                        <div class="px-4 py-3 font-semibold border-b text-gray-800">
-                            Notifications
-                        </div>
-
-                        <div class="max-h-64 overflow-y-auto">
-                            <div class="px-4 py-3 hover:bg-gray-100 text-sm text-gray-700">
-                                No notifications yet
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="relative">
-                    <button id="userMenuBtn"
-                            type="button"
-                            class="flex items-center gap-2 hover:bg-red-500 px-3 py-2 rounded-lg transition">
-
-                        <span class="font-semibold">
-                            {{ $fullName }}
-                        </span>
-                    </button>
-
-                    <div id="userDropdown"
-                         class="hidden absolute right-0 mt-3 w-64 bg-white rounded-2xl shadow-xl border overflow-hidden z-50">
-
-                        <div class="px-5 py-4 font-semibold text-gray-800 border-b">
-                            My Account
-                        </div>
-
-                        <a href="{{ route('sk_pres.profile') }}"
-                           class="flex items-center gap-3 px-5 py-3 hover:bg-gray-100 transition">
-
-                            <span>👤</span>
-
-                            <span class="text-gray-700">
-                                Profile Settings
-                            </span>
-                        </a>
-
-                        <form method="POST" action="{{ route('logout') }}">
-                            @csrf
-
-                            <button type="submit"
-                                    class="w-full text-left flex items-center gap-3 px-5 py-3 text-red-500 hover:bg-gray-100 transition">
-
-                                <span>↩️</span>
-                                <span>Log Out</span>
-                            </button>
-                        </form>
-                    </div>
-                </div>
-            </div>
-        </div>
+        @include('partials.app.topbar')
 
         <main class="flex-1 overflow-y-auto bg-gray-50">
             <div class="max-w-5xl mx-auto px-8 py-8">
                 <div class="flex flex-col md:flex-row md:items-start md:justify-between gap-5 mb-8">
                     <div>
-                        <p class="text-xs font-black uppercase tracking-[0.2em] text-red-600">
+                        <span class="sk-eyebrow"><span class="sk-dot"></span>
                             SK 360° Community Feed
-                        </p>
+                        </span>
 
                         <h1 class="text-3xl font-black text-gray-900 mt-2">
                             Announcements
@@ -179,7 +71,7 @@
 
                             <div class="relative">
                                 <span class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">
-                                    🔍
+                                    <span class="inline-flex align-[-3px]">@include('partials.ui.icon', ['icon' => 'search', 'iconSize' => 16])</span>
                                 </span>
 
                                 <input type="text"
@@ -292,11 +184,11 @@
 
                                     @if($announcement->visibility==='officials_only')
                                         <span class="shrink-0 rounded-full bg-amber-100 px-3 py-1 text-[9px] font-black uppercase text-amber-700">
-                                            🔒 Officials Only
+                                            <span class="inline-flex align-[-3px]">@include('partials.ui.icon', ['icon' => 'lock', 'iconSize' => 16])</span> Officials Only
                                         </span>
                                     @else
                                         <span class="shrink-0 rounded-full bg-green-100 px-3 py-1 text-[9px] font-black uppercase text-green-700">
-                                            🌐 Public
+                                            <span class="inline-flex align-[-3px]">@include('partials.ui.icon', ['icon' => 'globe', 'iconSize' => 16])</span> Public
                                         </span>
                                     @endif
                                 </div>
@@ -337,7 +229,7 @@
                                             data-feedback-submit-url="{{ route('public.announcements.feedback',$announcement->announcement_id) }}">
 
                                         <span class="text-base">
-                                            💬
+                                            <span class="inline-flex align-[-3px]">@include('partials.ui.icon', ['icon' => 'message-circle', 'iconSize' => 16])</span>
                                         </span>
 
                                         <strong data-feedback-count>
@@ -350,7 +242,7 @@
                                     </button>
 
                                     <div class="flex items-center gap-1">
-                                        <span>👁</span>
+                                        <span><span class="inline-flex align-[-3px]">@include('partials.ui.icon', ['icon' => 'eye', 'iconSize' => 16])</span></span>
 
                                         <strong data-view-count>
                                             {{ $announcement->views_count }}
@@ -366,7 +258,7 @@
                     @empty
                         <div class="bg-white rounded-2xl border border-dashed border-gray-200 p-12 text-center">
                             <div class="text-4xl mb-3">
-                                📢
+                                <span class="inline-flex align-[-3px]">@include('partials.ui.icon', ['icon' => 'megaphone', 'iconSize' => 16])</span>
                             </div>
 
                             <p class="font-black text-gray-700">

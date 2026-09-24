@@ -3,125 +3,167 @@
 
 @section('title', 'SK 360 | Set Password')
 
+{{-- Layout comes from the shared design system (.sk-auth); these rules only
+     style the live password checks driven by the script below. --}}
 @section('page_css')
-@if (file_exists(public_path('build/manifest.json')) || file_exists(public_path('hot')))
-    @vite(['resources/css/register.css'])
-@elseif (file_exists(resource_path('css/register.css')))
-    <style>
-        {!! file_get_contents(resource_path('css/register.css')) !!}
-    </style>
-@endif
-
 <style>
-    body{background:#eef2f6;}
-    .password-container{width:950px;max-width:95%;min-height:520px;display:flex;background:#fff;border-radius:24px;overflow:hidden;box-shadow:0 12px 35px rgba(0,0,0,.12);}
-    .password-left{width:45%;background:#e5091a;color:#fff;padding:55px 50px;display:flex;flex-direction:column;justify-content:center;}
-    .password-left h1{font-size:42px;margin:0 0 8px;font-weight:800;}
-    .password-left h2{font-size:28px;margin:0 0 22px;}
-    .password-left p{font-size:16px;line-height:1.6;margin:0;max-width:330px;}
-    .password-right{width:55%;padding:55px 50px;display:flex;align-items:center;}
-    .password-form{width:100%;}
-    .password-form h2{font-size:30px;margin:0 0 8px;color:#111;}
-    .subtitle{font-size:14px;color:#777;margin-bottom:32px;}
-    .form-group{margin-bottom:20px;}
-    .form-group label{display:block;font-size:13px;font-weight:700;color:#333;margin-bottom:7px;}
-    .form-group input{width:100%;height:46px;border:1px solid #d5d5d5;border-radius:9px;padding:0 13px;font-size:14px;outline:none;transition:.2s;background:#fff;}
-    .form-group input:focus{border-color:#e5091a;box-shadow:0 0 0 3px rgba(229,9,26,.08);}
-    .form-group input[readonly]{background:#f4f5f7;color:#666;cursor:not-allowed;}
-    .input-error{border-color:#dc2626!important;}
-    .input-valid{border-color:#16a34a!important;}
-    .requirements{margin-top:9px;padding-left:2px;}
-    .requirement{font-size:12px;margin:4px 0;color:#dc2626;display:flex;align-items:center;gap:6px;}
-    .requirement.valid{color:#16a34a;}
-    .requirement-icon{font-weight:bold;width:14px;}
-    .field-message{font-size:12px;margin-top:7px;display:none;}
-    .field-message.error{display:block;color:#dc2626;}
-    .field-message.success{display:block;color:#16a34a;}
-    .password-btn{width:100%;height:47px;border:0;border-radius:9px;background:#e5091a;color:white;font-size:14px;font-weight:700;cursor:pointer;margin-top:8px;transition:.2s;}
-    .password-btn:hover:not(:disabled){background:#c90817;}
-    .password-btn:disabled{background:#cbd0d6;color:#777;cursor:not-allowed;}
-    .login-link{text-align:center;margin-top:18px;font-size:12px;color:#777;}
-    .login-link a{color:#e5091a;font-weight:700;text-decoration:none;}
-    .expired-box{text-align:center;}
-    .expired-icon{width:60px;height:60px;margin:0 auto 20px;border-radius:50%;background:#fff0f1;color:#e5091a;display:flex;align-items:center;justify-content:center;font-size:32px;font-weight:800;}
-    .expired-text{font-size:14px;color:#666;line-height:1.6;margin:20px 0 10px;}
-    .expired-email{background:#f4f5f7;border:1px solid #ddd;border-radius:9px;padding:12px;margin-bottom:22px;font-size:13px;font-weight:700;color:#333;word-break:break-all;}
-    .back-login-btn{width:100%;height:47px;border:0;border-radius:9px;background:#e5091a;color:#fff;font-size:14px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;text-decoration:none;transition:.2s;}
-    .back-login-btn:hover{background:#c90817;}
-    @media(max-width:768px){
-        .password-container{flex-direction:column;}
-        .password-left,.password-right{width:100%;}
-        .password-left{padding:35px 30px;}
-        .password-right{padding:35px 30px;}
-        .password-left h1{font-size:34px;}
+    .sk-auth .sk-field input[readonly] { color: var(--sk-muted); cursor: not-allowed; }
+    .sk-auth .sk-field input.input-error { border-color: #dc2626; box-shadow: 0 0 0 4px rgba(220, 38, 38, .08); }
+    .sk-auth .sk-field input.input-valid { border-color: #16a34a; box-shadow: 0 0 0 4px rgba(22, 128, 60, .08); }
+
+    .requirements {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 6px 12px;
+        margin-top: 12px;
+        padding: 12px 14px;
+        border-radius: 12px;
+        background: var(--sk-subtle);
+        border: 1px solid var(--sk-border);
+    }
+
+    .requirement {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        font-size: 12.5px;
+        font-weight: 600;
+        color: var(--sk-red-hover);
+    }
+
+    .requirement.valid { color: var(--sk-green); }
+
+    .requirement-icon {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 17px;
+        height: 17px;
+        border-radius: 99px;
+        background: currentColor;
+        color: inherit;
+        font-size: 10px;
+        font-weight: 800;
+        line-height: 1;
+        flex-shrink: 0;
+    }
+
+    .requirement-icon { background: var(--sk-red-soft); }
+    .requirement.valid .requirement-icon { background: var(--sk-green-soft); }
+
+    .field-message { display: none; margin-top: 8px; font-size: 13px; font-weight: 600; }
+    .field-message.error { display: block; color: #b91c1c; }
+    .field-message.success { display: block; color: var(--sk-green); }
+
+    #setPasswordBtn:disabled { background: #d7dbe1; color: #6b7383; box-shadow: none; cursor: not-allowed; }
+
+    .expired-email {
+        margin-top: 20px;
+        padding: 12px 14px;
+        border-radius: 12px;
+        background: var(--sk-subtle);
+        border: 1px solid var(--sk-border);
+        font-size: 14px;
+        font-weight: 700;
+        color: var(--sk-text);
+        word-break: break-all;
+    }
+
+    @media (max-width: 480px) {
+        .requirements { grid-template-columns: 1fr; }
     }
 </style>
 @endsection
 
 @section('content')
-<div class="password-container">
-    <div class="password-left">
-        <h1>SK 360°</h1>
-        <h2>Welcome to SK 360°</h2>
-        <p>Set your password to activate your account and access the centralized platform for youth governance.</p>
-    </div>
+<div class="sk-auth">
+    <section class="sk-auth__brand">
+        <div class="sk-auth__top">
+            <div class="sk-auth__mark">
+                <img src="{{ asset('images/logo.png') }}" alt="SK 360 logo">
+                <div>
+                    <p class="sk-auth__mark-name">SK 360&deg;</p>
+                    <p class="sk-auth__mark-tag">Management System</p>
+                </div>
+            </div>
+        </div>
 
-    <div class="password-right">
+        <div>
+            <h1 class="sk-auth__headline">Welcome to SK 360&deg;</h1>
+            <p class="sk-auth__lead">Set your password to activate your account and access the centralized platform for youth governance.</p>
+        </div>
+
+        <div></div>
+    </section>
+
+    <section class="sk-auth__panel">
         @if ($linkExpired ?? false)
 
-            <div class="password-form expired-box">
-                <div class="expired-icon">!</div>
+            <div class="sk-auth__form">
+                <span class="sk-icon-tile sk-icon-tile--lg" style="margin-bottom: 20px;">
+                    @include('partials.ui.icon', ['icon' => 'triangle-alert', 'iconSize' => 26])
+                </span>
 
-                <h2>Setup Link Invalid or Expired</h2>
+                <h2 class="sk-auth__title">Setup Link Invalid or Expired</h2>
 
-                <p class="subtitle">
+                <p class="sk-auth__subtitle">
                     This password setup link is no longer valid.
                 </p>
 
-                <p class="expired-text">
-                    @if (($accountRole ?? '') === 'sk_secretary')
-                        Please contact your SK Chairman to request a new password setup link for your account.
-                    @else
-                        Please contact your SK President to request a new password setup link for your account.
-                    @endif
-                </p>
+                <div class="sk-alert sk-alert--info" style="margin-top: 20px;">
+                    @include('partials.ui.icon', ['icon' => 'info', 'iconSize' => 18])
+                    <span>
+                        @if (($accountRole ?? '') === 'sk_secretary')
+                            Please contact your SK Chairman to request a new password setup link for your account.
+                        @else
+                            Please contact your SK President to request a new password setup link for your account.
+                        @endif
+                    </span>
+                </div>
 
                 <div class="expired-email">
                     {{ $email }}
                 </div>
 
-                <a href="{{ route('login') }}" class="back-login-btn">
+                <a href="{{ route('login') }}" class="sk-btn sk-btn--primary sk-btn--lg" style="width: 100%; margin-top: 24px;">
                     Back to Login
                 </a>
             </div>
 
         @else
 
-            <form class="password-form" id="setPasswordForm" method="POST" action="{{ route('password.setup.store') }}">
+            <form class="sk-auth__form" id="setPasswordForm" method="POST" action="{{ route('password.setup.store') }}">
                 @csrf
 
                 <input type="hidden" name="token" value="{{ $token }}">
                 <input type="hidden" name="email" value="{{ $email }}">
 
-                <h2>Set Your Password</h2>
-                <p class="subtitle">Create a secure password for your SK360 account.</p>
+                <span class="sk-eyebrow"><span class="sk-dot"></span>Account Activation</span>
+                <h2 class="sk-auth__title">Set Your Password</h2>
+                <p class="sk-auth__subtitle">Create a secure password for your SK360 account.</p>
 
-                <div class="form-group">
-                    <label>Email Address</label>
-                    <input type="email" value="{{ $email }}" readonly>
-                </div>
+                <label class="sk-field">
+                    <span class="sk-field__label">Email Address</span>
+                    <span class="sk-field__control">
+                        @include('partials.ui.icon', ['icon' => 'mail', 'iconSize' => 18])
+                        <input type="email" value="{{ $email }}" readonly>
+                    </span>
+                </label>
 
-                <div class="form-group">
-                    <label>Password</label>
+                <div class="sk-field">
+                    <label class="sk-field__label" for="password">Password</label>
 
-                    <input
-                        type="password"
-                        id="password"
-                        name="password"
-                        placeholder="Enter your new password"
-                        autocomplete="new-password"
-                        required
-                    >
+                    <span class="sk-field__control">
+                        @include('partials.ui.icon', ['icon' => 'lock', 'iconSize' => 18])
+                        <input
+                            type="password"
+                            id="password"
+                            name="password"
+                            placeholder="Enter your new password"
+                            autocomplete="new-password"
+                            required
+                        >
+                    </span>
 
                     <div class="requirements">
                         <div class="requirement" id="lengthRule">
@@ -146,17 +188,20 @@
                     </div>
                 </div>
 
-                <div class="form-group">
-                    <label>Confirm Password</label>
+                <div class="sk-field">
+                    <label class="sk-field__label" for="password_confirmation">Confirm Password</label>
 
-                    <input
-                        type="password"
-                        id="password_confirmation"
-                        name="password_confirmation"
-                        placeholder="Re-enter your new password"
-                        autocomplete="new-password"
-                        required
-                    >
+                    <span class="sk-field__control">
+                        @include('partials.ui.icon', ['icon' => 'lock', 'iconSize' => 18])
+                        <input
+                            type="password"
+                            id="password_confirmation"
+                            name="password_confirmation"
+                            placeholder="Re-enter your new password"
+                            autocomplete="new-password"
+                            required
+                        >
+                    </span>
 
                     <div id="confirmMessage" class="field-message"></div>
                 </div>
@@ -164,20 +209,21 @@
                 <button
                     type="submit"
                     id="setPasswordBtn"
-                    class="password-btn"
+                    class="sk-btn sk-btn--primary sk-btn--lg"
+                    style="width: 100%; margin-top: 26px;"
                     disabled
                 >
                     Set Password
                 </button>
 
-                <div class="login-link">
+                <div class="sk-auth__footer" style="justify-content: center;">
                     Already set your password?
-                    <a href="{{ route('login') }}">Sign In</a>
+                    <a class="sk-link" href="{{ route('login') }}">Sign In</a>
                 </div>
             </form>
 
         @endif
-    </div>
+    </section>
 </div>
 @endsection
 
@@ -189,7 +235,7 @@ Swal.fire({
     icon:'error',
     title:'Unable to Set Password',
     html:{!! json_encode(implode('<br>', $errors->getBag('default')->all())) !!},
-    confirmButtonColor:'#e5091a'
+    confirmButtonColor:'#dc2626'
 });
 </script>
 @endif

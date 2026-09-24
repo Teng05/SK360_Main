@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Calendar | SK360 Public Portal</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    @include('partials.public.assets')
     <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.19/index.global.min.js"></script>
 
     <style>
@@ -68,50 +69,18 @@
     </style>
 </head>
 
-<body class="bg-gray-50 text-gray-800">
+<body class="sk-app sk-portal text-gray-800">
 
 {{-- HEADER --}}
-<header class="sticky top-0 z-40 bg-red-600 text-white shadow">
-    <div class="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
-        <a href="{{ route('public.home') }}" class="flex items-center gap-3">
-            <img src="{{ asset('images/sk logo.png') }}"
-                class="w-10 h-10 rounded-full object-cover"
-                alt="SK360 Logo">
-
-            <div>
-                <h1 class="text-xl font-black">SK 360°</h1>
-                <p class="text-[10px] opacity-80 uppercase tracking-widest">
-                    Public Information Portal
-                </p>
-            </div>
-        </a>
-
-        <a href="{{ route('public.home') }}"
-            class="text-xs font-bold hover:text-yellow-300 transition">
-            ← Public Portal
-        </a>
-    </div>
-</header>
+@include('partials.public.header')
 
 <main>
 
 {{-- PAGE HEADER --}}
-<section class="bg-gradient-to-br from-red-600 to-red-700 text-white">
-    <div class="max-w-4xl mx-auto px-6 py-12">
-        <p class="text-xs font-black uppercase tracking-[0.2em] text-red-100">
-            Public Schedule
-        </p>
-
-        <h2 class="text-4xl font-black mt-2">
-            Event Calendar
-        </h2>
-
-        <p class="text-red-100 text-sm mt-3 max-w-2xl leading-relaxed">
-            View public programs, activities, and upcoming events from the
-            Sangguniang Kabataan Federation of Lipa City.
-        </p>
-    </div>
-</section>
+<x-public-hero eyebrow="Public Schedule" title="Event Calendar">
+        View public programs, activities, and upcoming events from the
+        Sangguniang Kabataan Federation of Lipa City.
+    </x-public-hero>
 
 {{-- SEARCH --}}
 <section class="max-w-4xl mx-auto px-6 pt-8">
@@ -127,7 +96,7 @@
                 class="w-full rounded-xl border border-gray-200 pl-10 pr-20 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-red-300">
 
             <span class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">
-                🔎
+                @include('partials.ui.icon', ['icon' => 'search', 'iconSize' => 18])
             </span>
 
             <button id="clearSearchBtn"
@@ -169,7 +138,7 @@
             <div id="calendar"></div>
 
             <div id="calendarNoResults" class="hidden py-12 text-center">
-                <div class="text-3xl mb-3">🔎</div>
+                <div class="sk-icon-tile sk-icon-tile--gray mx-auto mb-3" style="width:56px;height:56px;border-radius:18px">@include('partials.ui.icon', ['icon' => 'search', 'iconSize' => 24])</div>
 
                 <h4 class="font-black text-gray-700">
                     No matching events
@@ -229,7 +198,7 @@
                         </h4>
 
                         <p class="text-xs text-gray-500 mt-2">
-                            🕐 {{ \Carbon\Carbon::parse($event->start_datetime)->format('h:i A') }}
+                            <span class="inline-flex align-[-2px]">@include('partials.ui.icon', ['icon' => 'clock', 'iconSize' => 14])</span> {{ \Carbon\Carbon::parse($event->start_datetime)->format('h:i A') }}
 
                             @if($event->end_datetime)
                                 - {{ \Carbon\Carbon::parse($event->end_datetime)->format('h:i A') }}
@@ -237,7 +206,7 @@
                         </p>
 
                         <p class="text-xs text-gray-400 mt-1 truncate">
-                            📍 {{ $event->location ?: 'Location not specified' }}
+                            <span class="inline-flex align-[-2px]">@include('partials.ui.icon', ['icon' => 'map-pin', 'iconSize' => 14])</span> {{ $event->location ?: 'Location not specified' }}
                         </p>
 
                     </div>
@@ -249,7 +218,7 @@
         @empty
 
             <div class="md:col-span-2 bg-white border border-gray-100 rounded-2xl px-6 py-12 text-center">
-                <div class="text-4xl mb-3">📅</div>
+                <div class="sk-icon-tile sk-icon-tile--gray mx-auto mb-3" style="width:56px;height:56px;border-radius:18px">@include('partials.ui.icon', ['icon' => 'calendar-days', 'iconSize' => 24])</div>
 
                 <h4 class="font-black text-gray-700">
                     No upcoming public events
@@ -268,7 +237,7 @@
         <div id="filteredUpcomingEmpty"
             class="hidden bg-white border border-gray-100 rounded-2xl px-6 py-12 text-center">
 
-            <div class="text-3xl mb-3">🔎</div>
+            <div class="sk-icon-tile sk-icon-tile--gray mx-auto mb-3" style="width:56px;height:56px;border-radius:18px">@include('partials.ui.icon', ['icon' => 'search', 'iconSize' => 24])</div>
 
             <h4 class="font-black text-gray-700">
                 No matching upcoming activities
@@ -324,7 +293,7 @@
                 <div class="flex gap-3">
 
                     <div class="w-10 h-10 rounded-xl bg-red-50 text-red-600 flex items-center justify-center shrink-0">
-                        📅
+                        @include('partials.ui.icon', ['icon' => 'calendar-days', 'iconSize' => 18])
                     </div>
 
                     <div>
@@ -343,7 +312,7 @@
                 <div class="flex gap-3">
 
                     <div class="w-10 h-10 rounded-xl bg-red-50 text-red-600 flex items-center justify-center shrink-0">
-                        🕐
+                        @include('partials.ui.icon', ['icon' => 'clock', 'iconSize' => 18])
                     </div>
 
                     <div>
@@ -362,7 +331,7 @@
                 <div class="flex gap-3">
 
                     <div class="w-10 h-10 rounded-xl bg-red-50 text-red-600 flex items-center justify-center shrink-0">
-                        📍
+                        @include('partials.ui.icon', ['icon' => 'map-pin', 'iconSize' => 18])
                     </div>
 
                     <div class="min-w-0">
@@ -403,15 +372,11 @@
     type="button"
     title="Back to top"
     class="hidden fixed bottom-6 right-6 z-50 w-12 h-12 rounded-full bg-red-600 text-white shadow-xl hover:bg-red-700 transition items-center justify-center text-xl">
-    ↑
+    @include('partials.ui.icon', ['icon' => 'arrow-up', 'iconSize' => 20])
 </button>
 
 {{-- FOOTER --}}
-<footer class="bg-gray-900 text-gray-400">
-    <div class="max-w-6xl mx-auto px-6 py-6 text-center text-xs">
-        &copy; {{ date('Y') }} SK360 • Sangguniang Kabataan Federation of Lipa City
-    </div>
-</footer>
+@include('partials.public.footer')
 
 <script>
 const allCalendarEvents=@json($calendarEvents);

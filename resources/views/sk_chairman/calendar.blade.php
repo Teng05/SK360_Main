@@ -18,32 +18,14 @@
 
 @section('content')
 <div class="flex h-screen bg-gray-100 overflow-hidden">
-    <div class="w-64 bg-red-600 text-white flex flex-col p-3 overflow-y-auto">
-        <div class="flex items-center gap-3 mb-4">
-    <img src="{{ asset('images/sk logo.png') }}" class="w-8 h-8 rounded-full object-cover"  alt="logo">
-    <div class="leading-tight">
-        <h2 class="text-lg font-extrabold tracking-wide">SK 360°</h2>
-        <p class="text-[10px] opacity-80">Management System</p>
-    </div>
-</div>
-        @include('shared.sidebar-user-card')
-
-        <nav class="space-y-1 text-xs">
-            @foreach ($menuItems as $item)
-                @php $isActive = $item['link'] === $currentUrl; @endphp
-                <a href="{{ $item['link'] }}" class="flex items-center gap-2 p-2 rounded-lg {{ $isActive ? 'bg-red-500' : 'hover:bg-red-500 transition' }}">
-                    <span class="{{ $isActive ? 'bg-yellow-400 text-red-600' : 'bg-red-400' }} p-1 rounded text-sm">{!! $item['icon'] !!}</span>
-                    <span class="{{ $isActive ? 'text-yellow-300 font-semibold' : '' }} text-xs">{{ $item['label'] }}</span>
-                </a>
-            @endforeach
-        </nav>
-    </div>
+    @include('partials.app.sidebar')
 
     <div class="flex-1 flex flex-col">
-        @include('shared.topbar', ['legacyAccountMenu' => false])
+        @include('partials.app.topbar')
 
         <div class="p-8 overflow-y-auto h-full bg-gray-50">
             <div class="mb-8">
+                <span class="sk-eyebrow"><span class="sk-dot"></span>Calendar</span>
                 <h1 class="text-3xl font-bold text-gray-800 uppercase">Event Calendar</h1>
                 <p class="text-gray-500">Official schedule of activities and programs</p>
             </div>
@@ -56,7 +38,7 @@
                 <div class="space-y-6">
                     <div class="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm">
                         <h3 class="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4">Legend</h3>
-                        <div class="space-y-3">
+                        <div class="sk-calendar-legend space-y-3">
                             @foreach ($legendItems as [$color, $label])
                                 <div class="flex items-center gap-3">
                                     <span class="w-3 h-3 rounded-full {{ $color }}"></span>
@@ -73,7 +55,7 @@
                                 <div class="border-l-4 border-red-500 pl-3">
                                     <div class="flex items-center justify-between gap-2">
                                         <p class="text-[11px] font-black text-gray-800 uppercase leading-none">{{ $event->title }}</p>
-                                        <span class="rounded-full px-2 py-1 text-[8px] font-bold uppercase {{ $event->type_badge }}">
+                                        <span data-sk-event="{{ $event->event_type }}" class="rounded-full px-2 py-1 text-[8px] font-bold uppercase {{ $event->type_badge }}">
                                             {{ $event->type_label }}
                                         </span>
                                     </div>
@@ -141,4 +123,3 @@
     });
 </script>
 @endpush
-

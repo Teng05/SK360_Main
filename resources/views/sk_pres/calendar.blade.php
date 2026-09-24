@@ -60,35 +60,17 @@
 
 @section('content')
 <div class="flex h-screen bg-[#f1f5f9] overflow-hidden">
-    <div class="w-64 bg-red-600 text-white flex flex-col p-3 overflow-y-auto">
-        <div class="flex items-center gap-3 mb-4">
-    <img src="{{ asset('images/sk logo.png') }}" class="w-8 h-8 rounded-full object-cover"  alt="logo">
-    <div class="leading-tight">
-        <h2 class="text-lg font-extrabold tracking-wide">SK 360°</h2>
-        <p class="text-[10px] opacity-80">Management System</p>
-    </div>
-</div>
-
-        @include('shared.sidebar-user-card')
-
-        <nav class="space-y-1 text-xs">
-            @foreach ($menuItems as $item)
-                <a href="{{ $item['link'] }}" class="flex items-center gap-2 p-2 rounded-lg {{ $item['link'] === $currentUrl ? 'bg-red-500' : 'hover:bg-red-500 transition' }}">
-                    <span class="{{ $item['link'] === $currentUrl ? 'bg-yellow-400 text-red-600' : 'bg-red-400' }} p-1 rounded text-sm">{{ $item['icon'] }}</span>
-                    <span class="{{ $item['link'] === $currentUrl ? 'text-yellow-300 font-semibold' : '' }} text-xs">{{ $item['label'] }}</span>
-                </a>
-            @endforeach
-        </nav>
-    </div>
+    @include('partials.app.sidebar')
 
     <div class="flex-1 flex flex-col">
-        @include('shared.topbar', ['legacyAccountMenu' => false])
+        @include('partials.app.topbar', ['search' => ['placeholder' => 'Search']])
 
         <main class="flex-1 overflow-y-auto p-8 bg-[#f8fafc]">
             <div class="flex items-start justify-between mb-6">
                 <div>
-                    <h2 class="text-[38px] font-bold text-gray-900 leading-tight">Event Calendar</h2>
-                    <p class="text-gray-500 mt-2 text-base">Schedule and coordinate SK events, meetings, and deadlines</p>
+                    <span class="sk-eyebrow"><span class="sk-dot"></span>Calendar</span>
+                    <h1 class="sk-page-title">Event Calendar</h1>
+                    <p class="sk-page-subtitle">Schedule and coordinate SK events, meetings, and deadlines</p>
                 </div>
 
                 <button id="openEventModalBtn" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm font-semibold shadow-sm">
@@ -108,7 +90,7 @@
                 </div>
             @endif
 
-            <div class="bg-white rounded-xl border border-gray-200 px-4 py-3 mb-5 flex flex-wrap gap-6 text-sm text-gray-700">
+            <div class="sk-calendar-legend bg-white rounded-xl border border-gray-200 px-4 py-3 mb-5 flex flex-wrap gap-6 text-sm text-gray-700">
                 @foreach ($legendItems as [$color, $label])
                     <div class="flex items-center gap-2">
                         <span class="w-4 h-4 rounded {{ $color }} inline-block"></span>
@@ -121,7 +103,7 @@
                 <div id="calendar"></div>
             </div>
 
-            <div class="space-y-3">
+            <div class="sk-calendar-legend space-y-3">
                 @forelse ($upcomingEvents as $event)
                     <div class="flex items-center justify-between border border-gray-200 rounded-xl px-4 py-3">
                         <div class="flex items-start gap-3">
@@ -267,4 +249,3 @@
     @endif
 </script>
 @endpush
-

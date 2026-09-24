@@ -9,67 +9,14 @@
 
 @section('content')
 <div class="flex h-screen bg-gray-100">
-    <div class="w-64 bg-red-600 text-white flex flex-col p-3 overflow-y-auto">
-        <div class="flex items-center gap-3 mb-4">
-            <img src="{{ asset('images/logo.png') }}" class="w-8 h-8 rounded-full object-cover" alt="logo">
-            <div class="leading-tight">
-                <h2 class="text-lg font-extrabold tracking-wide">SK 360°</h2>
-                <p class="text-[10px] opacity-80">Management System</p>
-            </div>
-        </div>
-
-        <div class="bg-red-500 rounded-lg p-2 flex items-center gap-2 mb-3 shadow text-xs">
-            <div class="bg-yellow-400 text-red-600 p-1 rounded-full text-sm">&#128100;</div>
-            <div>
-                <p class="font-semibold text-xs">{{ $fullName }}</p>
-                <p class="text-xs opacity-80">SK President</p>
-            </div>
-        </div>
-
-        <nav class="space-y-1 text-xs">
-            @foreach ($menuItems as $item)
-                @php $isActive = $item['link'] === $currentUrl; @endphp
-                <a href="{{ $item['link'] }}" class="flex items-center gap-2 p-2 rounded-lg {{ $isActive ? 'bg-red-500' : 'hover:bg-red-500 transition' }}">
-                    <span class="{{ $isActive ? 'bg-yellow-400 text-red-600' : 'bg-red-400' }} p-1 rounded text-sm">{!! $item['icon'] !!}</span>
-                    <span class="{{ $isActive ? 'text-yellow-300 font-semibold' : '' }} text-xs">{{ $item['label'] }}</span>
-                </a>
-            @endforeach
-        </nav>
-    </div>
+    @include('partials.app.sidebar')
 
     <div class="flex-1 flex flex-col">
-        <div class="bg-red-600 text-white px-6 py-3 flex justify-between items-center shadow relative">
-            <div class="w-1/4"></div>
-            <div class="w-1/3">
-                <input type="text" placeholder="Search..." class="w-full px-4 py-2 rounded-full text-black focus:outline-none text-sm">
-            </div>
-            <div class="w-1/4 flex justify-end items-center gap-5 text-sm">
-                <button class="hover:opacity-80">&#128276;</button>
-                <div class="relative">
-                    <button id="profileDropdownBtn" type="button" class="flex items-center gap-2 font-semibold focus:outline-none hover:opacity-80 transition">
-                        <span>{{ $fullName }}</span>
-                        <span class="text-[10px]">&#9660;</span>
-                    </button>
-                    <div id="profileMenu" class="absolute right-0 mt-3 w-48 bg-white rounded-xl shadow-2xl py-2 z-[9999] hidden border border-gray-100">
-                        <div class="px-4 py-3 border-b border-gray-50">
-                            <p class="text-[10px] text-gray-400 uppercase font-black tracking-widest">Account Settings</p>
-                        </div>
-                        <a href="{{ route('sk_pres.profile') }}" class="block px-4 py-3 text-gray-700 hover:bg-gray-50 text-xs flex items-center gap-2 transition">
-                            <span>&#128100;</span> View Profile
-                        </a>
-                        <form action="{{ route('logout') }}" method="POST">
-                            @csrf
-                            <button type="submit" class="w-full text-left px-4 py-3 text-red-600 hover:bg-red-50 text-xs font-bold flex items-center gap-2 transition">
-                                <span>&#128682;</span> Log Out
-                            </button>
-                        </form>
-                    </div>
-                </div>
-            </div>
-        </div>
+        @include('partials.app.topbar', ['accountButtonId' => 'profileDropdownBtn', 'accountMenuId' => 'profileMenu', 'bindBell' => true])
 
         <main class="flex-1 overflow-y-auto bg-gray-50 p-8">
             <div class="mb-6">
+                <span class="sk-eyebrow"><span class="sk-dot"></span>Archive</span>
                 <h1 class="text-4xl font-bold text-gray-900">Document Archive</h1>
                 <p class="text-gray-600 text-lg">Long-term record preservation and retrieval system</p>
             </div>
@@ -93,7 +40,7 @@
                         <p class="text-sm text-gray-500">Search and filter archived documents by administration, barangay, year, and type</p>
                     </div>
                     <a href="{{ route('sk_pres.archive.bulk-download', request()->query()) }}" class="rounded-xl bg-gray-100 px-4 py-2 text-xs font-bold text-gray-700 hover:bg-gray-200 transition">
-                        &#128229; Bulk Download
+                        <span class="inline-flex align-[-3px]">@include('partials.ui.icon', ['icon' => 'download', 'iconSize' => 16])</span> Bulk Download
                     </a>
                 </div>
 
@@ -206,11 +153,11 @@
                             </div>
                             @if ($document->downloadable)
                                 <a href="{{ route('sk_pres.archive.download', [$document->source_type, $document->source_id]) }}" class="text-gray-500 hover:text-red-500 transition" title="Download">
-                                    &#128229;
+                                    <span class="inline-flex align-[-3px]">@include('partials.ui.icon', ['icon' => 'download', 'iconSize' => 16])</span>
                                 </a>
                             @else
                                 <span class="cursor-not-allowed text-gray-300" title="No downloadable file">
-                                    &#128229;
+                                    <span class="inline-flex align-[-3px]">@include('partials.ui.icon', ['icon' => 'download', 'iconSize' => 16])</span>
                                 </span>
                             @endif
                         </div>

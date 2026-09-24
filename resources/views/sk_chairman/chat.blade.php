@@ -9,33 +9,14 @@
 
 @section('content')
 <div class="flex h-screen bg-gray-100">
-    <div class="w-64 bg-red-600 text-white flex flex-col p-3 overflow-y-auto">
-       <div class="flex items-center gap-3 mb-4">
-    <img src="{{ asset('images/sk logo.png') }}" class="w-8 h-8 rounded-full object-cover"  alt="logo">
-    <div class="leading-tight">
-        <h2 class="text-lg font-extrabold tracking-wide">SK 360°</h2>
-        <p class="text-[10px] opacity-80">Management System</p>
-    </div>
-</div>
-
-        @include('shared.sidebar-user-card')
-
-        <nav class="space-y-1 text-xs">
-            @foreach ($menuItems as $item)
-                @php $isActive = $item['link'] === $currentUrl; @endphp
-                <a href="{{ $item['link'] }}" class="flex items-center gap-2 p-2 rounded-lg {{ $isActive ? 'bg-red-500' : 'hover:bg-red-500 transition' }}">
-                    <span class="{{ $isActive ? 'bg-yellow-400 text-red-600' : 'bg-red-400' }} p-1 rounded text-sm">{!! $item['icon'] !!}</span>
-                    <span class="{{ $isActive ? 'text-yellow-300 font-semibold' : '' }} text-xs">{{ $item['label'] }}</span>
-                </a>
-            @endforeach
-        </nav>
-    </div>
+    @include('partials.app.sidebar')
 
     <div class="flex-1 flex flex-col">
-        @include('shared.topbar', ['legacyAccountMenu' => false])
+        @include('partials.app.topbar')
 
         <main class="flex-1 overflow-y-auto bg-gray-50 p-8">
             <div class="mb-6">
+                <span class="sk-eyebrow"><span class="sk-dot"></span>Chat</span>
                 <h1 class="text-3xl font-bold text-gray-900">Real-Time Chat</h1>
                 <p class="text-gray-500">Formal communication channel for SK federation</p>
             </div>
@@ -44,7 +25,7 @@
                 <div class="min-w-0 rounded-3xl border border-gray-100 bg-white shadow-sm lg:w-[320px]">
                     <div class="border-b border-gray-100 p-4">
                         <div class="relative">
-                            <span class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300">&#128269;</span>
+                            <span class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300"><span class="inline-flex align-[-3px]">@include('partials.ui.icon', ['icon' => 'search', 'iconSize' => 16])</span></span>
                             <input id="roomSearch" type="text" placeholder="Search users or groups..." class="w-full rounded-xl bg-gray-50 py-3 pl-10 pr-4 text-sm text-gray-700 outline-none ring-1 ring-transparent focus:ring-red-200">
                         </div>
                         <button id="createGroupBtn" type="button" class="mt-3 w-full rounded-xl bg-red-500 px-4 py-3 text-sm font-bold text-white transition hover:bg-red-600">
@@ -60,6 +41,10 @@
                             <h2 id="activeRoomName" class="text-lg font-black text-gray-900">No active conversation</h2>
                             <p id="activeRoomMeta" class="text-xs text-gray-400">Search for a user or create a group to start chatting</p>
                         </div>
+                        <div class="flex items-center gap-2 text-gray-400">
+                            <button type="button" class="rounded-lg border border-gray-200 px-2 py-1 text-xs"><span class="inline-flex align-[-3px]">@include('partials.ui.icon', ['icon' => 'video', 'iconSize' => 16])</span></button>
+                            <button type="button" class="rounded-lg border border-gray-200 px-2 py-1 text-xs"><span class="inline-flex align-[-3px]">@include('partials.ui.icon', ['icon' => 'phone', 'iconSize' => 16])</span></button>
+                        </div>
                     </div>
 
                     <div id="chatStatus" class="px-5 pt-4 text-xs text-gray-400">No conversation selected yet.</div>
@@ -68,7 +53,7 @@
 
                     <div class="border-t border-gray-100 p-4">
                         <form id="messageForm" class="flex items-center gap-3">
-                            <button type="button" class="rounded-lg border border-gray-200 px-3 py-2 text-gray-400">&#128206;</button>
+                            <button type="button" class="rounded-lg border border-gray-200 px-3 py-2 text-gray-400"><span class="inline-flex align-[-3px]">@include('partials.ui.icon', ['icon' => 'paperclip', 'iconSize' => 16])</span></button>
                             <input id="messageInput" type="text" placeholder="Type your message..." class="flex-1 rounded-xl bg-gray-50 px-4 py-3 text-sm text-gray-700 outline-none ring-1 ring-transparent focus:ring-red-200" disabled>
                             <button id="sendMessageBtn" type="submit" class="rounded-lg bg-red-500 px-4 py-3 text-white hover:bg-red-600 transition disabled:cursor-not-allowed disabled:opacity-50" disabled>&#10148;</button>
                         </form>
@@ -115,8 +100,6 @@
     };
     const groupMembers = @json($groupMembers ?? []);
 
-    let unsubscribeRooms = null;
-    window.addEventListener('pagehide', () => { unsubscribeRooms?.(); unsubscribeMessages?.(); });
     let rooms = [];
     let activeRoomId = null;
     let unsubscribeMessages = null;
@@ -200,10 +183,6 @@
         return `group_${memberIds.map(String).sort().join('_')}`;
     }
 
-    function escapeRoomText(value) {
-        return String(value).replace(/[&<>"']/g, char => ({'&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'}[char]));
-    }
-
     function renderRooms(filter = '') {
         const keyword = filter.trim().toLowerCase();
         const filteredRooms = rooms.filter((room) =>
@@ -229,11 +208,11 @@
             >
                 <div class="flex items-start gap-3">
                     <div class="flex h-10 w-10 items-center justify-center rounded-full ${room.id === activeRoomId ? 'bg-white/20 text-white' : room.color + ' text-white'} text-[10px] font-black">
-                        ${escapeRoomText(room.initials)}
+                        ${room.initials}
                     </div>
                     <div class="min-w-0">
-                        <div class="text-sm font-black ${room.id === activeRoomId ? 'text-white' : 'text-gray-800'}">${escapeRoomText(room.name)}</div>
-                        <div class="text-[11px] ${room.id === activeRoomId ? 'text-white/80' : 'text-gray-400'}">${escapeRoomText(room.subtitle)}</div>
+                        <div class="text-sm font-black ${room.id === activeRoomId ? 'text-white' : 'text-gray-800'}">${room.name}</div>
+                        <div class="text-[11px] ${room.id === activeRoomId ? 'text-white/80' : 'text-gray-400'}">${room.subtitle}</div>
                     </div>
                 </div>
             </button>
@@ -277,9 +256,9 @@
                     class="user-search-btn w-full rounded-2xl border border-gray-100 p-3 text-left transition hover:bg-gray-50"
                 >
                     <div class="flex items-start gap-3">
-                        ${user.profile_pic_url
-                            ? `<img src="${escapeRoomText(user.profile_pic_url)}" alt="${escapeRoomText(user.name)}" class="h-10 w-10 rounded-full object-cover">`
-                            : `<div class="flex h-10 w-10 items-center justify-center rounded-full bg-red-500 text-[10px] font-black text-white">${initials}</div>`}
+                        <div class="flex h-10 w-10 items-center justify-center rounded-full bg-red-500 text-[10px] font-black text-white">
+                            ${initials}
+                        </div>
                         <div class="min-w-0">
                             <div class="text-sm font-black text-gray-800">${user.name}</div>
                             <div class="text-[11px] text-gray-400">${roleLabel(user.role)}${user.barangay ? ' • ' + user.barangay : ''}</div>
@@ -410,7 +389,94 @@
         }
     }
 
-    @include('shared.chat-group-script')
+    async function ensureFederationGroupRoom() {
+        const memberMap = new Map(groupMembers.map((member) => [String(member.id), member]));
+        memberMap.set(String(currentUser.id), {
+            id: String(currentUser.id),
+            name: currentUser.name,
+            role: currentUser.role
+        });
+
+        const members = Array.from(memberMap.values());
+        const memberIds = members.map((member) => String(member.id));
+        const memberNames = members.map((member) => member.name);
+        const roomKey = makeGroupRoomKey(memberIds);
+        const existingRoomQuery = query(
+            collection(db, 'chat_rooms'),
+            where('roomKey', '==', roomKey),
+            limit(1)
+        );
+
+        const existingRoomSnapshot = await getDocs(existingRoomQuery);
+
+        if (!existingRoomSnapshot.empty) {
+            const doc = existingRoomSnapshot.docs[0];
+            return {
+                id: doc.id,
+                ...doc.data()
+            };
+        }
+
+        await addDoc(collection(db, 'chat_rooms'), {
+            name: 'SK Federation Group',
+            type: 'group',
+            groupKind: 'federation',
+            createdBy: String(currentUser.id),
+            createdAt: serverTimestamp(),
+            memberIds,
+            memberNames,
+            roomKey
+        });
+
+        const createdRoomSnapshot = await getDocs(existingRoomQuery);
+
+        if (createdRoomSnapshot.empty) {
+            throw new Error('Unable to create group room.');
+        }
+
+        const createdDoc = createdRoomSnapshot.docs[0];
+
+        return {
+            id: createdDoc.id,
+            ...createdDoc.data()
+        };
+    }
+
+    async function openFederationGroup() {
+        chatStatus.textContent = 'Creating group chat...';
+        createGroupBtn.disabled = true;
+
+        try {
+            const room = await ensureFederationGroupRoom();
+            const memberCount = Array.isArray(room.memberIds) ? room.memberIds.length : groupMembers.length;
+            const roomEntry = {
+                id: room.id,
+                name: room.name || 'SK Federation Group',
+                subtitle: `${memberCount} members`,
+                color: 'bg-red-500',
+                initials: initialsFor(room.name || 'SK Federation Group', 'SKG'),
+                createdAtSeconds: room.createdAt?.seconds || Date.now()
+            };
+
+            const existingIndex = rooms.findIndex((item) => item.id === room.id);
+
+            if (existingIndex === -1) {
+                rooms.unshift(roomEntry);
+            } else {
+                rooms[existingIndex] = roomEntry;
+            }
+
+            activeRoomId = room.id;
+            roomSearch.value = '';
+            renderRooms();
+            subscribeToMessages();
+        } catch (error) {
+            chatStatus.textContent = 'Unable to create group chat. Check Firestore permissions.';
+            console.error(error);
+        } finally {
+            createGroupBtn.disabled = false;
+        }
+    }
 
     async function loadRooms() {
         chatStatus.textContent = 'Loading rooms...';
@@ -418,11 +484,11 @@
         try {
             const roomsQuery = query(
                 collection(db, 'chat_rooms'),
-                where('memberIds', 'array-contains', String(currentUser.id))
-                // Listen to every room this account belongs to.
+                where('memberIds', 'array-contains', String(currentUser.id)),
+                limit(50)
             );
 
-            unsubscribeRooms = onSnapshot(roomsQuery, (snapshot) => {
+            const snapshot = await getDocs(roomsQuery);
 
             rooms = snapshot.docs.map((doc) => {
                 const data = doc.data();
@@ -450,20 +516,11 @@
             renderRooms();
 
             if (rooms.length > 0) {
-                if (!rooms.some(room => room.id === activeRoomId)) {
-                    activeRoomId = rooms[0].id;
-                    subscribeToMessages();
-                }
-                renderRooms(roomSearch.value);
-            } else {
-                activeRoomId = null;
+                activeRoomId = rooms[0].id;
                 subscribeToMessages();
+            } else {
                 resetEmptyState();
             }
-            }, (error) => {
-                chatStatus.textContent = 'Unable to update rooms. Please reload to reconnect.';
-                console.error(error);
-            });
         } catch (error) {
             chatStatus.textContent = 'Unable to load rooms. Check Firestore rules.';
             roomList.innerHTML = `<div class="rounded-2xl border border-red-100 bg-red-50 p-4 text-sm text-red-600">${error.message}</div>`;
