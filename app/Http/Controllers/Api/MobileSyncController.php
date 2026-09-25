@@ -282,8 +282,8 @@ class MobileSyncController extends Controller
             }
             $deliveryEmail = $value;
         } else {
-            if (! preg_match('/^[0-9+()\-\s]{7,30}$/', $value)) {
-                return response()->json(['message' => 'Enter a valid phone number.'], 422);
+            if (! preg_match('/^09\d{9}$/', $value)) {
+                return response()->json(['message' => 'Phone number must be 11 digits and start with 09.'], 422);
             }
             if ($value === (string) $user->phone_number) {
                 return response()->json(['message' => 'This is already your phone number.'], 422);
@@ -718,14 +718,6 @@ class MobileSyncController extends Controller
 
         $start = Carbon::parse($validated['start_datetime']);
         $end = Carbon::parse($validated['end_datetime']);
-        $conflict = DB::table('events')
-            ->where('event_id', '!=', $eventId)
-            ->where('start_datetime', '<', $end)
-            ->where('end_datetime', '>', $start)
-            ->exists();
-        if ($conflict) {
-            return response()->json(['message' => 'This schedule overlaps an existing event.'], 422);
-        }
 
         DB::table('events')->where('event_id', $eventId)->update([
             'title' => $validated['title'],
@@ -1298,6 +1290,15 @@ class MobileSyncController extends Controller
 
         if (! $slot) {
             return response()->json(['message' => 'That submission slot is no longer available.'], 422);
+        }
+
+        if ($validated['submission_type'] === 'budget_report'
+            && Schema::hasColumn('submission_slots', 'budget_period_type')
+            && filled($slot->budget_period_type)
+            && ($validated['report_type'] ?? null) !== $slot->budget_period_type) {
+            return response()->json([
+                'message' => 'Select the reporting period required by this budget slot.',
+            ], 422);
         }
 
         $now = now();
@@ -2583,8 +2584,10 @@ class MobileSyncController extends Controller
 
     protected function meetingUnavailable(Meeting $meeting): bool
     {
-        return $meeting->status === 'completed'
-            || ($meeting->scheduled_at && $meeting->scheduled_at->isPast());
+        // A scheduled meeting remains joinable after its start time until the
+        // President explicitly ends it. Checking scheduled_at here prevented
+        // participants from joining once the meeting actually began.
+        return $meeting->status === 'completed';
     }
 
     protected function decorateMobileMeeting(Meeting $meeting): Meeting
@@ -2793,7 +2796,30 @@ class MobileSyncController extends Controller
     // Ranking helpers: current leaderboard and past periods.
     protected function mobileRankings(): array
     {
-        return $this->mobileRankingRows($this->rankingsLeaderboard());
+        $rows = collect($this->mobileRankingRows($this->rankingsLeaderboard()));
+        if (Schema::hasTable('barangays')) {
+            $existing = $rows->pluck('barangay_id')->map(fn ($id) => (string) $id)->all();
+            $missing = DB::table('barangays')
+                ->orderBy('barangay_name')
+                ->get(['barangay_id', 'barangay_name'])
+                ->reject(fn ($barangay) => in_array((string) $barangay->barangay_id, $existing, true))
+                ->map(fn ($barangay) => [
+                    'barangay_id' => $barangay->barangay_id,
+                    'barangay_name' => $barangay->barangay_name,
+                    'rank' => null,
+                    'total_points' => 0,
+                    'timely_submission_points' => 0,
+                    'completeness_points' => 0,
+                    'participation_points' => 0,
+                    'on_time' => 0,
+                    'completion' => 0,
+                    'engagement' => 0,
+                    'trend' => '—',
+                ]);
+            $rows = $rows->concat($missing);
+        }
+
+        return $rows->values()->all();
     }
 
     protected function mobileRankingHistory(): array
