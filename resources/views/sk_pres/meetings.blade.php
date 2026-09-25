@@ -102,6 +102,53 @@
                         </div>
                     </div>
 
+                    <div class="rounded-[24px] border border-red-100 bg-red-50/40 p-5" data-sk-tone="red">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <h2 class="text-base font-semibold text-gray-900">Active Meetings</h2>
+                                <p class="text-xs text-gray-500">End an ongoing meeting when the session is finished</p>
+                            </div>
+                            <span class="rounded-full bg-red-100 px-3 py-1 text-xs font-semibold text-red-700">
+                                {{ $activeMeetings->count() }} active
+                            </span>
+                        </div>
+
+                        <div class="mt-4 space-y-3">
+                            @forelse ($activeMeetings as $meeting)
+                                <div class="rounded-2xl border border-red-100 bg-white p-4 shadow-sm">
+                                    <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                                        <div>
+                                            <p class="text-sm font-semibold text-gray-900">{{ $meeting->title }}</p>
+                                            <p class="mt-1 text-xs text-gray-500">{{ $meeting->preview_datetime }}</p>
+                                            <p class="mt-2 text-xs text-gray-400">{{ $meeting->agenda ?: 'No agenda provided yet.' }}</p>
+                                        </div>
+
+                                        <div class="flex flex-wrap gap-2">
+                                            <a href="{{ route('sk_pres.meetings.call', $meeting->meeting_id) }}"
+                                               class="inline-flex items-center rounded-xl bg-[#d90f1f] px-4 py-2 text-xs font-semibold text-white transition hover:bg-[#b90e1b]">
+                                                Join Meeting
+                                            </a>
+                                            @if ($meeting->can_finish)
+                                                <form action="{{ route('meetings.finish', $meeting->meeting_id) }}" method="POST">
+                                                    @csrf
+                                                    <button type="submit"
+                                                            onclick="return confirm('End this meeting and move it to Past Meetings?')"
+                                                            class="inline-flex items-center rounded-xl border border-red-200 bg-white px-4 py-2 text-xs font-semibold text-red-700 transition hover:bg-red-50">
+                                                        End Meeting
+                                                    </button>
+                                                </form>
+                                            @endif
+                                        </div>
+                                    </div>
+                                </div>
+                            @empty
+                                <div class="rounded-2xl border border-dashed border-red-200 bg-white px-6 py-6 text-center">
+                                    <p class="text-sm text-gray-500">No active meetings right now.</p>
+                                </div>
+                            @endforelse
+                        </div>
+                    </div>
+
                     <div class="rounded-[24px] border border-gray-100 bg-[#fbfbfd] p-5" data-sk-tone="gray">
                         <div class="flex items-center justify-between">
                             <div>

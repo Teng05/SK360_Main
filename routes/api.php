@@ -21,6 +21,8 @@ Route::prefix('mobile')->group(function(){
         Route::post('/wall/posts',[MobileSyncController::class,'storeWallPost'])->name('mobile.wall.posts.store');
         Route::patch('/wall/posts/{announcementId}',[MobileSyncController::class,'updateWallPost'])->name('mobile.wall.posts.update');
         Route::post('/wall/posts/{announcementId}/like',[MobileSyncController::class,'toggleWallLike'])->name('mobile.wall.posts.like');
+        Route::get('/wall/posts/{announcementId}/comments',[MobileSyncController::class,'wallPostComments'])->name('mobile.wall.posts.comments.index');
+        Route::post('/wall/posts/{announcementId}/comments',[MobileSyncController::class,'storeWallPostComment'])->name('mobile.wall.posts.comments.store');
 
         Route::post('/events',[MobileSyncController::class,'storeEvent'])->name('mobile.events.store');
         Route::patch('/events/{eventId}',[MobileSyncController::class,'updateEvent'])->name('mobile.events.update');

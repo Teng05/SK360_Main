@@ -617,6 +617,71 @@ class MobileSyncController extends Controller
         ]);
     }
 
+    public function wallPostComments(Request $request, int $announcementId): JsonResponse
+    {
+        if (! Schema::hasTable('announcement_feedback')) {
+            return response()->json(['comments' => [], 'total' => 0]);
+        }
+
+        $exists = DB::table('announcements')
+            ->where('announcement_id', $announcementId)
+            ->where('visibility', 'public')
+            ->exists();
+        if (! $exists) {
+            return response()->json(['message' => 'Post not found.'], 404);
+        }
+
+        $comments = DB::table('announcement_feedback as f')
+            ->leftJoin('users as u', 'f.user_id', '=', 'u.user_id')
+            ->leftJoin('barangays as b', 'u.barangay_id', '=', 'b.barangay_id')
+            ->where('f.announcement_id', $announcementId)
+            ->where('f.status', 'posted')
+            ->select('f.feedback_id', 'f.user_id', 'f.name', 'f.comment', 'f.created_at', 'u.role', 'b.barangay_name')
+            ->orderBy('f.created_at')
+            ->limit(100)
+            ->get()
+            ->map(fn ($row) => [
+                'comment_id' => $row->feedback_id,
+                'feedback_id' => $row->feedback_id,
+                'user_id' => $row->user_id,
+                'name' => trim((string) $row->name) ?: 'Anonymous',
+                'comment' => $row->comment,
+                'created_at' => $row->created_at,
+                'role' => $row->role,
+                'barangay_name' => $row->barangay_name,
+            ])->values();
+
+        return response()->json(['comments' => $comments, 'total' => $comments->count()]);
+    }
+
+    public function storeWallPostComment(Request $request, int $announcementId): JsonResponse
+    {
+        if (! Schema::hasTable('announcement_feedback')) {
+            return response()->json(['message' => 'Comments are not available.'], 404);
+        }
+        $exists = DB::table('announcements')
+            ->where('announcement_id', $announcementId)
+            ->where('visibility', 'public')
+            ->exists();
+        if (! $exists) {
+            return response()->json(['message' => 'Post not found.'], 404);
+        }
+        $validated = $request->validate(['comment' => ['required', 'string', 'max:1000']]);
+        $user = $request->user();
+        $name = trim(($user->first_name ?? '') . ' ' . ($user->last_name ?? '')) ?: 'SK Official';
+        $feedbackId = DB::table('announcement_feedback')->insertGetId([
+            'announcement_id' => $announcementId,
+            'user_id' => $user->user_id,
+            'name' => $name,
+            'email' => strtolower(trim((string) $user->email)),
+            'comment' => trim($validated['comment']),
+            'status' => 'posted',
+            'verified_at' => now(),
+            'created_at' => now(),
+        ], 'feedback_id');
+        return response()->json(['message' => 'Your comment has been posted.', 'comment_id' => $feedbackId], 201);
+    }
+
     // Allows officials to hide or restore public feedback.
     public function updateFeedback(Request $request, int $feedbackId): JsonResponse
     {

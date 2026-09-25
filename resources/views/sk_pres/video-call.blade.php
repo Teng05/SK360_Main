@@ -9,6 +9,8 @@
     <style>
         html, body { height: 100%; margin: 0; overflow: hidden; background: #111111; }
         .video-pane { background: #0f172a; border: 1px solid rgba(255, 255, 255, 0.06); }
+        #remote-grid { grid-auto-rows: minmax(180px, 1fr); }
+        #local-player { order: 99; min-height: 180px; }
     </style>
 @endsection
 
@@ -32,15 +34,12 @@
     </div>
 
     <div class="grid h-full w-full grid-cols-1 gap-3 p-6 pt-28 lg:grid-cols-[1fr_320px]">
-        <div class="grid min-h-0 grid-rows-[1fr_152px_auto] gap-3">
+        <div class="grid min-h-0 grid-rows-[1fr_auto] gap-3">
             <div id="remote-grid" class="grid min-h-0 grid-cols-1 gap-3 md:grid-cols-2">
                 <div id="remote-empty" class="video-pane flex min-h-[320px] items-center justify-center rounded-[24px] text-sm text-slate-400">
                     Waiting for other participants to join...
                 </div>
-            </div>
-
-            <div class="grid grid-cols-2 gap-3 md:grid-cols-4">
-                <div id="local-player" class="video-pane flex h-[140px] items-center justify-center rounded-[20px] text-sm text-slate-400">
+                <div id="local-player" class="video-pane flex min-h-[180px] items-center justify-center rounded-[20px] text-sm text-slate-400">
                     Joining local preview...
                 </div>
             </div>
@@ -100,6 +99,7 @@
     let localTracks=[];
     let participantSyncTimer=null;
     let joinedCall=false;
+    let recoveringCamera=false;
 
     const showStatus=(message)=>{
         statusText.textContent=message;
@@ -210,6 +210,37 @@
         }
     };
 
+    // Some browsers stop the camera track when the device briefly sleeps or reconnects.
+    // Recreate and publish the track so the call can recover without leaving the room.
+    const recoverCamera=async()=>{
+        if(recoveringCamera || !client || !joinedCall) return;
+
+        recoveringCamera=true;
+        setConnectionStatus('Restoring camera','bg-yellow-500/20 text-yellow-300');
+
+        try{
+            const oldTrack=localTracks[1];
+            if(oldTrack){
+                await client.unpublish(oldTrack).catch(()=>{});
+                oldTrack.close();
+            }
+
+            const newTrack=await AgoraRTC.createCameraVideoTrack();
+            localTracks[1]=newTrack;
+            newTrack.play('local-player');
+            await client.publish(newTrack);
+            toggleCamBtn.textContent='Turn Off Camera';
+            setConnectionStatus('Connected','bg-green-500/20 text-green-300');
+        }catch(error){
+            console.error('Camera recovery failed',error);
+            toggleCamBtn.textContent='Turn On Camera';
+            showStatus('Camera stopped. Please allow camera access and click Turn On Camera to retry.');
+            setConnectionStatus('Camera unavailable','bg-red-500/20 text-red-300');
+        }finally{
+            recoveringCamera=false;
+        }
+    };
+
     const joinMeeting=async()=>{
         try{
             setConnectionStatus('Fetching token','bg-yellow-500/20 text-yellow-300');
@@ -266,6 +297,7 @@
             await recordCallJoin();
 
             localTracks=await AgoraRTC.createMicrophoneAndCameraTracks();
+            localTracks[1].on('track-ended',recoverCamera);
             localTracks[1].play('local-player');
             await client.publish(localTracks);
 
