@@ -553,20 +553,25 @@ class MobileSyncController extends Controller
         }
 
         $validated = $request->validate([
-            'title' => ['required', 'string', 'max:255'],
+            'title' => ['nullable', 'string', 'max:255'],
             'post_content' => ['required', 'string', 'max:5000'],
-            'audience' => ['required', 'in:public,officials_only'],
-            'status' => ['required', 'in:draft,published'],
+            'audience' => ['nullable', 'in:public,officials_only'],
+            'visibility' => ['nullable', 'in:public,officials_only'],
+            'status' => ['nullable', 'in:draft,published'],
         ]);
 
         $changes = [
-            'title' => $validated['title'],
             'content' => $validated['post_content'],
-            'visibility' => $validated['audience'],
             'updated_at' => now(),
         ];
+        if (filled($validated['title'] ?? null)) {
+            $changes['title'] = $validated['title'];
+        }
+        $changes['visibility'] = $validated['audience']
+            ?? $validated['visibility']
+            ?? ($announcement->visibility ?? 'public');
         if (Schema::hasColumn('announcements', 'status')) {
-            $changes['status'] = $validated['status'];
+            $changes['status'] = $validated['status'] ?? ($announcement->status ?? 'published');
         }
 
         DB::table('announcements')->where('announcement_id', $announcementId)->update($changes);
@@ -1177,6 +1182,91 @@ class MobileSyncController extends Controller
         ], 201);
     }
 
+    public function storeChairmanAccount(Request $request): JsonResponse
+    {
+        $president = $request->user();
+        if ($president->role !== 'sk_president') {
+            return response()->json(['message' => 'Only the SK President can create a Chairman account.'], 403);
+        }
+
+        $currentTerm = $this->mobileCurrentTerm();
+        if (! $currentTerm) {
+            return response()->json(['message' => 'There is no active administration term.'], 422);
+        }
+
+        $validated = $request->validate([
+            'first_name' => ['required', 'string', 'max:100'],
+            'last_name' => ['required', 'string', 'max:100'],
+            'email' => ['required', 'email', 'max:100', 'unique:users,email'],
+            'phone' => ['nullable', 'string', 'max:20', 'unique:users,phone_number'],
+            'barangay_id' => ['required', 'integer', 'exists:barangays,barangay_id'],
+        ]);
+
+        $existing = DB::table('official_terms')
+            ->where('term_id', $currentTerm->term_id)
+            ->where('barangay_id', $validated['barangay_id'])
+            ->where('role', 'sk_chairman')
+            ->whereIn('status', ['pending', 'current'])
+            ->exists();
+        if ($existing) {
+            return response()->json(['message' => 'That barangay already has a current or pending SK Chairman.'], 422);
+        }
+
+        $token = Str::random(64);
+        $chairman = DB::transaction(function () use ($validated, $currentTerm, $token) {
+            $user = User::create([
+                'first_name' => trim($validated['first_name']),
+                'last_name' => trim($validated['last_name']),
+                'email' => strtolower($validated['email']),
+                'phone_number' => filled($validated['phone'] ?? null) ? trim($validated['phone']) : null,
+                'barangay_id' => $validated['barangay_id'],
+                'role' => 'sk_chairman',
+                'password' => Hash::make(Str::random(64)),
+                'is_verified' => 0,
+                'status' => 'inactive',
+                'term_start' => $currentTerm->start_year.'-01-01',
+                'term_end' => $currentTerm->end_year.'-12-31',
+                'archived_at' => null,
+            ]);
+
+            DB::table('official_terms')->insert([
+                'user_id' => $user->user_id,
+                'term_id' => $currentTerm->term_id,
+                'barangay_id' => $validated['barangay_id'],
+                'role' => 'sk_chairman',
+                'status' => 'pending',
+                'started_at' => null,
+                'completed_at' => null,
+            ]);
+
+            DB::table('password_reset_tokens')->updateOrInsert(
+                ['email' => $user->email],
+                ['token' => Hash::make($token), 'created_at' => now()]
+            );
+
+            return $user;
+        });
+
+        $setupLink = route('password.setup', ['token' => $token, 'email' => $chairman->email]);
+        try {
+            Mail::send('email.account-setup', ['user' => $chairman, 'setupLink' => $setupLink], function ($message) use ($chairman) {
+                $message->to($chairman->email, trim($chairman->first_name.' '.$chairman->last_name))
+                    ->subject('Set Up Your SK360 Account');
+            });
+        } catch (\Throwable $exception) {
+            \Log::error('Mobile Chairman setup email failed for '.$chairman->email.': '.$exception->getMessage());
+            return response()->json([
+                'message' => 'Chairman account created, but the setup email could not be sent. Use the web Leadership page to resend it.',
+                'chairman_created' => true,
+            ], 201);
+        }
+
+        return response()->json([
+            'message' => 'SK Chairman account created. A password setup link was sent to '.$chairman->email.'.',
+            'chairman_created' => true,
+        ], 201);
+    }
+
     // Report uploads, submission slots, and consolidation.
     public function storeOfficialSubmission(Request $request, RankingPointsService $points): JsonResponse
     {
@@ -1216,6 +1306,25 @@ class MobileSyncController extends Controller
             return response()->json(['message' => 'That submission slot is not active today.'], 422);
         }
 
+        $sourceType = $validated['submission_type'];
+        $reportTable = $sourceType === 'budget_report' ? 'budget_reports' : 'accomplishment_reports';
+        $reportIdColumn = $sourceType === 'budget_report' ? 'budget_report_id' : 'report_id';
+        $existingReport = DB::table($reportTable)
+            ->where('barangay_id', $user->barangay_id)
+            ->where('slot_id', $slot->slot_id)
+            ->first();
+        if ($existingReport && Schema::hasTable('submission_quality_reviews')) {
+            $review = DB::table('submission_quality_reviews')
+                ->where('source_type', $sourceType)
+                ->where('source_id', $existingReport->{$reportIdColumn})
+                ->first();
+            if ($review && strtolower((string) $review->status) === 'approved') {
+                return response()->json([
+                    'message' => 'This report has already been approved and can no longer be replaced.',
+                ], 422);
+            }
+        }
+
         $directoryName = $validated['submission_type'] === 'budget_report'
             ? 'budget_reports'
             : 'reports';
@@ -1247,6 +1356,23 @@ class MobileSyncController extends Controller
             $row = DB::table('accomplishment_reports')
                 ->where('report_id', $sourceId)
                 ->first();
+        }
+
+        if ($existingReport && Schema::hasTable('submission_quality_reviews')) {
+            DB::table('submission_quality_reviews')
+                ->where('source_type', $sourceType)
+                ->where('source_id', $sourceId)
+                ->where('status', 'needs_revision')
+                ->update([
+                    'reviewer_id' => null,
+                    'status' => 'pending',
+                    'complete_contents' => false,
+                    'correct_document' => false,
+                    'correct_period' => false,
+                    'remarks' => null,
+                    'reviewed_at' => null,
+                    'updated_at' => now(),
+                ]);
         }
 
         $isOnTime = $now->lessThanOrEqualTo(
@@ -1832,6 +1958,17 @@ class MobileSyncController extends Controller
 
         $query = $this->visibleReportQuery('accomplishment_reports', $user);
 
+        if (Schema::hasTable('submission_quality_reviews')) {
+            $query->leftJoin('submission_quality_reviews as qr', function ($join) {
+                $join->on('qr.source_id', '=', 'accomplishment_reports.report_id')
+                    ->where('qr.source_type', '=', 'accomplishment_report');
+            })->addSelect([
+                'qr.status as quality_status',
+                'qr.remarks as quality_remarks',
+                'qr.reviewed_at as quality_reviewed_at',
+            ]);
+        }
+
         $rows = $this->finish(
             $query,
             'accomplishment_reports',
@@ -1840,6 +1977,7 @@ class MobileSyncController extends Controller
         );
 
         return array_map(function ($row) {
+            $row->quality_status = $row->quality_status ?? 'pending';
             $row->uploaded_file_url = $this->publicUrl($row->uploaded_file_path ?? null);
             $row->generated_pdf_url = $this->publicUrl($row->generated_pdf_path ?? null);
             $row->mobile_view_url = $this->mobileDocumentViewUrl('accomplishment_report', (int) $row->report_id);
@@ -1856,6 +1994,17 @@ class MobileSyncController extends Controller
 
         $query = $this->visibleReportQuery('budget_reports', $user);
 
+        if (Schema::hasTable('submission_quality_reviews')) {
+            $query->leftJoin('submission_quality_reviews as qr', function ($join) {
+                $join->on('qr.source_id', '=', 'budget_reports.budget_report_id')
+                    ->where('qr.source_type', '=', 'budget_report');
+            })->addSelect([
+                'qr.status as quality_status',
+                'qr.remarks as quality_remarks',
+                'qr.reviewed_at as quality_reviewed_at',
+            ]);
+        }
+
         $rows = $this->finish(
             $query,
             'budget_reports',
@@ -1864,6 +2013,7 @@ class MobileSyncController extends Controller
         );
 
         return array_map(function ($row) {
+            $row->quality_status = $row->quality_status ?? 'pending';
             $row->uploaded_file_url = $this->publicUrl($row->uploaded_file_path ?? null);
             $row->generated_pdf_url = $this->publicUrl($row->generated_pdf_path ?? null);
 

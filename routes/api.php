@@ -36,6 +36,7 @@ Route::prefix('mobile')->group(function(){
         Route::post('/leadership/council',[MobileSyncController::class,'storeCouncilMember'])->name('mobile.leadership.council.store');
         Route::post('/leadership/council/{councilId}',[MobileSyncController::class,'updateCouncilMember'])->name('mobile.leadership.council.update');
         Route::post('/leadership/secretary',[MobileSyncController::class,'storeSecretaryAccount'])->middleware('throttle:3,10')->name('mobile.leadership.secretary.store');
+        Route::post('/leadership/chairman',[MobileSyncController::class,'storeChairmanAccount'])->middleware('throttle:3,10')->name('mobile.leadership.chairman.store');
 
         Route::post('/official-submissions',[MobileSyncController::class,'storeOfficialSubmission'])->name('mobile.official-submissions.store');
 
