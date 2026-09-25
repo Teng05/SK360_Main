@@ -1939,6 +1939,7 @@ class MobileSyncController extends Controller
     protected function visibleReportQuery(string $table, User $user): Builder
     {
         return DB::table($table)
+            ->select($table.'.*')
             ->where(function (Builder $query) use ($user, $table) {
                 $query->where($table.'.user_id', $user->user_id);
 
@@ -1980,7 +1981,10 @@ class MobileSyncController extends Controller
             $row->quality_status = $row->quality_status ?? 'pending';
             $row->uploaded_file_url = $this->publicUrl($row->uploaded_file_path ?? null);
             $row->generated_pdf_url = $this->publicUrl($row->generated_pdf_path ?? null);
-            $row->mobile_view_url = $this->mobileDocumentViewUrl('accomplishment_report', (int) $row->report_id);
+            $reportId = $row->report_id ?? $row->accomplishment_report_id ?? null;
+            $row->mobile_view_url = $reportId
+                ? $this->mobileDocumentViewUrl('accomplishment_report', (int) $reportId)
+                : null;
 
             return $row;
         }, $rows);
