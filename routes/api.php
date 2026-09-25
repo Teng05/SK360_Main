@@ -28,6 +28,8 @@ Route::prefix('mobile')->group(function(){
         Route::get('/chat/users',[MobileSyncController::class,'chatUsers'])->name('mobile.chat.users');
 
         Route::post('/leadership/council',[MobileSyncController::class,'storeCouncilMember'])->name('mobile.leadership.council.store');
+        Route::post('/leadership/council/{councilId}',[MobileSyncController::class,'updateCouncilMember'])->name('mobile.leadership.council.update');
+        Route::post('/leadership/secretary',[MobileSyncController::class,'storeSecretaryAccount'])->name('mobile.leadership.secretary.store');
 
         Route::post('/official-submissions',[MobileSyncController::class,'storeOfficialSubmission'])->name('mobile.official-submissions.store');
 
