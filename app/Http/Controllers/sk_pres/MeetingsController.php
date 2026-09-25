@@ -38,12 +38,13 @@ class MeetingsController extends Controller
                 })
             : collect();
 
+        $now=now();
         $upcomingMeetings=$meetings
             ->filter(
                 fn(Meeting $meeting)=>
                     $meeting->status==='scheduled'
                     &&
-                    $meeting->scheduled_at->isFuture()
+                    $meeting->scheduled_at->greaterThan($now->copy()->subHour())
             )
             ->sortBy(
                 fn(Meeting $meeting)=>
@@ -57,6 +58,7 @@ class MeetingsController extends Controller
                     $meeting->status==='scheduled'
                     &&
                     $meeting->scheduled_at->isPast()
+                    && $meeting->scheduled_at->greaterThan($now->copy()->subHour())
             )
             ->sortBy(
                 fn(Meeting $meeting)=>
@@ -68,6 +70,7 @@ class MeetingsController extends Controller
             ->filter(
                 fn(Meeting $meeting)=>
                     $meeting->status!=='scheduled'
+                    || $meeting->scheduled_at->lessThanOrEqualTo($now->copy()->subHour())
             )
             ->sortByDesc(
                 fn(Meeting $meeting)=>

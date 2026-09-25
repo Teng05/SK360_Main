@@ -1,7 +1,7 @@
 {{-- File guide: Blade view template for resources/views/sk_pres/meetings.blade.php. --}}
 @extends('layouts.app')
 
-@section('title', 'Meetings & Video Conference')
+@section('title', 'Meetings')
 
 @section('page_css')
     <script src="https://cdn.tailwindcss.com"></script>
@@ -29,7 +29,7 @@
                 <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                     <div>
                         <span class="sk-eyebrow"><span class="sk-dot"></span>Meetings</span>
-                        <h1 class="text-[32px] font-bold tracking-tight text-gray-900">Meetings & Video Conference</h1>
+                        <h1 class="text-[32px] font-bold tracking-tight text-gray-900">Meetings</h1>
                         <p class="mt-2 text-sm text-gray-500">Organize SK meetings and conduct virtual conferences</p>
                     </div>
 
@@ -54,7 +54,7 @@
                     <button id="scheduleTabBtn" type="button" class="tab-btn flex-1 rounded-full px-4 py-2 bg-white text-gray-900 shadow-sm">
                         Meeting Schedule
                     </button>
-                    <button id="conferenceTabBtn" type="button" class="tab-btn flex-1 rounded-full px-4 py-2">
+                    <button id="conferenceTabBtn" type="button" class="tab-btn hidden flex-1 rounded-full px-4 py-2">
                         Video Conference
                     </button>
                 </div>
@@ -136,7 +136,7 @@
                     </div>
                 </div>
 
-                <div id="conferenceTab" class="mt-8 hidden">
+                <div id="conferenceTab" class="mt-8 hidden" style="display:none">
                     <div class="grid gap-4 xl:grid-cols-[minmax(0,1fr)_240px]">
                         <div class="rounded-[24px] bg-[#1b2230] p-4 text-white shadow-inner">
                             <div class="flex items-center justify-between">
