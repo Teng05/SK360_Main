@@ -4,6 +4,8 @@ namespace App\Http\Controllers\public_portal;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
@@ -184,6 +186,12 @@ class BudgetController extends Controller
                     (float) ($item->total_amount ?? 0)
             );
 
+        $paginatedBudgetItems = $this->paginateCollection(
+            $budgetItems,
+            9,
+            'budget_page'
+        );
+
         return view(
             'public_portal.budgets',
             [
@@ -200,13 +208,33 @@ class BudgetController extends Controller
                     $selectedBarangay,
 
                 'budgetItems' =>
-                    $budgetItems,
+                    $paginatedBudgetItems,
 
                 'publishedCount' =>
                     $publishedCount,
 
                 'totalBudget' =>
                     $totalBudget,
+            ]
+        );
+    }
+
+    protected function paginateCollection(
+        Collection $items,
+        int $perPage = 9,
+        string $pageName = 'page'
+    ): LengthAwarePaginator {
+        $page = LengthAwarePaginator::resolveCurrentPage($pageName);
+
+        return new LengthAwarePaginator(
+            $items->forPage($page, $perPage)->values(),
+            $items->count(),
+            $perPage,
+            $page,
+            [
+                'path' => request()->url(),
+                'pageName' => $pageName,
+                'query' => request()->query(),
             ]
         );
     }

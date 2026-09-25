@@ -154,12 +154,25 @@
                                         <div class="min-w-0">
                                             <p class="text-sm font-semibold text-gray-900">{{ $meeting->title }}</p>
                                             <p class="mt-1 text-xs text-gray-500">{{ $meeting->preview_datetime }}</p>
+                                            @if($meeting->location_or_link)
+                                                <p class="mt-1 text-xs text-gray-500">{{ $meeting->location_or_link }}</p>
+                                            @endif
                                             <p class="mt-2 text-xs text-gray-400">{{ $meeting->agenda ?: 'No agenda provided yet.' }}</p>
                                         </div>
                                         <span class="inline-flex items-center rounded-full bg-blue-50 px-3 py-1 text-[11px] font-semibold text-blue-600">{{ $meeting->status_label }}</span>
                                     </div>
                                     <div class="mt-4">
                                         <span class="inline-flex items-center rounded-xl bg-gray-100 px-4 py-2 text-xs font-semibold text-gray-500">Available when meeting starts</span>
+                                        <button type="button"
+                                            class="editMeetingBtn ml-2 inline-flex items-center rounded-xl bg-red-50 px-4 py-2 text-xs font-semibold text-[#d90f1f] transition hover:bg-red-100"
+                                            data-action="{{ route('sk_pres.meetings.update',$meeting->meeting_id) }}"
+                                            data-title="{{ $meeting->title }}"
+                                            data-agenda="{{ $meeting->agenda }}"
+                                            data-location="{{ $meeting->location_or_link }}"
+                                            data-date="{{ $meeting->meeting_date }}"
+                                            data-time="{{ \Illuminate\Support\Str::of($meeting->meeting_time)->substr(0,5) }}">
+                                            Edit
+                                        </button>
                                     </div>
                                 </div>
                             @empty
@@ -186,6 +199,9 @@
                                         <div class="min-w-0">
                                             <p class="text-sm font-semibold text-gray-900">{{ $meeting->title }}</p>
                                             <p class="mt-1 text-xs text-gray-500">{{ $meeting->preview_datetime }}</p>
+                                            @if($meeting->location_or_link)
+                                                <p class="mt-1 text-xs text-gray-500">{{ $meeting->location_or_link }}</p>
+                                            @endif
                                             <p class="mt-2 text-xs text-gray-400">{{ $meeting->agenda ?: 'No agenda provided yet.' }}</p>
                                         </div>
                                         <span class="inline-flex items-center rounded-full bg-red-50 px-3 py-1 text-[11px] font-semibold text-red-600">{{ $meeting->status_label }}</span>
@@ -193,6 +209,16 @@
 
                                     <div class="mt-4 flex flex-wrap gap-2">
                                         <a href="{{ route('sk_pres.meetings.call',$meeting->meeting_id) }}" class="inline-flex items-center rounded-xl bg-[#d90f1f] px-4 py-2 text-xs font-semibold text-white transition hover:bg-[#b90e1b]">Join Video Call</a>
+                                        <button type="button"
+                                            class="editMeetingBtn inline-flex items-center rounded-xl bg-red-50 px-4 py-2 text-xs font-semibold text-[#d90f1f] transition hover:bg-red-100"
+                                            data-action="{{ route('sk_pres.meetings.update',$meeting->meeting_id) }}"
+                                            data-title="{{ $meeting->title }}"
+                                            data-agenda="{{ $meeting->agenda }}"
+                                            data-location="{{ $meeting->location_or_link }}"
+                                            data-date="{{ $meeting->meeting_date }}"
+                                            data-time="{{ \Illuminate\Support\Str::of($meeting->meeting_time)->substr(0,5) }}">
+                                            Edit Info
+                                        </button>
                                         <form method="POST" action="{{ route('sk_pres.meetings.finish',$meeting->meeting_id) }}" onsubmit="return confirm('Finish this meeting? Video-call attendance will stop accepting new participants and attendance can then be finalized.');">
                                             @csrf
                                             <button type="submit" class="inline-flex items-center rounded-xl bg-gray-900 px-4 py-2 text-xs font-semibold text-white transition hover:bg-gray-700">Finish Meeting</button>
@@ -224,6 +250,9 @@
                                         <div>
                                             <p class="text-sm font-semibold text-gray-900">{{ $meeting->title }}</p>
                                             <p class="mt-1 text-xs text-gray-500">{{ $meeting->preview_datetime }}</p>
+                                            @if($meeting->location_or_link)
+                                                <p class="mt-1 text-xs text-gray-500">{{ $meeting->location_or_link }}</p>
+                                            @endif
 
                                             @if($meeting->status==='completed' && $meeting->attendance_finalized)
                                                 <div class="mt-3 flex flex-wrap gap-2">
@@ -326,8 +355,8 @@
     <div class="w-full max-w-xl rounded-[28px] bg-white p-8 shadow-2xl">
         <div class="flex items-start justify-between gap-4">
             <div>
-                <h2 class="text-2xl font-bold text-gray-900">Schedule New Meeting</h2>
-                <p class="mt-2 text-sm text-gray-500">Create a meeting and invite participants</p>
+                <h2 id="meetingModalTitle" class="text-2xl font-bold text-gray-900">Schedule New Meeting</h2>
+                <p id="meetingModalDescription" class="mt-2 text-sm text-gray-500">Create a meeting and invite participants</p>
             </div>
 
             <button id="closeModalBtn" type="button" class="rounded-xl p-2 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600">
@@ -335,32 +364,38 @@
             </button>
         </div>
 
-        <form action="{{ route('sk_pres.meetings.store') }}" method="POST" class="mt-8 space-y-5">
+        <form id="meetingForm" action="{{ route('sk_pres.meetings.store') }}" method="POST" class="mt-8 space-y-5">
             @csrf
+            <input id="meetingFormMethod" type="hidden" name="_method" value="PUT" disabled>
 
             <div>
                 <label class="mb-2 block text-sm font-semibold text-gray-800">Meeting Title</label>
-                <input type="text" name="title" value="{{ old('title') }}" class="h-12 w-full rounded-xl border border-red-100 bg-[#fff7f7] px-4 text-sm text-gray-700 outline-none transition focus:border-[#d90f1f] focus:bg-white" required>
+                <input id="meetingTitle" type="text" name="title" value="{{ old('title') }}" class="h-12 w-full rounded-xl border border-red-100 bg-[#fff7f7] px-4 text-sm text-gray-700 outline-none transition focus:border-[#d90f1f] focus:bg-white" required>
             </div>
 
             <div>
                 <label class="mb-2 block text-sm font-semibold text-gray-800">Agenda</label>
-                <textarea name="agenda" rows="4" class="w-full rounded-xl border border-red-100 bg-[#fff7f7] px-4 py-3 text-sm text-gray-700 outline-none transition focus:border-[#d90f1f] focus:bg-white">{{ old('agenda') }}</textarea>
+                <textarea id="meetingAgenda" name="agenda" rows="4" class="w-full rounded-xl border border-red-100 bg-[#fff7f7] px-4 py-3 text-sm text-gray-700 outline-none transition focus:border-[#d90f1f] focus:bg-white">{{ old('agenda') }}</textarea>
+            </div>
+
+            <div>
+                <label class="mb-2 block text-sm font-semibold text-gray-800">Conference Location or Link</label>
+                <input id="meetingLocation" type="text" name="location_or_link" value="{{ old('location_or_link') }}" class="h-12 w-full rounded-xl border border-red-100 bg-[#fff7f7] px-4 text-sm text-gray-700 outline-none transition focus:border-[#d90f1f] focus:bg-white" placeholder="Room, venue, or conference link">
             </div>
 
             <div class="grid grid-cols-1 gap-5 md:grid-cols-2">
                 <div>
                     <label class="mb-2 block text-sm font-semibold text-gray-800">Date</label>
-                    <input type="date" name="meeting_date" value="{{ old('meeting_date') }}" class="h-12 w-full rounded-xl border border-red-100 bg-[#fff7f7] px-4 text-sm text-gray-700 outline-none transition focus:border-[#d90f1f] focus:bg-white" required>
+                    <input id="meetingDate" type="date" name="meeting_date" value="{{ old('meeting_date') }}" class="h-12 w-full rounded-xl border border-red-100 bg-[#fff7f7] px-4 text-sm text-gray-700 outline-none transition focus:border-[#d90f1f] focus:bg-white" required>
                 </div>
 
                 <div>
                     <label class="mb-2 block text-sm font-semibold text-gray-800">Time</label>
-                    <input type="time" name="meeting_time" value="{{ old('meeting_time') }}" class="h-12 w-full rounded-xl border border-red-100 bg-[#fff7f7] px-4 text-sm text-gray-700 outline-none transition focus:border-[#d90f1f] focus:bg-white" required>
+                    <input id="meetingTime" type="time" name="meeting_time" value="{{ old('meeting_time') }}" class="h-12 w-full rounded-xl border border-red-100 bg-[#fff7f7] px-4 text-sm text-gray-700 outline-none transition focus:border-[#d90f1f] focus:bg-white" required>
                 </div>
             </div>
 
-            <button type="submit" class="w-full rounded-xl bg-[#d90f1f] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#b90e1b]">
+            <button id="meetingSubmitButton" type="submit" class="w-full rounded-xl bg-[#d90f1f] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#b90e1b]">
                 Add Event
             </button>
         </form>
@@ -422,6 +457,16 @@
     const openModalBtn = document.getElementById('openModalBtn');
     const closeModalBtn = document.getElementById('closeModalBtn');
     const scheduleModal = document.getElementById('scheduleModal');
+    const meetingForm = document.getElementById('meetingForm');
+    const meetingFormMethod = document.getElementById('meetingFormMethod');
+    const meetingModalTitle = document.getElementById('meetingModalTitle');
+    const meetingModalDescription = document.getElementById('meetingModalDescription');
+    const meetingTitle = document.getElementById('meetingTitle');
+    const meetingAgenda = document.getElementById('meetingAgenda');
+    const meetingLocation = document.getElementById('meetingLocation');
+    const meetingDate = document.getElementById('meetingDate');
+    const meetingTime = document.getElementById('meetingTime');
+    const meetingSubmitButton = document.getElementById('meetingSubmitButton');
     const scheduleTabBtn = document.getElementById('scheduleTabBtn');
     const conferenceTabBtn = document.getElementById('conferenceTabBtn');
     const scheduleTab = document.getElementById('scheduleTab');
@@ -432,6 +477,7 @@
     const closeAttendanceModalBtn = document.getElementById('closeAttendanceModalBtn');
     const cancelAttendanceBtn = document.getElementById('cancelAttendanceBtn');
     const selectAllAttendance = document.getElementById('selectAllAttendance');
+    const createMeetingUrl = @js(route('sk_pres.meetings.store'));
 
     const attendanceCheckboxes=()=>Array.from(
         attendanceForm.querySelectorAll('input[name="present_barangays[]"]')
@@ -515,13 +561,42 @@
         scheduleModal.classList.remove('flex');
     };
 
-    openModalBtn.addEventListener('click', openScheduleModal);
+    const openCreateMeetingModal = () => {
+        meetingForm.reset();
+        meetingForm.action = createMeetingUrl;
+        meetingFormMethod.disabled = true;
+        meetingModalTitle.textContent = 'Schedule New Meeting';
+        meetingModalDescription.textContent = 'Create a meeting and invite participants';
+        meetingSubmitButton.textContent = 'Add Event';
+        openScheduleModal();
+    };
+
+    const openEditMeetingModal = (button) => {
+        meetingForm.reset();
+        meetingForm.action = button.dataset.action;
+        meetingFormMethod.disabled = false;
+        meetingModalTitle.textContent = 'Edit Meeting Information';
+        meetingModalDescription.textContent = 'Update valid conference information for this meeting.';
+        meetingSubmitButton.textContent = 'Save Changes';
+        meetingTitle.value = button.dataset.title || '';
+        meetingAgenda.value = button.dataset.agenda || '';
+        meetingLocation.value = button.dataset.location || '';
+        meetingDate.value = button.dataset.date || '';
+        meetingTime.value = button.dataset.time || '';
+        openScheduleModal();
+    };
+
+    openModalBtn.addEventListener('click', openCreateMeetingModal);
     closeModalBtn.addEventListener('click', closeScheduleModal);
 
     scheduleModal.addEventListener('click', (e) => {
         if (e.target === scheduleModal) {
             closeScheduleModal();
         }
+    });
+
+    document.querySelectorAll('.editMeetingBtn').forEach((button)=>{
+        button.addEventListener('click',()=>openEditMeetingModal(button));
     });
 
     const openAttendanceModal=(button)=>{
@@ -560,4 +635,3 @@
     @endif
 </script>
 @endpush
-

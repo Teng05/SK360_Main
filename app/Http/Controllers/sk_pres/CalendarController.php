@@ -111,6 +111,13 @@ class CalendarController extends Controller
                         'deadline'=>'bg-red-600',
                         default=>'bg-fuchsia-500',
                     },
+                    'extendedProps'=>[
+                        'editable'=>true,
+                        'event_type'=>$event->event_type,
+                        'description'=>$event->description,
+                        'location'=>$event->location,
+                        'visibility'=>$event->visibility,
+                    ],
                 ];
             })
             ->merge(
@@ -120,6 +127,9 @@ class CalendarController extends Controller
                         'title'=>$slot->title,
                         'start'=>$slot->start_date,
                         'end'=>$slot->end_date,
+                        'extendedProps'=>[
+                            'editable'=>false,
+                        ],
                         'className'=>
                             $slot->submission_type==='budget_report'
                                 ? 'bg-amber-500'
@@ -243,6 +253,47 @@ class CalendarController extends Controller
             );
     }
 
+    public function update(Request $request,int $eventId): RedirectResponse
+    {
+        abort_unless(auth()->check() && auth()->user()->role === 'sk_president',403);
+
+        $currentTermId=$this->currentTermId();
+
+        if(!$currentTermId){
+            return back()->with(
+                'warning',
+                'There is no active administration term.'
+            );
+        }
+
+        $event=DB::table('events')
+            ->where('event_id',$eventId)
+            ->where('term_id',$currentTermId)
+            ->first();
+
+        if(!$event){
+            return back()->with(
+                'warning',
+                'Event was not found in the current administration.'
+            );
+        }
+
+        $validated=$this->validateEvent($request);
+        $eventData=$this->eventData($validated);
+
+        DB::table('events')
+            ->where('event_id',$eventId)
+            ->where('term_id',$currentTermId)
+            ->update([
+                ...$eventData,
+                'updated_at'=>now(),
+            ]);
+
+        return redirect()
+            ->route('sk_pres.calendar')
+            ->with('status','Event updated successfully.');
+    }
+
     protected function validateEvent(Request $request): array
     {
         return $request->validate([
@@ -258,6 +309,11 @@ class CalendarController extends Controller
             'description'=>[
                 'nullable',
                 'string',
+            ],
+            'location'=>[
+                'nullable',
+                'string',
+                'max:255',
             ],
             'start_datetime'=>[
                 'required',
@@ -279,28 +335,13 @@ class CalendarController extends Controller
         array $validated,
         int $termId
     ): object {
-        $start=
-            $validated['start_datetime'].
-            ' 00:00:00';
-
-        $end=
-            (
-                $validated['end_datetime']
-                ??
-                $validated['start_datetime']
-            ).
-            ' 23:59:59';
+        $eventData=$this->eventData($validated);
 
         $eventId=DB::table('events')
             ->insertGetId([
                 'term_id'=>$termId,
                 'created_by'=>auth()->user()->user_id,
-                'title'=>$validated['event_title'],
-                'description'=>$validated['description'] ?? null,
-                'event_type'=>$validated['event_type'],
-                'start_datetime'=>$start,
-                'end_datetime'=>$end,
-                'visibility'=>$validated['visibility'],
+                ...$eventData,
                 'created_at'=>now(),
             ],'event_id');
 
@@ -309,7 +350,25 @@ class CalendarController extends Controller
             'term_id'=>$termId,
             'title'=>$validated['event_title'],
             'visibility'=>$validated['visibility'],
-            'start_datetime'=>Carbon::parse($start),
+            'start_datetime'=>Carbon::parse($eventData['start_datetime']),
+        ];
+    }
+
+    protected function eventData(array $validated): array
+    {
+        $start=Carbon::parse($validated['start_datetime']);
+        $end=isset($validated['end_datetime']) && filled($validated['end_datetime'])
+            ? Carbon::parse($validated['end_datetime'])
+            : $start->copy()->addHour();
+
+        return [
+            'title'=>$validated['event_title'],
+            'description'=>$validated['description'] ?? null,
+            'location'=>$validated['location'] ?? null,
+            'event_type'=>$validated['event_type'],
+            'start_datetime'=>$start,
+            'end_datetime'=>$end,
+            'visibility'=>$validated['visibility'],
         ];
     }
 

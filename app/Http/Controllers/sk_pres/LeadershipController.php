@@ -4,13 +4,15 @@ namespace App\Http\Controllers\sk_pres;
 
 use App\Http\Controllers\Controller;
 use App\Models\Barangay;
+use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
 class LeadershipController extends Controller
 {
-    public function index(): View
+    public function index(Request $request): View
     {
         abort_unless(auth()->check() && auth()->user()->role === 'sk_president',403);
 
@@ -22,7 +24,7 @@ class LeadershipController extends Controller
             ->orderBy('barangay_name')
             ->get(['barangay_id','barangay_name']);
 
-        $selectedBarangayId=(int)request('barangay_id',0);
+        $selectedBarangayId=(int)$request->query('barangay_id',0);
 
         if($selectedBarangayId > 0 && !$barangays->contains('barangay_id',$selectedBarangayId)){
             $selectedBarangayId=0;
@@ -71,6 +73,12 @@ class LeadershipController extends Controller
             ],
         ];
 
+        $paginatedLeadershipGroups=$this->paginateCollection(
+            $leadershipGroups,
+            5,
+            'leadership_page'
+        );
+
         return view('sk_pres.leadership',[
             'fullName'=>$fullName,
             'menuItems'=>$this->menuItems(),
@@ -79,9 +87,34 @@ class LeadershipController extends Controller
             'selectedBarangayId'=>$selectedBarangayId,
             'currentAdministration'=>$currentAdministration,
             'federationPresidents'=>$federationPresidents,
-            'leadershipGroups'=>$leadershipGroups,
+            'leadershipGroups'=>$paginatedLeadershipGroups,
             'stats'=>$stats,
         ]);
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | PAGINATION
+    |--------------------------------------------------------------------------
+    */
+    protected function paginateCollection(
+        Collection $items,
+        int $perPage=5,
+        string $pageName='page'
+    ): LengthAwarePaginator {
+        $page=LengthAwarePaginator::resolveCurrentPage($pageName);
+
+        return new LengthAwarePaginator(
+            $items->forPage($page,$perPage)->values(),
+            $items->count(),
+            $perPage,
+            $page,
+            [
+                'path'=>request()->url(),
+                'pageName'=>$pageName,
+                'query'=>request()->query(),
+            ]
+        );
     }
 
     /*

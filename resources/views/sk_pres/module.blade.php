@@ -136,16 +136,17 @@
                         &times;
                     </button>
 
-                    <h2 class="text-4xl font-bold text-gray-900 mb-2">
+                    <h2 id="slotModalTitle" class="text-4xl font-bold text-gray-900 mb-2">
                         Create New Submission Slot
                     </h2>
 
-                    <p class="text-gray-600 mb-8 text-base">
+                    <p id="slotModalDescription" class="text-gray-600 mb-8 text-base">
                         Set up a new submission period for SK officials to submit reports
                     </p>
 
                     <form id="slotForm" action="{{ route('sk_pres.module.store') }}" method="POST" class="space-y-6">
                         @csrf
+                        <input type="hidden" id="slotFormMethod" name="_method" value="PUT" disabled>
 
                         <div>
                             <label class="block text-lg font-semibold text-gray-900 mb-2">
@@ -423,7 +424,7 @@
                             </div>
                         </div>
 
-                        <button type="submit"
+                        <button id="slotSubmitButton" type="submit"
                             class="w-full bg-red-600 hover:bg-red-700 text-white text-2xl font-bold py-4 rounded-2xl transition">
                             Create Slot
                         </button>
@@ -664,6 +665,26 @@
                                                 </span>
 
                                                 <div class="flex flex-wrap gap-2">
+                                                    <button type="button"
+                                                        class="edit-slot-btn inline-flex items-center justify-center gap-2 rounded-xl border border-blue-200 bg-blue-50 hover:bg-blue-100 px-4 py-2.5 text-xs font-bold text-blue-600 transition"
+                                                        data-update-url="{{ route('sk_pres.module.update',$slot->slot_id) }}"
+                                                        data-submission-type="{{ $slot->submission_type }}"
+                                                        data-accomplishment-category="{{ $slot->accomplishment_category }}"
+                                                        data-ydp-program-type="{{ $slot->ydp_program_type }}"
+                                                        data-budget-category="{{ $slot->budget_category }}"
+                                                        data-fiscal-year="{{ $slot->fiscal_year }}"
+                                                        data-budget-period-type="{{ $slot->budget_period_type }}"
+                                                        data-fiscal-month="{{ $slot->fiscal_month }}"
+                                                        data-fiscal-quarter="{{ $slot->fiscal_quarter }}"
+                                                        data-fiscal-half="{{ $slot->fiscal_half }}"
+                                                        data-title="{{ $slot->title }}"
+                                                        data-description="{{ $slot->description }}"
+                                                        data-role="{{ $slot->role }}"
+                                                        data-start-date="{{ $slot->start_date }}"
+                                                        data-end-date="{{ $slot->end_date }}">
+                                                        ✎ Edit
+                                                    </button>
+
                                                     @if($slot->status === 'open')
                                                         <button type="button"
                                                             onclick="closeSlot({{ $slot->slot_id }},@js($slot->title))"
@@ -722,6 +743,11 @@
     const openModalBtn=document.getElementById('openModalBtn');
     const closeModalBtn=document.getElementById('closeModalBtn');
     const submissionModal=document.getElementById('submissionModal');
+    const slotForm=document.getElementById('slotForm');
+    const slotFormMethod=document.getElementById('slotFormMethod');
+    const slotModalTitle=document.getElementById('slotModalTitle');
+    const slotModalDescription=document.getElementById('slotModalDescription');
+    const slotSubmitButton=document.getElementById('slotSubmitButton');
     const submissionType=document.getElementById('submissionType');
     const accomplishmentDetails=document.getElementById('accomplishmentDetails');
     const accomplishmentCategory=document.getElementById('accomplishmentCategory');
@@ -738,6 +764,12 @@
     const fiscalMonth=document.getElementById('fiscalMonth');
     const fiscalQuarter=document.getElementById('fiscalQuarter');
     const fiscalHalf=document.getElementById('fiscalHalf');
+    const submissionTitle=document.getElementById('submissionTitle');
+    const submissionDescription=document.getElementById('submissionDescription');
+    const submissionRole=document.getElementById('submissionRole');
+    const startDate=document.getElementById('startDate');
+    const endDate=document.getElementById('endDate');
+    const createSlotUrl=@js(route('sk_pres.module.store'));
 
     function syncAccomplishmentFields(){
         const isAccomplishment=submissionType.value==='accomplishment_report';
@@ -797,22 +829,81 @@
         }
     });
 
-    openModalBtn.addEventListener('click',function(){
+    function openSlotModal(){
         submissionModal.classList.remove('hidden');
         submissionModal.classList.add('flex');
         syncSlotFields();
-    });
+    }
 
-    closeModalBtn.addEventListener('click',function(){
+    function closeSlotModal(){
         submissionModal.classList.add('hidden');
         submissionModal.classList.remove('flex');
+    }
+
+    function openCreateSlotModal(){
+        slotForm.reset();
+        slotForm.action=createSlotUrl;
+        slotFormMethod.disabled=true;
+        slotModalTitle.textContent='Create New Submission Slot';
+        slotModalDescription.textContent='Set up a new submission period for SK officials to submit reports';
+        slotSubmitButton.textContent='Create Slot';
+        fiscalYear.value=new Date().getFullYear();
+        submissionType.value='accomplishment_report';
+        accomplishmentCategory.value='general';
+        budgetCategory.value='';
+        budgetPeriodType.value='';
+        fiscalMonth.value='';
+        fiscalQuarter.value='';
+        fiscalHalf.value='';
+        openSlotModal();
+    }
+
+    function setFieldValue(field,value){
+        field.value=value || '';
+    }
+
+    function openEditSlotModal(button){
+        slotForm.reset();
+        slotForm.action=button.dataset.updateUrl;
+        slotFormMethod.disabled=false;
+        slotModalTitle.textContent='Edit Submission Slot';
+        slotModalDescription.textContent='Update this submission slot without changing its current status.';
+        slotSubmitButton.textContent='Save Changes';
+
+        setFieldValue(submissionType,button.dataset.submissionType);
+        setFieldValue(accomplishmentCategory,button.dataset.accomplishmentCategory || 'general');
+        setFieldValue(ydpProgramType,button.dataset.ydpProgramType);
+        setFieldValue(budgetCategory,button.dataset.budgetCategory);
+        setFieldValue(fiscalYear,button.dataset.fiscalYear);
+        setFieldValue(budgetPeriodType,button.dataset.budgetPeriodType);
+        setFieldValue(fiscalMonth,button.dataset.fiscalMonth);
+        setFieldValue(fiscalQuarter,button.dataset.fiscalQuarter);
+        setFieldValue(fiscalHalf,button.dataset.fiscalHalf);
+        setFieldValue(submissionTitle,button.dataset.title);
+        setFieldValue(submissionDescription,button.dataset.description);
+        setFieldValue(submissionRole,button.dataset.role);
+        setFieldValue(startDate,button.dataset.startDate);
+        setFieldValue(endDate,button.dataset.endDate);
+
+        openSlotModal();
+    }
+
+    openModalBtn.addEventListener('click',openCreateSlotModal);
+
+    closeModalBtn.addEventListener('click',function(){
+        closeSlotModal();
     });
 
     submissionModal.addEventListener('click',function(e){
         if(e.target===submissionModal){
-            submissionModal.classList.add('hidden');
-            submissionModal.classList.remove('flex');
+            closeSlotModal();
         }
+    });
+
+    document.querySelectorAll('.edit-slot-btn').forEach(button=>{
+        button.addEventListener('click',()=>{
+            openEditSlotModal(button);
+        });
     });
 
     submissionType.addEventListener('change',syncSlotFields);

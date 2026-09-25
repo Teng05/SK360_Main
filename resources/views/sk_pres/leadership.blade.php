@@ -383,6 +383,28 @@
             </div>
 
             <!-- Barangay Groups -->
+            <div class="mb-4 flex flex-col gap-2 rounded-2xl border border-gray-100 bg-white px-5 py-4 shadow-sm md:flex-row md:items-center md:justify-between">
+                <div>
+                    <p class="text-[10px] font-black uppercase tracking-widest text-gray-400">
+                        Barangay Leadership Directory
+                    </p>
+
+                    <p class="text-xs text-gray-500 mt-1">
+                        Showing
+                        <strong>{{ $leadershipGroups->firstItem() ?? 0 }}</strong>
+                        to
+                        <strong>{{ $leadershipGroups->lastItem() ?? 0 }}</strong>
+                        of
+                        <strong>{{ $leadershipGroups->total() }}</strong>
+                        barangay{{ $leadershipGroups->total() === 1 ? '' : 's' }}
+                    </p>
+                </div>
+
+                <p class="text-[10px] text-gray-400">
+                    Use search to filter records on the current page.
+                </p>
+            </div>
+
             <div id="leadershipGroups"
                 class="space-y-4">
 
@@ -681,6 +703,12 @@
 
                 @endforelse
             </div>
+
+            @if($leadershipGroups->hasPages())
+                <div class="mt-6">
+                    {{ $leadershipGroups->links() }}
+                </div>
+            @endif
 
             <!-- No Search Results -->
             <div id="leadershipNoResults"

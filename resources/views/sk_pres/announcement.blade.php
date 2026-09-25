@@ -360,6 +360,16 @@
                                             Views
                                         </span>
                                     </div>
+                                    <button type="button"
+                                            class="edit-announcement-btn ml-auto flex items-center gap-1 text-red-600 hover:text-red-700 transition"
+                                            data-update-url="{{ route('sk_pres.announcements.update',$announcement->announcement_id) }}"
+                                            data-title="{{ $announcement->title }}"
+                                            data-content="{{ $announcement->content }}"
+                                            data-visibility="{{ $announcement->visibility }}">
+
+                                        <span>?</span>
+                                        <span>Edit</span>
+                                    </button>
                                 </div>
                             </div>
                         </article>
@@ -498,6 +508,98 @@
     </div>
 </div>
 
+{{-- EDIT ANNOUNCEMENT MODAL --}}
+<div id="editAnnouncementModal"
+     class="fixed inset-0 bg-black/50 backdrop-blur-sm hidden items-center justify-center z-[105] px-4">
+
+    <div class="bg-white w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden">
+        <div class="bg-red-600 px-7 py-6 text-white flex items-start justify-between gap-4">
+            <div>
+                <p class="text-[10px] font-black uppercase tracking-widest text-red-100">
+                    SK Federation
+                </p>
+
+                <h2 class="text-2xl font-black mt-1">
+                    Edit Announcement
+                </h2>
+
+                <p class="text-sm text-red-100 mt-1">
+                    Update the official announcement details.
+                </p>
+            </div>
+
+            <button id="closeEditAnnouncementModalBtn"
+                    type="button"
+                    class="w-9 h-9 rounded-full bg-red-500 hover:bg-red-400 transition text-xl font-black">
+
+                ×
+            </button>
+        </div>
+
+        <form id="editAnnouncementForm"
+              method="POST"
+              action="#"
+              class="p-7 space-y-5">
+
+            @csrf
+            @method('PUT')
+
+            <div>
+                <label class="block text-[10px] font-black uppercase tracking-widest text-gray-500 mb-2">
+                    Announcement Title
+                </label>
+
+                <input id="editAnnouncementTitle"
+                       type="text"
+                       name="title"
+                       maxlength="255"
+                       required
+                       class="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-red-200">
+            </div>
+
+            <div>
+                <label class="block text-[10px] font-black uppercase tracking-widest text-gray-500 mb-2">
+                    Content
+                </label>
+
+                <textarea id="editAnnouncementContent"
+                          name="content"
+                          rows="6"
+                          required
+                          class="w-full resize-none rounded-xl border border-gray-200 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-red-200"></textarea>
+            </div>
+
+            <div>
+                <label class="block text-[10px] font-black uppercase tracking-widest text-gray-500 mb-2">
+                    Visibility
+                </label>
+
+                <select id="editAnnouncementVisibility"
+                        name="visibility"
+                        class="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-red-200">
+
+                    <option value="public">Public</option>
+                    <option value="officials_only">Officials Only</option>
+                </select>
+            </div>
+
+            <div class="flex justify-end gap-3 pt-2">
+                <button id="cancelEditAnnouncementBtn"
+                        type="button"
+                        class="border border-gray-200 bg-white hover:bg-gray-50 text-gray-600 px-5 py-3 rounded-xl text-sm font-black">
+
+                    Cancel
+                </button>
+
+                <button type="submit"
+                        class="bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-xl text-sm font-black shadow-sm">
+
+                    Save Changes
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
 {{-- COMMENTS MODAL --}}
 <div id="commentModal"
      class="hidden fixed inset-0 bg-black/50 backdrop-blur-sm z-[110] items-center justify-center p-4">
@@ -603,6 +705,27 @@
     const announcementModal=
         document.getElementById('announcementModal');
 
+    const editAnnouncementModal=
+        document.getElementById('editAnnouncementModal');
+
+    const closeEditAnnouncementModalBtn=
+        document.getElementById('closeEditAnnouncementModalBtn');
+
+    const cancelEditAnnouncementBtn=
+        document.getElementById('cancelEditAnnouncementBtn');
+
+    const editAnnouncementForm=
+        document.getElementById('editAnnouncementForm');
+
+    const editAnnouncementTitle=
+        document.getElementById('editAnnouncementTitle');
+
+    const editAnnouncementContent=
+        document.getElementById('editAnnouncementContent');
+
+    const editAnnouncementVisibility=
+        document.getElementById('editAnnouncementVisibility');
+
     const commentModal=
         document.getElementById('commentModal');
 
@@ -688,6 +811,43 @@
     announcementModal.addEventListener('click',event=>{
         if(event.target===announcementModal){
             closeAnnouncementModal();
+        }
+    });
+
+    function openEditAnnouncementModal(button){
+        editAnnouncementForm.action=button.dataset.updateUrl;
+        editAnnouncementTitle.value=button.dataset.title || '';
+        editAnnouncementContent.value=button.dataset.content || '';
+        editAnnouncementVisibility.value=button.dataset.visibility || 'public';
+
+        editAnnouncementModal.classList.remove('hidden');
+        editAnnouncementModal.classList.add('flex');
+    }
+
+    function closeEditAnnouncementModal(){
+        editAnnouncementModal.classList.add('hidden');
+        editAnnouncementModal.classList.remove('flex');
+    }
+
+    document.querySelectorAll('.edit-announcement-btn').forEach(button=>{
+        button.addEventListener('click',()=>{
+            openEditAnnouncementModal(button);
+        });
+    });
+
+    closeEditAnnouncementModalBtn.addEventListener(
+        'click',
+        closeEditAnnouncementModal
+    );
+
+    cancelEditAnnouncementBtn.addEventListener(
+        'click',
+        closeEditAnnouncementModal
+    );
+
+    editAnnouncementModal.addEventListener('click',event=>{
+        if(event.target===editAnnouncementModal){
+            closeEditAnnouncementModal();
         }
     });
 

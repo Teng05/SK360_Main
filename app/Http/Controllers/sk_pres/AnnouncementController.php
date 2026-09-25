@@ -360,6 +360,43 @@ class AnnouncementController extends Controller
             );
     }
 
+    public function update(Request $request,int $announcementId): RedirectResponse
+    {
+        abort_unless(
+            auth()->check()
+            &&
+            auth()->user()->role==='sk_president',
+            403
+        );
+
+        $announcement=DB::table('announcements')
+            ->where('announcement_id',$announcementId)
+            ->first();
+
+        if(!$announcement){
+            abort(404);
+        }
+
+        $validated=$request->validate([
+            'title'=>['required','string','max:255'],
+            'content'=>['required','string'],
+            'visibility'=>['nullable','in:public,officials_only'],
+        ]);
+
+        DB::table('announcements')
+            ->where('announcement_id',$announcementId)
+            ->update([
+                'title'=>$validated['title'],
+                'content'=>$validated['content'],
+                'visibility'=>$validated['visibility'] ?? 'public',
+                'updated_at'=>now(),
+            ]);
+
+        return redirect()
+            ->route('sk_pres.announcements')
+            ->with('status','Announcement updated successfully.');
+    }
+
     protected function currentTermId(): ?int
     {
         $termId=DB::table(

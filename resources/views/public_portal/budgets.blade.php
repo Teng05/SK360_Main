@@ -309,6 +309,16 @@
                     Annual Budget information below is based on records submitted through SK360.
                 </p>
 
+                <p class="text-xs text-gray-400 mt-2">
+                    Showing
+                    <strong>{{ $budgetItems->firstItem() ?? 0 }}</strong>
+                    to
+                    <strong>{{ $budgetItems->lastItem() ?? 0 }}</strong>
+                    of
+                    <strong>{{ $budgetItems->total() }}</strong>
+                    barangay{{ $budgetItems->total() === 1 ? '' : 's' }}
+                </p>
+
             </div>
 
             @if($selectedBarangay)
@@ -501,6 +511,12 @@
             @endforelse
 
         </div>
+
+        @if($budgetItems->hasPages())
+            <div class="mt-8">
+                {{ $budgetItems->links() }}
+            </div>
+        @endif
 
     </section>
 

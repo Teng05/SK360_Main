@@ -132,22 +132,26 @@ Route::middleware('auth')->prefix('sk_pres')->name('sk_pres.')->group(function()
     Route::patch('/module/live/{slotId}/close',[ModuleController::class,'closeLive'])->name('module.live.close');
     Route::delete('/module/live/{slotId}',[ModuleController::class,'destroyLive'])->name('module.live.destroy');
     Route::post('/module',[ModuleController::class,'store'])->name('module.store');
+    Route::put('/module/{slotId}',[ModuleController::class,'update'])->name('module.update');
     Route::patch('/module/{slotId}/close',[ModuleController::class,'close'])->name('module.close');
     Route::post('/module/{slotId}/delete',[ModuleController::class,'destroy'])->name('module.destroy');
 
     Route::get('/announcements',[AnnouncementController::class,'index'])->name('announcements');
     Route::post('/announcements',[AnnouncementController::class,'store'])->name('announcements.store');
+    Route::put('/announcements/{announcementId}',[AnnouncementController::class,'update'])->name('announcements.update');
 
     Route::get('/calendar',[CalendarController::class,'index'])->name('calendar');
     Route::get('/calendar/live',[CalendarController::class,'live'])->name('calendar.live');
     Route::post('/calendar/live',[CalendarController::class,'storeLive'])->name('calendar.live.store');
     Route::post('/calendar',[CalendarController::class,'store'])->name('calendar.store');
+    Route::put('/calendar/{eventId}',[CalendarController::class,'update'])->name('calendar.update');
 
     Route::get('/chat',[SkPresidentChatController::class,'index'])->name('chat');
     Route::get('/chat/users',[SkPresidentChatController::class,'searchUsers'])->name('chat.users');
 
     Route::get('/meetings',[MeetingsController::class,'index'])->name('meetings');
     Route::post('/meetings',[MeetingsController::class,'store'])->name('meetings.store');
+    Route::put('/meetings/{meeting}',[MeetingsController::class,'update'])->name('meetings.update');
     Route::post('/meetings/{meeting}/finish',[MeetingsController::class,'finish'])->name('meetings.finish');
     Route::post('/meetings/{meeting}/attendance',[MeetingsController::class,'recordAttendance'])->name('meetings.attendance');
     Route::get('/meetings/{meeting}/call',[MeetingsController::class,'call'])->name('meetings.call');

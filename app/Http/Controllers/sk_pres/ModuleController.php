@@ -271,6 +271,50 @@ class ModuleController extends Controller
             ->with('status','Submission slot closed successfully.');
     }
 
+    public function update(Request $request,int $slotId): RedirectResponse
+    {
+        abort_unless(auth()->check() && auth()->user()->role === 'sk_president',403);
+
+        $currentTermId=$this->currentTermId();
+
+        if(!$currentTermId){
+            return back()->with(
+                'warning',
+                'There is no active administration term.'
+            );
+        }
+
+        $slot=DB::table('submission_slots')
+            ->where('slot_id',$slotId)
+            ->where('term_id',$currentTermId)
+            ->first();
+
+        if(!$slot){
+            return back()->with(
+                'warning',
+                'Submission slot was not found in the current administration.'
+            );
+        }
+
+        $validated=$this->validateSlot($request);
+        $changes=$this->slotData($validated,$currentTermId);
+
+        unset(
+            $changes['term_id'],
+            $changes['status'],
+            $changes['created_at']
+        );
+
+        DB::table('submission_slots')
+            ->where('slot_id',$slotId)
+            ->where('term_id',$currentTermId)
+            ->update($changes);
+
+        return redirect()
+            ->route('sk_pres.module')
+            ->with('status','Submission slot updated successfully.');
+    }
+
     public function destroy(int $slotId): RedirectResponse
     {
         abort_unless(auth()->check() && auth()->user()->role === 'sk_president',403);

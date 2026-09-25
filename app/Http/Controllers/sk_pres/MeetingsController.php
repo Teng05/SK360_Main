@@ -106,12 +106,7 @@ class MeetingsController extends Controller
                 );
         }
 
-        $validated=$request->validate([
-            'title'=>['required','string','max:255'],
-            'agenda'=>['nullable','string'],
-            'meeting_date'=>['required','date'],
-            'meeting_time'=>['required','date_format:H:i'],
-        ]);
+        $validated=$this->validateMeeting($request);
 
         $meeting=new Meeting();
         $meeting->term_id=$currentTermId;
@@ -119,7 +114,7 @@ class MeetingsController extends Controller
         $meeting->agenda=$validated['agenda'] ?? null;
         $meeting->meeting_date=$validated['meeting_date'];
         $meeting->meeting_time=$validated['meeting_time'].':00';
-        $meeting->location_or_link=null;
+        $meeting->location_or_link=$validated['location_or_link'] ?? null;
         $meeting->dyte_meeting_id=null;
         $meeting->created_by=auth()->user()->user_id;
         $meeting->status='scheduled';
@@ -131,6 +126,50 @@ class MeetingsController extends Controller
         return redirect()
             ->route('sk_pres.meetings')
             ->with('status','Meeting scheduled successfully.');
+    }
+
+    public function update(Request $request,Meeting $meeting): RedirectResponse
+    {
+        abort_unless(
+            auth()->check()
+            &&
+            auth()->user()->role==='sk_president',
+            403
+        );
+
+        $this->ensureCurrentTermMeeting($meeting);
+
+        if($meeting->status!=='scheduled'){
+            return back()->with(
+                'warning',
+                'Only scheduled or ongoing meetings can be updated.'
+            );
+        }
+
+        $validated=$this->validateMeeting($request);
+
+        $meeting->title=$validated['title'];
+        $meeting->agenda=$validated['agenda'] ?? null;
+        $meeting->meeting_date=$validated['meeting_date'];
+        $meeting->meeting_time=$validated['meeting_time'].':00';
+        $meeting->location_or_link=$validated['location_or_link'] ?? null;
+        $meeting->updated_at=now();
+        $meeting->save();
+
+        return redirect()
+            ->route('sk_pres.meetings')
+            ->with('status','Meeting updated successfully.');
+    }
+
+    protected function validateMeeting(Request $request): array
+    {
+        return $request->validate([
+            'title'=>['required','string','max:255'],
+            'agenda'=>['nullable','string'],
+            'location_or_link'=>['nullable','string','max:255'],
+            'meeting_date'=>['required','date'],
+            'meeting_time'=>['required','date_format:H:i'],
+        ]);
     }
 
     public function finish(Meeting $meeting): RedirectResponse
