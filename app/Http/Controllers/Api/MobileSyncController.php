@@ -67,6 +67,7 @@ class MobileSyncController extends Controller
             return response()->json(['message' => 'Account is not active or verified.'], 403);
         }
 
+        /** @var User $user */
         $plainToken = Str::random(80);
 
         MobileApiToken::create([
@@ -464,6 +465,7 @@ class MobileSyncController extends Controller
             'accomplishment_reports' => $this->accomplishmentReports($user, $since),
             'budget_reports' => $this->budgetReports($user, $since),
             'leadership_profiles' => $this->leadershipProfiles($user, $since),
+            'leadership_history' => $this->leadershipHistory($user),
             'archive_documents' => $this->archiveDocuments($user, $since),
         ]);
     }
@@ -977,20 +979,23 @@ class MobileSyncController extends Controller
             return response()->json(['message' => 'There is no active administration term.'], 422);
         }
 
+        $targetTerm = $this->resolveMobileLeadershipTerm($validated['term'] ?? null) ?: $currentTerm;
+        $isCurrentTerm = (int) $targetTerm->term_id === (int) $currentTerm->term_id
+            && $targetTerm->status === 'current';
+        $termLabel = $targetTerm->start_year.'-'.$targetTerm->end_year;
+
         $councilId = DB::table('sk_council')->insertGetId([
             'barangay_id' => $user->barangay_id,
-            'term_id' => $currentTerm->term_id,
+            'term_id' => $targetTerm->term_id,
             'name' => trim($validated['name']),
             'position' => 'SK Councilor',
             'email' => $validated['email'] ?? null,
             'phone' => $validated['phone'] ?? null,
-            'term' => filled($validated['term'] ?? null)
-                ? $validated['term']
-                : $currentTerm->start_year.'-'.$currentTerm->end_year,
-            'status' => 'current',
+            'term' => $termLabel,
+            'status' => $isCurrentTerm ? 'current' : 'completed',
             'profile_img' => $profileImage,
             'created_at' => now(),
-            'completed_at' => null,
+            'completed_at' => $isCurrentTerm ? null : ($targetTerm->completed_at ?: now()),
         ], 'council_id');
 
         return response()->json([
@@ -1011,7 +1016,6 @@ class MobileSyncController extends Controller
         $member = DB::table('sk_council')
             ->where('council_id', $councilId)
             ->where('barangay_id', $user->barangay_id)
-            ->where('status', 'current')
             ->where(function ($query) {
                 $query->whereRaw('LOWER(position) LIKE ?', ['%councilor%'])
                     ->orWhereRaw('LOWER(position) LIKE ?', ['%kagawad%']);
@@ -1029,11 +1033,23 @@ class MobileSyncController extends Controller
             'profile_img' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
         ]);
 
+        $currentTerm = $this->mobileCurrentTerm();
+        $targetTerm = $this->resolveMobileLeadershipTerm($validated['term'] ?? null)
+            ?: ($member->term_id ? DB::table('administration_terms')->where('term_id', $member->term_id)->first() : null)
+            ?: $currentTerm;
+        $isCurrentTerm = $currentTerm
+            && (int) $targetTerm->term_id === (int) $currentTerm->term_id
+            && $targetTerm->status === 'current';
+        $termLabel = $targetTerm->start_year.'-'.$targetTerm->end_year;
+
         $changes = [
+            'term_id' => $targetTerm->term_id,
             'name' => trim($validated['name']),
             'email' => $validated['email'] ?? null,
             'phone' => $validated['phone'] ?? null,
-            'term' => filled($validated['term'] ?? null) ? $validated['term'] : $member->term,
+            'term' => $termLabel,
+            'status' => $isCurrentTerm ? 'current' : 'completed',
+            'completed_at' => $isCurrentTerm ? null : ($targetTerm->completed_at ?: now()),
         ];
         if ($request->hasFile('profile_img')) {
             $directory = public_path('uploads/council_profiles');
@@ -1081,18 +1097,23 @@ class MobileSyncController extends Controller
             'last_name' => ['required', 'string', 'max:100'],
             'email' => ['required', 'email', 'max:100', 'unique:users,email'],
             'phone' => ['nullable', 'string', 'max:20', 'unique:users,phone_number'],
+            'term' => ['nullable', 'string', 'max:50'],
         ]);
+
+        $targetTerm = $this->resolveMobileLeadershipTerm($validated['term'] ?? null) ?: $currentTerm;
+        $isCurrentTerm = (int) $targetTerm->term_id === (int) $currentTerm->term_id
+            && $targetTerm->status === 'current';
 
         $existing = User::where('barangay_id', $chairman->barangay_id)
             ->where('role', 'sk_secretary')
             ->whereNull('archived_at')
             ->exists();
-        if ($existing) {
+        if ($isCurrentTerm && $existing) {
             return response()->json(['message' => 'Your barangay already has a current or pending SK Secretary.'], 422);
         }
 
         $token = Str::random(64);
-        $secretary = DB::transaction(function () use ($validated, $chairman, $currentTerm, $token) {
+        $secretary = DB::transaction(function () use ($validated, $chairman, $targetTerm, $isCurrentTerm, $token) {
             $user = User::create([
                 'first_name' => trim($validated['first_name']),
                 'last_name' => trim($validated['last_name']),
@@ -1101,29 +1122,39 @@ class MobileSyncController extends Controller
                 'barangay_id' => $chairman->barangay_id,
                 'role' => 'sk_secretary',
                 'password' => Hash::make(Str::random(64)),
-                'is_verified' => 0,
-                'status' => 'inactive',
-                'term_start' => null,
-                'term_end' => null,
-                'archived_at' => null,
+                'is_verified' => $isCurrentTerm ? 0 : 1,
+                'status' => $isCurrentTerm ? 'inactive' : 'active',
+                'term_start' => $targetTerm->start_year.'-01-01',
+                'term_end' => $targetTerm->end_year.'-12-31',
+                'archived_at' => $isCurrentTerm ? null : ($targetTerm->completed_at ?: now()),
             ]);
 
             DB::table('official_terms')->insert([
                 'user_id' => $user->user_id,
-                'term_id' => $currentTerm->term_id,
+                'term_id' => $targetTerm->term_id,
                 'barangay_id' => $chairman->barangay_id,
                 'role' => 'sk_secretary',
-                'status' => 'pending',
-                'started_at' => null,
-                'completed_at' => null,
+                'status' => $isCurrentTerm ? 'pending' : 'completed',
+                'started_at' => $isCurrentTerm ? null : now(),
+                'completed_at' => $isCurrentTerm ? null : ($targetTerm->completed_at ?: now()),
             ]);
-            DB::table('password_reset_tokens')->updateOrInsert(
-                ['email' => $user->email],
-                ['token' => Hash::make($token), 'created_at' => now()]
-            );
+
+            if ($isCurrentTerm) {
+                DB::table('password_reset_tokens')->updateOrInsert(
+                    ['email' => $user->email],
+                    ['token' => Hash::make($token), 'created_at' => now()]
+                );
+            }
 
             return $user;
         });
+
+        if (! $isCurrentTerm) {
+            return response()->json([
+                'message' => 'SK Secretary historical record added.',
+                'secretary_created' => true,
+            ], 201);
+        }
 
         $setupLink = route('password.setup', ['token' => $token, 'email' => $secretary->email]);
         try {
@@ -1842,40 +1873,42 @@ class MobileSyncController extends Controller
 
     protected function leadershipProfiles(User $user, ?Carbon $since): array
     {
+        $currentTerm = $this->mobileCurrentTerm();
+
+        if (! $currentTerm) {
+            return [];
+        }
+
         $leaders = collect();
         $userProfilePicture = Schema::hasColumn('users', 'profile_pic')
             ? 'profile_pic'
             : DB::raw('NULL as profile_pic');
 
         $userLeaders = DB::table('users')
-            ->whereIn('role', ['sk_chairman', 'sk_secretary'])
-            ->whereNotNull('barangay_id')
+            ->join('official_terms as ot', 'ot.user_id', '=', 'users.user_id')
+            ->where('ot.term_id', $currentTerm->term_id)
+            ->whereIn('ot.status', ['pending', 'current'])
+            ->whereColumn('ot.role', 'users.role')
+            ->whereIn('users.role', ['sk_chairman', 'sk_secretary'])
+            ->whereNotNull('users.barangay_id')
             ->select(
-                DB::raw('user_id as leadership_id'),
-                'user_id',
+                DB::raw('ot.official_term_id as leadership_id'),
+                'users.user_id',
                 $userProfilePicture,
-                'barangay_id',
-                'email',
-                DB::raw('phone_number as phone'),
-                'is_verified',
-                DB::raw("CONCAT(first_name, ' ', last_name) as full_name"),
+                'users.barangay_id',
+                'users.email',
+                DB::raw('users.phone_number as phone'),
+                'users.is_verified',
+                DB::raw("CONCAT(users.first_name, ' ', users.last_name) as full_name"),
                 DB::raw("
                     CASE
-                        WHEN role = 'sk_chairman' THEN 'sk_chairman'
-                        WHEN role = 'sk_secretary' THEN 'sk_secretary'
-                        ELSE role
+                        WHEN users.role = 'sk_chairman' THEN 'sk_chairman'
+                        WHEN users.role = 'sk_secretary' THEN 'sk_secretary'
+                        ELSE users.role
                     END as position
                 "),
-                DB::raw("COALESCE((
-                    SELECT CONCAT(at.start_year, '-', at.end_year)
-                    FROM official_terms ot
-                    JOIN administration_terms at ON at.term_id = ot.term_id
-                    WHERE ot.user_id = users.user_id
-                      AND ot.status IN ('pending', 'current')
-                    ORDER BY ot.official_term_id DESC
-                    LIMIT 1
-                ), 'N/A') as term"),
-                'status'
+                DB::raw("'".$currentTerm->start_year.'-'.$currentTerm->end_year."' as term"),
+                'ot.status'
             )
             ->get();
 
@@ -1883,6 +1916,7 @@ class MobileSyncController extends Controller
 
         if (Schema::hasTable('sk_council')) {
             $councilRows = DB::table('sk_council')
+                ->where('term_id', $currentTerm->term_id)
                 ->where('status', 'current')
                 ->select(
                     DB::raw('council_id as leadership_id'),
@@ -1968,6 +2002,128 @@ class MobileSyncController extends Controller
                 return $leader;
             })
             ->all();
+    }
+
+    protected function leadershipHistory(User $user): array
+    {
+        $terms = DB::table('administration_terms')
+            ->where('status', 'completed')
+            ->orderByDesc('start_year')
+            ->orderByDesc('term_id')
+            ->get();
+
+        return $terms
+            ->map(function ($term) use ($user) {
+                $termLabel = $term->start_year.'-'.$term->end_year;
+                $leaders = collect();
+
+                $userProfilePicture = Schema::hasColumn('users', 'profile_pic')
+                    ? 'users.profile_pic'
+                    : DB::raw('NULL as profile_pic');
+
+                $officials = DB::table('official_terms as ot')
+                    ->join('users', 'ot.user_id', '=', 'users.user_id')
+                    ->where('ot.term_id', $term->term_id)
+                    ->whereIn('ot.role', ['sk_chairman', 'sk_secretary'])
+                    ->select(
+                        DB::raw('ot.official_term_id as leadership_id'),
+                        'users.user_id',
+                        $userProfilePicture,
+                        'ot.barangay_id',
+                        'users.email',
+                        DB::raw('users.phone_number as phone'),
+                        'users.is_verified',
+                        DB::raw("CONCAT(users.first_name, ' ', users.last_name) as full_name"),
+                        'ot.role as position',
+                        DB::raw("'".$termLabel."' as term"),
+                        'ot.status'
+                    )
+                    ->get();
+
+                $leaders = $leaders->merge($officials);
+
+                if (Schema::hasTable('sk_council')) {
+                    $council = DB::table('sk_council')
+                        ->where('term_id', $term->term_id)
+                        ->select(
+                            DB::raw('council_id as leadership_id'),
+                            DB::raw('NULL as user_id'),
+                            'profile_img as profile_pic',
+                            'barangay_id',
+                            DB::raw('name as full_name'),
+                            'email',
+                            'phone',
+                            DB::raw("
+                                CASE
+                                    WHEN LOWER(position) LIKE '%chairman%' THEN 'sk_chairman'
+                                    WHEN LOWER(position) LIKE '%secretary%' THEN 'sk_secretary'
+                                    WHEN LOWER(position) LIKE '%treasurer%' THEN 'sk_treasurer'
+                                    WHEN LOWER(position) LIKE '%councilor%' THEN 'sk_councilor'
+                                    WHEN LOWER(position) LIKE '%kagawad%' THEN 'sk_councilor'
+                                    ELSE LOWER(REPLACE(position, ' ', '_'))
+                                END as position
+                            "),
+                            DB::raw("COALESCE(term, '".$termLabel."') as term"),
+                            'status'
+                        )
+                        ->get();
+
+                    $leaders = $leaders->merge($council);
+                }
+
+                if (! $this->isPresident($user) && $user->barangay_id) {
+                    $leaders = $leaders->where('barangay_id', $user->barangay_id);
+                }
+
+                $members = $leaders
+                    ->filter(fn ($leader) => ! empty($leader->barangay_id))
+                    ->values()
+                    ->map(function ($leader) {
+                        $path = $leader->profile_pic ?? null;
+                        $leader->profile_pic_url = $path && $path !== 'default.png'
+                            ? $this->publicUrl(Str::startsWith($path, 'uploads/')
+                                ? $path
+                                : (($leader->user_id ?? null) !== null
+                                    ? 'uploads/profile_pics/'.$path
+                                    : 'uploads/council_profiles/'.$path))
+                            : null;
+
+                        return $leader;
+                    });
+
+                if ($members->isEmpty()) {
+                    return null;
+                }
+
+                return [
+                    'term_id' => $term->term_id,
+                    'term' => $termLabel,
+                    'status' => $term->status,
+                    'completed_at' => $term->completed_at,
+                    'members' => $members->all(),
+                ];
+            })
+            ->filter()
+            ->values()
+            ->all();
+    }
+
+    protected function resolveMobileLeadershipTerm(?string $term): ?object
+    {
+        $term = trim((string) $term);
+
+        if ($term !== '' && preg_match('/(\\d{4})\\s*-\\s*(\\d{4})/', $term, $matches)) {
+            $resolved = DB::table('administration_terms')
+                ->where('start_year', $matches[1])
+                ->where('end_year', $matches[2])
+                ->first();
+
+            if ($resolved) {
+                return $resolved;
+            }
+        }
+
+        return $this->mobileCurrentTerm();
     }
 
     protected function archiveDocuments(User $user, ?Carbon $since): array
@@ -2201,6 +2357,14 @@ class MobileSyncController extends Controller
         abort_unless($termId, 422, 'There is no active administration term.');
 
         return ['term_id' => $termId];
+    }
+
+    protected function mobileCurrentTerm(): ?object
+    {
+        return DB::table('administration_terms')
+            ->where('status', 'current')
+            ->orderByDesc('term_id')
+            ->first();
     }
 
     // Reuse the existing report ID when a barangay submits to the same slot again.
