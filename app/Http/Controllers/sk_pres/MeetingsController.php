@@ -25,20 +25,34 @@ class MeetingsController extends Controller
 
         $currentTermId=$this->currentTermId();
 
-        $meetings=$currentTermId
-            ? Meeting::query()
-                ->where('term_id',$currentTermId)
-                ->whereNotNull('meeting_date')
-                ->orderByDesc('meeting_date')
-                ->orderByDesc('meeting_time')
-                ->get()
-                ->map(function(Meeting $meeting) use($currentTermId){
-                    return $this->decorateAttendance(
+        $meetingQuery=Meeting::query()
+            ->when(
+                Schema::hasColumn('meetings','term_id') && $currentTermId,
+                fn($query)=>$query->where('term_id',$currentTermId)
+            )
+            ->when(
+                Schema::hasColumn('meetings','meeting_date'),
+                fn($query)=>$query->whereNotNull('meeting_date')
+            );
+
+        $meetings=$meetingQuery
+            ->when(
+                Schema::hasColumn('meetings','meeting_date'),
+                fn($query)=>$query->orderByDesc('meeting_date')
+            )
+            ->when(
+                Schema::hasColumn('meetings','meeting_time'),
+                fn($query)=>$query->orderByDesc('meeting_time')
+            )
+            ->get()
+            ->map(function(Meeting $meeting) use($currentTermId){
+                return $currentTermId
+                    ? $this->decorateAttendance(
                         $this->decorateMeeting($meeting),
                         $currentTermId
-                    );
-                })
-            : collect();
+                    )
+                    : $this->decorateMeeting($meeting);
+            });
 
         $now=now();
         $upcomingMeetings=$meetings
