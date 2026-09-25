@@ -27,6 +27,7 @@ class MeetingsController extends Controller
         $meetings=$currentTermId
             ? Meeting::query()
                 ->where('term_id',$currentTermId)
+                ->whereNotNull('meeting_date')
                 ->orderByDesc('meeting_date')
                 ->orderByDesc('meeting_time')
                 ->get()
@@ -575,6 +576,18 @@ class MeetingsController extends Controller
     protected function decorateMeeting(Meeting $meeting): Meeting
     {
         $scheduledAt=$meeting->scheduled_at;
+
+        // Ignore malformed legacy rows instead of breaking the whole meetings page.
+        if(!$scheduledAt){
+            $meeting->display_datetime='Schedule unavailable';
+            $meeting->preview_datetime='Schedule unavailable';
+            $meeting->is_today=false;
+            $meeting->status_label=$meeting->status==='completed' ? 'Completed' : 'Schedule unavailable';
+            $meeting->can_finish=false;
+            $meeting->can_record_attendance=$meeting->status==='completed';
+
+            return $meeting;
+        }
 
         $meeting->display_datetime=$scheduledAt->format('Y-m-d h:i A');
         $meeting->preview_datetime=$scheduledAt->format('M d, Y h:i A');
