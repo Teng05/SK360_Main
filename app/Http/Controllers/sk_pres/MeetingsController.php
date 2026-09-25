@@ -25,7 +25,8 @@ class MeetingsController extends Controller
 
         $currentTermId=$this->currentTermId();
 
-        $meetingQuery=Meeting::query()
+        $meetingQuery=Schema::hasTable('meetings')
+            ? Meeting::query()
             ->when(
                 Schema::hasColumn('meetings','term_id') && $currentTermId,
                 fn($query)=>$query->where('term_id',$currentTermId)
@@ -33,9 +34,7 @@ class MeetingsController extends Controller
             ->when(
                 Schema::hasColumn('meetings','meeting_date'),
                 fn($query)=>$query->whereNotNull('meeting_date')
-            );
-
-        $meetings=$meetingQuery
+            )
             ->when(
                 Schema::hasColumn('meetings','meeting_date'),
                 fn($query)=>$query->orderByDesc('meeting_date')
@@ -44,7 +43,10 @@ class MeetingsController extends Controller
                 Schema::hasColumn('meetings','meeting_time'),
                 fn($query)=>$query->orderByDesc('meeting_time')
             )
-            ->get()
+            : null;
+
+        $meetings=$meetingQuery
+            ? $meetingQuery->get()
             ->map(function(Meeting $meeting) use($currentTermId){
                 return $currentTermId
                     ? $this->decorateAttendance(
@@ -52,7 +54,8 @@ class MeetingsController extends Controller
                         $currentTermId
                     )
                     : $this->decorateMeeting($meeting);
-            });
+            })
+            : collect();
 
         $now=now();
         $upcomingMeetings=$meetings
@@ -520,7 +523,11 @@ class MeetingsController extends Controller
 
     protected function attendanceBarangays(?int $termId)
     {
-        if(!$termId || !Schema::hasTable('official_terms') || !Schema::hasTable('barangays')){
+        if(!$termId
+            || !Schema::hasTable('official_terms')
+            || !Schema::hasTable('barangays')
+            || !Schema::hasColumns('official_terms',['term_id','barangay_id','role','status'])
+        ){
             return collect();
         }
 
@@ -544,6 +551,7 @@ class MeetingsController extends Controller
             ->values();
 
         $logs=Schema::hasTable('ranking_point_logs')
+            && Schema::hasColumns('ranking_point_logs',['term_id','source_type','source_id','action','barangay_id'])
             ? DB::table('ranking_point_logs')
                 ->where('term_id',$termId)
                 ->where('source_type','meeting')
@@ -666,6 +674,12 @@ class MeetingsController extends Controller
 
     protected function currentTermId(): ?int
     {
+        if(!Schema::hasTable('administration_terms')
+            || !Schema::hasColumns('administration_terms',['term_id','status'])
+        ){
+            return null;
+        }
+
         $termId=DB::table('administration_terms')
             ->where('status','current')
             ->orderByDesc('term_id')

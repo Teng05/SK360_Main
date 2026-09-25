@@ -509,6 +509,12 @@ class MobileSyncController extends Controller
         $announcementId = DB::table('announcements')->insertGetId($announcementData, 'announcement_id');
 
         $user = $request->user();
+        if (($announcementData['status'] ?? 'published') === 'published') {
+            app(NotificationService::class)->notifyAnnouncementCreated(
+                DB::table('announcements')->where('announcement_id', $announcementId)->first(),
+                $user
+            );
+        }
 
         if (! empty($user->barangay_id)) {
             app(RankingPointsService::class)->award(
@@ -753,6 +759,11 @@ class MobileSyncController extends Controller
             'created_at' => now(),
         ], 'event_id');
 
+        app(NotificationService::class)->notifyEventCreated(
+            DB::table('events')->where('event_id', $eventId)->first(),
+            $request->user()
+        );
+
         return response()->json([
             'message' => 'Event created.',
             'event' => DB::table('events')
@@ -828,6 +839,8 @@ class MobileSyncController extends Controller
         $meeting = DB::table('meetings')
             ->where('meeting_id', $meetingId)
             ->first();
+
+        app(NotificationService::class)->notifyMeetingCreated($meeting, $request->user());
 
         $meeting->call_url = url("/sk_pres/meetings/{$meetingId}/call");
 

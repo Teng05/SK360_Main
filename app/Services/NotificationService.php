@@ -261,6 +261,20 @@ class NotificationService
         );
     }
 
+    public function notifyMeetingCreated(object $meeting, User $actor): void
+    {
+        $this->createForRoles(
+            ['sk_chairman', 'sk_secretary'],
+            $actor,
+            [
+                'type' => 'meeting',
+                'title' => 'New council meeting',
+                'message' => $meeting->title . ' on ' . $meeting->meeting_date,
+                'meeting_id' => (int) ($meeting->meeting_id ?? 0),
+            ]
+        );
+    }
+
     /*
     |--------------------------------------------------------------------------
     | NOTIFY PRESIDENT OF SUBMISSION
