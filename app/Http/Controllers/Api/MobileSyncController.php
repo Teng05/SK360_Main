@@ -1939,13 +1939,13 @@ class MobileSyncController extends Controller
     protected function visibleReportQuery(string $table, User $user): Builder
     {
         return DB::table($table)
-            ->where(function (Builder $query) use ($user) {
-                $query->where('user_id', $user->user_id);
+            ->where(function (Builder $query) use ($user, $table) {
+                $query->where($table.'.user_id', $user->user_id);
 
                 if ($this->isPresident($user)) {
-                    $query->orWhereNotNull('user_id');
+                    $query->orWhereNotNull($table.'.user_id');
                 } elseif ($this->isOfficial($user) && $user->barangay_id) {
-                    $query->orWhere('barangay_id', $user->barangay_id);
+                    $query->orWhere($table.'.barangay_id', $user->barangay_id);
                 }
             });
     }
