@@ -92,7 +92,7 @@
                                             Join Meeting
                                         </a>
                                         @if ($meeting->can_finish)
-                                            <form action="{{ route('meetings.finish', $meeting->meeting_id) }}" method="POST">
+                                            <form action="{{ route('sk_pres.meetings.finish', $meeting->meeting_id) }}" method="POST">
                                                 @csrf
                                                 <button type="submit"
                                                         onclick="return confirm('End this meeting and move it to Past Meetings?')"
