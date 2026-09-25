@@ -13,6 +13,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\View\View;
 use TaylanUnutmaz\AgoraTokenBuilder\RtcTokenBuilder;
 
@@ -505,7 +506,7 @@ class MeetingsController extends Controller
 
     protected function attendanceBarangays(?int $termId)
     {
-        if(!$termId){
+        if(!$termId || !Schema::hasTable('official_terms') || !Schema::hasTable('barangays')){
             return collect();
         }
 
@@ -528,15 +529,17 @@ class MeetingsController extends Controller
             ->map(fn($id)=>(int)$id)
             ->values();
 
-        $logs=DB::table('ranking_point_logs')
-            ->where('term_id',$termId)
-            ->where('source_type','meeting')
-            ->where('source_id',(string)$meeting->meeting_id)
-            ->whereIn('action',[
-                RankingPointsService::MEETING_ATTENDANCE,
-                RankingPointsService::MISSED_MEETING,
-            ])
-            ->get(['barangay_id','action']);
+        $logs=Schema::hasTable('ranking_point_logs')
+            ? DB::table('ranking_point_logs')
+                ->where('term_id',$termId)
+                ->where('source_type','meeting')
+                ->where('source_id',(string)$meeting->meeting_id)
+                ->whereIn('action',[
+                    RankingPointsService::MEETING_ATTENDANCE,
+                    RankingPointsService::MISSED_MEETING,
+                ])
+                ->get(['barangay_id','action'])
+            : collect();
 
         $presentIds=$logs
             ->where('action',RankingPointsService::MEETING_ATTENDANCE)
