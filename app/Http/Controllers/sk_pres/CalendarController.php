@@ -17,7 +17,7 @@ class CalendarController extends Controller
 {
     public function index(): View
     {
-        abort_unless(auth()->check() && auth()->user()->role === 'sk_president',403);
+        abort_unless(auth()->check() && auth()->user()->role==='sk_president',403);
 
         $user=auth()->user();
         $fullName=trim(($user->first_name ?? '').' '.($user->last_name ?? '')) ?: 'User';
@@ -53,48 +53,31 @@ class CalendarController extends Controller
                 ->get()
             : collect();
 
-        $upcomingEvents=$currentTermId
-            ? DB::table('events')
-                ->where('term_id',$currentTermId)
-                ->where('end_datetime','>=',now())
-                ->orderBy('start_datetime')
-                ->limit(5)
-                ->get()
-                ->map(function($event){
-                    $event->type_label=match($event->event_type){
-                        'meeting'=>'Meeting',
-                        'program'=>'Event/Program',
-                        'deadline'=>'Deadline',
-                        default=>'Other Activity',
-                    };
-
-                    return $event;
-                })
-            : collect();
+        $upcomingEvents=$events
+            ->filter(fn($event)=>Carbon::parse($event->end_datetime)->greaterThanOrEqualTo(now()))
+            ->take(5)
+            ->map(function($event){
+                $event->type_label=$this->eventTypeLabel($event->event_type);
+                $event->type_badge=$this->eventTypeBadge($event->event_type);
+                $event->visibility_label=$this->visibilityLabel($event->visibility);
+                $event->source_type='event';
+                return $event;
+            });
 
         $upcomingSlots=$slotEvents
-            ->filter(
-                fn($slot)=>
-                    Carbon::parse($slot->end_date)
-                        ->endOfDay()
-                        ->greaterThanOrEqualTo(now())
-            )
+            ->filter(fn($slot)=>Carbon::parse($slot->end_date)->endOfDay()->greaterThanOrEqualTo(now()))
             ->take(5)
             ->map(function($slot){
-                $slot->start_datetime=Carbon::parse(
-                    $slot->start_date
-                )->startOfDay();
-
-                $slot->event_type=
-                    $slot->submission_type==='budget_report'
-                        ? 'budget_slot'
-                        : 'report_slot';
-
-                $slot->type_label=
-                    $slot->submission_type==='budget_report'
-                        ? 'Budget Slot'
-                        : 'Report Slot';
-
+                $slot->start_datetime=Carbon::parse($slot->start_date)->startOfDay();
+                $slot->end_datetime=Carbon::parse($slot->end_date)->endOfDay();
+                $slot->event_type=$slot->submission_type==='budget_report' ? 'budget_slot' : 'report_slot';
+                $slot->type_label=$slot->submission_type==='budget_report' ? 'Budget Slot' : 'Report Slot';
+                $slot->type_badge=$slot->submission_type==='budget_report'
+                    ? 'bg-amber-100 text-amber-700'
+                    : 'bg-indigo-100 text-indigo-700';
+                $slot->visibility_label=$slot->role ?: 'Both';
+                $slot->location='Online submission';
+                $slot->source_type='slot';
                 return $slot;
             });
 
@@ -105,35 +88,46 @@ class CalendarController extends Controller
                     'title'=>$event->title,
                     'start'=>$event->start_datetime,
                     'end'=>$event->end_datetime,
-                    'className'=>match($event->event_type){
-                        'meeting'=>'bg-blue-700',
-                        'program'=>'bg-green-600',
-                        'deadline'=>'bg-red-600',
-                        default=>'bg-fuchsia-500',
-                    },
+                    'className'=>$this->eventTypeColor($event->event_type),
                     'extendedProps'=>[
+                        'source_type'=>'event',
                         'editable'=>true,
                         'event_type'=>$event->event_type,
+                        'type_label'=>$this->eventTypeLabel($event->event_type),
                         'description'=>$event->description,
                         'location'=>$event->location,
                         'visibility'=>$event->visibility,
+                        'visibility_label'=>$this->visibilityLabel($event->visibility),
+                        'start_value'=>Carbon::parse($event->start_datetime)->format('Y-m-d\TH:i'),
+                        'end_value'=>Carbon::parse($event->end_datetime)->format('Y-m-d\TH:i'),
                     ],
                 ];
             })
             ->merge(
                 $slotEvents->map(function($slot){
+                    $slotType=$slot->submission_type==='budget_report' ? 'budget_slot' : 'report_slot';
+
                     return [
                         'id'=>'slot-'.$slot->slot_id,
                         'title'=>$slot->title,
                         'start'=>$slot->start_date,
-                        'end'=>$slot->end_date,
+                        'end'=>Carbon::parse($slot->end_date)->addDay()->format('Y-m-d'),
+                        'allDay'=>true,
+                        'className'=>$slotType==='budget_slot' ? 'bg-amber-500' : 'bg-indigo-600',
                         'extendedProps'=>[
+                            'source_type'=>'slot',
                             'editable'=>false,
+                            'event_type'=>$slotType,
+                            'type_label'=>$slotType==='budget_slot' ? 'Budget Slot' : 'Report Slot',
+                            'description'=>$slot->description,
+                            'location'=>'Online submission',
+                            'visibility'=>$slot->role,
+                            'visibility_label'=>$slot->role ?: 'Both',
+                            'start_value'=>$slot->start_date,
+                            'end_value'=>$slot->end_date,
+                            'submission_type'=>$slot->submission_type,
+                            'status'=>$slot->status,
                         ],
-                        'className'=>
-                            $slot->submission_type==='budget_report'
-                                ? 'bg-amber-500'
-                                : 'bg-indigo-600',
                     ];
                 })
             )
@@ -143,9 +137,9 @@ class CalendarController extends Controller
             'meeting'=>'bg-blue-700',
             'program'=>'bg-green-600',
             'deadline'=>'bg-red-600',
-            'other'=>'bg-fuchsia-500',
             'report_slot'=>'bg-indigo-600',
             'budget_slot'=>'bg-amber-500',
+            'other'=>'bg-fuchsia-500',
         ];
 
         $legendItems=[
@@ -174,18 +168,14 @@ class CalendarController extends Controller
 
     public function live(): JsonResponse
     {
-        abort_unless(auth()->check() && auth()->user()->role === 'sk_president',403);
+        abort_unless(auth()->check() && auth()->user()->role==='sk_president',403);
 
-        return response()->json(
-            $this->calendarPayload()
-        );
+        return response()->json($this->calendarPayload());
     }
 
-    public function storeLive(
-        Request $request,
-        NotificationService $notifications
-    ): JsonResponse {
-        abort_unless(auth()->check() && auth()->user()->role === 'sk_president',403);
+    public function storeLive(Request $request,NotificationService $notifications): JsonResponse
+    {
+        abort_unless(auth()->check() && auth()->user()->role==='sk_president',403);
 
         $currentTermId=$this->currentTermId();
 
@@ -195,50 +185,31 @@ class CalendarController extends Controller
             ],422);
         }
 
-        $validated=$this->validateEvent(
-            $request
-        );
-
-        $event=$this->createEvent(
-            $validated,
-            $currentTermId
-        );
+        $validated=$this->validateEvent($request);
+        $event=$this->createEvent($validated,$currentTermId);
 
         $notifications->notifyEventCreated(
             $event,
             auth()->user()
         );
 
-        return response()->json(
-            $this->calendarPayload()
-        );
+        return response()->json($this->calendarPayload());
     }
 
-    public function store(
-        Request $request,
-        NotificationService $notifications
-    ): RedirectResponse {
-        abort_unless(auth()->check() && auth()->user()->role === 'sk_president',403);
+    public function store(Request $request,NotificationService $notifications): RedirectResponse
+    {
+        abort_unless(auth()->check() && auth()->user()->role==='sk_president',403);
 
         $currentTermId=$this->currentTermId();
 
         if(!$currentTermId){
             return back()
                 ->withInput()
-                ->with(
-                    'warning',
-                    'There is no active administration term. Start a new administration term first.'
-                );
+                ->with('warning','There is no active administration term. Start a new administration term first.');
         }
 
-        $validated=$this->validateEvent(
-            $request
-        );
-
-        $event=$this->createEvent(
-            $validated,
-            $currentTermId
-        );
+        $validated=$this->validateEvent($request);
+        $event=$this->createEvent($validated,$currentTermId);
 
         $notifications->notifyEventCreated(
             $event,
@@ -247,23 +218,17 @@ class CalendarController extends Controller
 
         return redirect()
             ->route('sk_pres.calendar')
-            ->with(
-                'status',
-                'Event created successfully.'
-            );
+            ->with('status','Event created successfully.');
     }
 
     public function update(Request $request,int $eventId): RedirectResponse
     {
-        abort_unless(auth()->check() && auth()->user()->role === 'sk_president',403);
+        abort_unless(auth()->check() && auth()->user()->role==='sk_president',403);
 
         $currentTermId=$this->currentTermId();
 
         if(!$currentTermId){
-            return back()->with(
-                'warning',
-                'There is no active administration term.'
-            );
+            return back()->with('warning','There is no active administration term.');
         }
 
         $event=DB::table('events')
@@ -272,10 +237,7 @@ class CalendarController extends Controller
             ->first();
 
         if(!$event){
-            return back()->with(
-                'warning',
-                'Event was not found in the current administration.'
-            );
+            return back()->with('warning','Event was not found in the current administration.');
         }
 
         $validated=$this->validateEvent($request);
@@ -309,6 +271,7 @@ class CalendarController extends Controller
             'description'=>[
                 'nullable',
                 'string',
+                'max:2000',
             ],
             'location'=>[
                 'nullable',
@@ -331,10 +294,8 @@ class CalendarController extends Controller
         ]);
     }
 
-    protected function createEvent(
-        array $validated,
-        int $termId
-    ): object {
+    protected function createEvent(array $validated,int $termId): object
+    {
         $eventData=$this->eventData($validated);
 
         $eventId=DB::table('events')
@@ -362,9 +323,13 @@ class CalendarController extends Controller
             : $start->copy()->addHour();
 
         return [
-            'title'=>$validated['event_title'],
-            'description'=>$validated['description'] ?? null,
-            'location'=>$validated['location'] ?? null,
+            'title'=>trim($validated['event_title']),
+            'description'=>isset($validated['description']) && filled($validated['description'])
+                ? trim($validated['description'])
+                : null,
+            'location'=>isset($validated['location']) && filled($validated['location'])
+                ? trim($validated['location'])
+                : null,
             'event_type'=>$validated['event_type'],
             'start_datetime'=>$start,
             'end_datetime'=>$end,
@@ -403,6 +368,9 @@ class CalendarController extends Controller
                     'start'=>$event->start_datetime,
                     'end'=>$event->end_datetime,
                     'type'=>$event->event_type,
+                    'description'=>$event->description,
+                    'location'=>$event->location,
+                    'visibility'=>$event->visibility,
                 ];
             })
             ->merge(
@@ -412,10 +380,12 @@ class CalendarController extends Controller
                         'title'=>$slot->title,
                         'start'=>$slot->start_date,
                         'end'=>$slot->end_date,
-                        'type'=>
-                            $slot->submission_type==='budget_report'
-                                ? 'budget_slot'
-                                : 'report_slot',
+                        'type'=>$slot->submission_type==='budget_report'
+                            ? 'budget_slot'
+                            : 'report_slot',
+                        'description'=>$slot->description,
+                        'location'=>'Online submission',
+                        'visibility'=>$slot->role,
                     ];
                 })
             )
@@ -423,26 +393,59 @@ class CalendarController extends Controller
 
         return [
             'events'=>$calendarEvents,
-
             'upcomingEvents'=>$calendarEvents
                 ->filter(
                     fn($event)=>
-                        Carbon::parse(
-                            $event['end']
-                            ??
-                            $event['start']
-                        )
+                        Carbon::parse($event['end'] ?? $event['start'])
                             ->endOfDay()
                             ->greaterThanOrEqualTo(now())
                 )
                 ->sortBy('start')
                 ->take(5)
                 ->values(),
-
-            'updatedAt'=>now()->format(
-                'M d, Y h:i A'
-            ),
+            'updatedAt'=>now()->format('M d, Y h:i A'),
         ];
+    }
+
+    protected function eventTypeColor(?string $eventType): string
+    {
+        return match($eventType){
+            'meeting'=>'bg-blue-700',
+            'program'=>'bg-green-600',
+            'deadline'=>'bg-red-600',
+            default=>'bg-fuchsia-500',
+        };
+    }
+
+    protected function eventTypeLabel(?string $eventType): string
+    {
+        return match($eventType){
+            'meeting'=>'Meeting',
+            'program'=>'Event/Program',
+            'deadline'=>'Deadline',
+            default=>'Other Activity',
+        };
+    }
+
+    protected function eventTypeBadge(?string $eventType): string
+    {
+        return match($eventType){
+            'meeting'=>'bg-blue-100 text-blue-700',
+            'program'=>'bg-green-100 text-green-700',
+            'deadline'=>'bg-red-100 text-red-700',
+            default=>'bg-fuchsia-100 text-fuchsia-700',
+        };
+    }
+
+    protected function visibilityLabel(?string $visibility): string
+    {
+        return match($visibility){
+            'public'=>'All Users / Public',
+            'officials_only'=>'SK Chairman and SK Secretary',
+            'chairman_only'=>'SK Chairman Only',
+            'secretary_only'=>'SK Secretary Only',
+            default=>'Unspecified',
+        };
     }
 
     protected function currentTermId(): ?int
