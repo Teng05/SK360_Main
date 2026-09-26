@@ -621,27 +621,27 @@ class AuthController extends Controller
             ->whereIn('role',self::OFFICIAL_ROLES)
             ->first();
 
-        if(!$user){
+        if(!$user || !Hash::check($credentials['password'],$user->password)){
             return back()
-                ->withErrors(['email'=>'No official account found with this email.'])
+                ->withErrors([
+                    'login'=>'Invalid email or password.',
+                ])
                 ->onlyInput('email');
         }
 
         if($user->status !== 'active'){
             return back()
-                ->withErrors(['email'=>'Your account is inactive. Contact admin.'])
+                ->withErrors([
+                    'login'=>'Your account is inactive. Contact admin.',
+                ])
                 ->onlyInput('email');
         }
 
         if(!$user->is_verified){
             return back()
-                ->withErrors(['email'=>'Email not verified. Please check your inbox.'])
-                ->onlyInput('email');
-        }
-
-        if(!Hash::check($credentials['password'],$user->password)){
-            return back()
-                ->withErrors(['email'=>'Incorrect password.'])
+                ->withErrors([
+                    'login'=>'Your account is not yet verified. Please check your email or contact admin.',
+                ])
                 ->onlyInput('email');
         }
 

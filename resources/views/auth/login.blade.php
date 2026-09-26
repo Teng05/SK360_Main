@@ -103,7 +103,7 @@
 @push('scripts')
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
-@if (session('verified'))
+@if(session('verified'))
 <script>
 Swal.fire({
     icon:'success',
@@ -113,7 +113,15 @@ Swal.fire({
 </script>
 @endif
 
-@if ($errors->any())
+@if($errors->has('login'))
+<script>
+Swal.fire({
+    icon:'error',
+    title:'Login Failed',
+    text:@json($errors->first('login'))
+});
+</script>
+@elseif($errors->any())
 <script>
 Swal.fire({
     icon:'error',
