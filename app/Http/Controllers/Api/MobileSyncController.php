@@ -1353,6 +1353,7 @@ class MobileSyncController extends Controller
             'reporting_year' => ['nullable', 'integer', 'min:2000', 'max:2100'],
             'reporting_month' => ['nullable', 'integer', 'min:1', 'max:12'],
             'reporting_quarter' => ['nullable', 'in:Q1,Q2,Q3,Q4'],
+            'total_amount' => ['nullable', 'numeric', 'min:0'],
             'remarks' => ['nullable', 'string', 'max:5000'],
             'report_file' => ['required', 'file', 'mimes:pdf', 'max:5120'],
         ]);
@@ -2565,6 +2566,10 @@ class MobileSyncController extends Controller
             'created_at' => now(),
         ];
 
+        if (Schema::hasColumn('budget_reports', 'total_amount')) {
+            $data['total_amount'] = (float) ($validated['total_amount'] ?? 0);
+        }
+
         if (Schema::hasColumn('budget_reports', 'budget_period_type')) {
             $data['budget_period_type'] = $reportType;
             $data['fiscal_month'] = $reportType === 'monthly'
@@ -2574,6 +2579,19 @@ class MobileSyncController extends Controller
             $data['fiscal_quarter'] = $reportType === 'quarterly'
                 ? ($validated['reporting_quarter'] ?? 'Q1')
                 : null;
+        }
+
+        if (Schema::hasColumn('budget_reports', 'budget_category')) {
+            $data['budget_category'] = $slot->budget_category ?? null;
+        }
+        $amount = (float) ($validated['total_amount'] ?? 0);
+        if (($slot->budget_category ?? null) === 'annual_budget'
+            && Schema::hasColumn('budget_reports', 'annual_budget_amount')) {
+            $data['annual_budget_amount'] = $amount;
+        }
+        if (($slot->budget_category ?? null) === 'coa_report'
+            && Schema::hasColumn('budget_reports', 'actual_expenditure')) {
+            $data['actual_expenditure'] = $amount;
         }
 
         return $this->saveSlotReport('budget_reports', 'budget_report_id', $data);
