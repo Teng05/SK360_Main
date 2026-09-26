@@ -46,6 +46,7 @@ Route::prefix('mobile')->group(function(){
         Route::get('/submission-slots/{slotId}/submissions',[MobileSyncController::class,'submissionSlotSubmissions'])->name('mobile.submission-slots.submissions');
         Route::patch('/submission-slots/{slotId}/toggle',[MobileSyncController::class,'toggleSubmissionSlot'])->name('mobile.submission-slots.toggle');
         Route::post('/submission-slots',[MobileSyncController::class,'storeSubmissionSlot'])->name('mobile.submission-slots.store');
+        Route::patch('/submission-slots/{slotId}',[MobileSyncController::class,'updateSubmissionSlot'])->name('mobile.submission-slots.update');
         Route::delete('/submission-slots/{slotId}',[MobileSyncController::class,'deleteSubmissionSlot'])->name('mobile.submission-slots.destroy');
 
         Route::get('/consolidation',[MobileSyncController::class,'consolidation'])->name('mobile.consolidation');

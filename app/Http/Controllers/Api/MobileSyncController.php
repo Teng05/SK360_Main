@@ -1564,6 +1564,30 @@ class MobileSyncController extends Controller
         return response()->json(['message' => 'Submission slot status updated.']);
     }
 
+    public function updateSubmissionSlot(Request $request, int $slotId): JsonResponse
+    {
+        if (! $this->isPresident($request->user())) {
+            return response()->json(['message' => 'Only SK President can edit submission slots.'], 403);
+        }
+        $validated = $request->validate([
+            'title' => ['required', 'string', 'max:255'],
+            'description' => ['nullable', 'string', 'max:2000'],
+            'start_date' => ['required', 'date'],
+            'end_date' => ['required', 'date', 'after_or_equal:start_date'],
+            'status' => ['required', 'in:open,closed'],
+        ]);
+        $updated = DB::table('submission_slots')->where('slot_id', $slotId)->update([
+            'title' => $validated['title'],
+            'description' => $validated['description'] ?? null,
+            'start_date' => $validated['start_date'],
+            'end_date' => $validated['end_date'],
+            'status' => $validated['status'],
+            'updated_at' => now(),
+        ]);
+        if (! $updated) return response()->json(['message' => 'Submission slot not found.'], 404);
+        return response()->json(['message' => 'Submission slot updated.']);
+    }
+
     public function submissionSlotSubmissions(Request $request, int $slotId): JsonResponse
     {
         if (! $this->isPresident($request->user())) {
