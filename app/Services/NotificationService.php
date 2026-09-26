@@ -91,6 +91,57 @@ class NotificationService
 
     /*
     |--------------------------------------------------------------------------
+    | SUBMISSION SLOT UPDATED
+    |--------------------------------------------------------------------------
+    */
+
+    public function notifySubmissionSlotUpdated(
+        array $slot,
+        User $actor
+    ): void
+    {
+        $roles=match($slot['role']){
+            'SK Chairman'=>[
+                'sk_chairman',
+            ],
+
+            'SK Secretary'=>[
+                'sk_secretary',
+            ],
+
+            default=>[
+                'sk_chairman',
+                'sk_secretary',
+            ],
+        };
+
+        $targetType=
+            $slot['submission_type']===
+            'budget_report'
+                ? 'budget_slot'
+                : 'report_slot';
+
+        $this->createForRoles(
+            $roles,
+            $actor,
+            [
+                'type'=>$targetType,
+                'title'=>'Submission slot updated',
+                'message'=>
+                    $slot['title'].
+                    ' was updated. Submission period: '.
+                    $slot['start_date'].
+                    ' to '.
+                    $slot['end_date'].
+                    '. Authorized submitter: '.
+                    $slot['role'].'.',
+                'slot_id'=>(int)($slot['slot_id'] ?? 0),
+            ]
+        );
+    }
+
+    /*
+    |--------------------------------------------------------------------------
     | NEW SUBMISSION RECEIVED BY PRESIDENT
     |--------------------------------------------------------------------------
     */
@@ -423,7 +474,6 @@ class NotificationService
         $now=now();
 
         foreach($recipients as $recipient){
-
             $rows[]=[
                 'user_id'=>$recipient->user_id,
                 'actor_id'=>$actor->user_id,

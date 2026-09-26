@@ -1,13 +1,10 @@
 {{-- File guide: Blade view template for resources/views/sk_pres/module.blade.php. --}}
 @extends('layouts.app')
-
 @section('title', 'SK 360 Dashboard')
-
 @section('page_css')
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 @endsection
-
 @section('content')
 <div class="flex h-screen bg-[#f1f5f9] overflow-hidden">
     <div class="w-64 bg-red-600 text-white flex flex-col p-3 overflow-y-auto">
@@ -18,7 +15,6 @@
                 <p class="text-[10px] opacity-80">Management System</p>
             </div>
         </div>
-
         <div class="bg-red-500 rounded-lg p-2 flex items-center gap-2 mb-3 shadow text-xs">
             <div class="bg-yellow-400 text-red-600 p-1 rounded-full text-sm">👤</div>
             <div>
@@ -26,7 +22,6 @@
                 <p class="text-xs opacity-80">Active Role</p>
             </div>
         </div>
-
         <nav class="space-y-1 text-xs">
             @foreach($menuItems as $item)
                 <a href="{{ $item['link'] }}"
@@ -41,17 +36,14 @@
             @endforeach
         </nav>
     </div>
-
     <div class="flex-1 flex flex-col">
         <div class="bg-red-600 text-white px-6 py-3 flex justify-between items-center shadow">
             <input type="text" placeholder="Search..."
                 class="px-4 py-2 rounded-full text-black w-1/3 focus:outline-none">
-
             <div class="flex items-center gap-3 relative">
                 <div class="relative">
                     <button id="notifBtn" type="button"
                         class="text-xl hover:bg-red-500 p-2 rounded-lg transition">🔔</button>
-
                     <div id="notifDropdown"
                         class="hidden absolute right-0 mt-3 w-72 bg-white rounded-2xl shadow-xl border z-50 overflow-hidden">
                         <div class="px-4 py-3 font-semibold border-b text-gray-800">Notifications</div>
@@ -62,23 +54,19 @@
                         </div>
                     </div>
                 </div>
-
                 <div class="relative">
                     <button id="userMenuBtn" type="button"
                         class="flex items-center gap-2 hover:bg-red-500 px-3 py-2 rounded-lg transition">
                         <span class="font-semibold">{{ $fullName }}</span>
                     </button>
-
                     <div id="userDropdown"
                         class="hidden absolute right-0 mt-3 w-64 bg-white rounded-2xl shadow-xl border overflow-hidden z-50">
                         <div class="px-5 py-4 font-semibold text-gray-800 border-b">My Account</div>
-
                         <a href="{{ route('sk_pres.profile') }}"
                             class="flex items-center gap-3 px-5 py-3 hover:bg-gray-100 transition">
                             <span>👤</span>
                             <span class="text-gray-700">Profile Settings</span>
                         </a>
-
                         <form method="POST" action="{{ route('logout') }}">
                             @csrf
                             <button type="submit"
@@ -91,7 +79,6 @@
                 </div>
             </div>
         </div>
-
         <main class="flex-1 overflow-y-auto p-8 bg-[#f8fafc]">
             <div class="flex items-start justify-between mb-8">
                 <div>
@@ -102,58 +89,54 @@
                         Create and manage submission periods for Accomplishment Reports and Budget & Financial Reports
                     </p>
                 </div>
-
                 <button id="openModalBtn"
                     class="bg-red-600 hover:bg-red-700 text-white px-5 py-3 rounded-lg text-sm font-semibold shadow-sm">
                     ＋ Create Submission Slot
                 </button>
             </div>
-
             @if(session('status'))
                 <div class="mb-6 rounded-2xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
                     {{ session('status') }}
                 </div>
             @endif
-
             @if(session('warning'))
                 <div class="mb-6 rounded-2xl border border-yellow-200 bg-yellow-50 px-4 py-3 text-sm text-yellow-700">
                     {{ session('warning') }}
                 </div>
             @endif
-
             @if($errors->any())
                 <div class="mb-6 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                    {{ $errors->first() }}
+                    <p class="font-bold">Unable to save the submission slot. Please correct the following:</p>
+                    <ul class="mt-2 list-disc pl-5 space-y-1">
+                        @foreach($errors->all() as $error)
+                            <li>{{ $error }}</li>
+                        @endforeach
+                    </ul>
                 </div>
             @endif
-
             <div id="submissionModal"
                 class="fixed inset-0 bg-black/40 hidden items-center justify-center z-50 px-4">
-
                 <div class="bg-white w-full max-w-3xl max-h-[92vh] overflow-y-auto rounded-[24px] border-2 border-blue-500 shadow-2xl p-8 relative">
                     <button id="closeModalBtn" type="button"
                         class="absolute top-4 right-5 text-gray-500 hover:text-red-600 text-2xl font-bold">
                         &times;
                     </button>
-
                     <h2 id="slotModalTitle" class="text-4xl font-bold text-gray-900 mb-2">
                         Create New Submission Slot
                     </h2>
-
                     <p id="slotModalDescription" class="text-gray-600 mb-8 text-base">
                         Set up a new submission period for SK officials to submit reports
                     </p>
-
-                    <form id="slotForm" action="{{ route('sk_pres.module.store') }}" method="POST" class="space-y-6">
+                    <form id="slotForm" action="{{ route('sk_pres.module.store') }}" method="POST" class="space-y-6" novalidate>
                         @csrf
                         <input type="hidden" id="slotFormMethod" name="_method" value="PUT" disabled>
-
+                        <input type="hidden" id="slotFormContext" name="form_context" value="{{ old('form_context','create') }}">
+                        <input type="hidden" id="editingSlotId" name="editing_slot_id" value="{{ old('editing_slot_id') }}">
                         <div>
                             <label class="block text-lg font-semibold text-gray-900 mb-2">
                                 Submission Type
                             </label>
-
-                            <select id="submissionType" name="submission_type"
+                            <select id="submissionType" name="submission_type" required
                                 class="w-full h-14 px-4 rounded-xl border border-red-300 bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-400">
                                 <option value="accomplishment_report"
                                     @selected(old('submission_type','accomplishment_report') === 'accomplishment_report')>
@@ -165,22 +148,18 @@
                                 </option>
                             </select>
                         </div>
-
                         <div id="accomplishmentDetails"
                             class="space-y-5 rounded-2xl border border-blue-200 bg-blue-50/40 p-5">
-
                             <div>
                                 <h3 class="text-lg font-bold text-gray-900">Accomplishment Report Details</h3>
                                 <p class="text-sm text-gray-500 mt-1">
                                     Classify the accomplishment requirement for reporting and ranking purposes.
                                 </p>
                             </div>
-
                             <div>
                                 <label class="block text-sm font-semibold text-gray-900 mb-2">
                                     Accomplishment Category
                                 </label>
-
                                 <select id="accomplishmentCategory" name="accomplishment_category"
                                     class="w-full h-14 px-4 rounded-xl border border-blue-300 bg-white focus:outline-none focus:ring-2 focus:ring-blue-400">
                                     <option value="general"
@@ -197,32 +176,26 @@
                                     </option>
                                 </select>
                             </div>
-
                             <div id="ydpProgramSection" class="hidden">
                                 <label class="block text-sm font-semibold text-gray-900 mb-2">
                                     YDP Program Type
                                 </label>
-
                                 <select id="ydpProgramType" name="ydp_program_type"
                                     class="w-full h-14 px-4 rounded-xl border border-blue-300 bg-white focus:outline-none focus:ring-2 focus:ring-blue-400">
                                     <option value="">Select program type</option>
-
                                     @foreach($ydpProgramTypes as $value=>$label)
                                         <option value="{{ $value }}" @selected(old('ydp_program_type') === $value)>
                                             {{ $label }}
                                         </option>
                                     @endforeach
                                 </select>
-
                                 <p class="text-xs text-gray-500 mt-2">
                                     Choose the program type based on the SK Youth Development Program checklist.
                                 </p>
                             </div>
                         </div>
-
                         <div id="budgetDetails"
                             class="hidden space-y-5 rounded-2xl border border-red-200 bg-red-50/40 p-5">
-
                             <div>
                                 <h3 class="text-lg font-bold text-gray-900">
                                     Budget / Financial Report Details
@@ -231,13 +204,11 @@
                                     Specify what type of financial submission is expected from the barangay.
                                 </p>
                             </div>
-
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
                                 <div>
                                     <label class="block text-sm font-semibold text-gray-900 mb-2">
                                         Report Category
                                     </label>
-
                                     <select id="budgetCategory" name="budget_category"
                                         class="w-full h-14 px-4 rounded-xl border border-red-300 bg-white focus:outline-none focus:ring-2 focus:ring-red-400">
                                         <option value="">Select category</option>
@@ -255,24 +226,20 @@
                                         </option>
                                     </select>
                                 </div>
-
                                 <div>
                                     <label class="block text-sm font-semibold text-gray-900 mb-2">
                                         Fiscal Year
                                     </label>
-
                                     <input id="fiscalYear" type="number" name="fiscal_year"
                                         min="2000" max="2100"
                                         value="{{ old('fiscal_year',now()->year) }}"
                                         class="w-full h-14 px-4 rounded-xl border border-red-300 bg-white focus:outline-none focus:ring-2 focus:ring-red-400">
                                 </div>
                             </div>
-
                             <div id="reportPeriodSection" class="hidden">
                                 <label class="block text-sm font-semibold text-gray-900 mb-2">
                                     Reporting Period
                                 </label>
-
                                 <select id="budgetPeriodType" name="budget_period_type"
                                     class="w-full h-14 px-4 rounded-xl border border-red-300 bg-white focus:outline-none focus:ring-2 focus:ring-red-400">
                                     <option value="">Select reporting period</option>
@@ -290,14 +257,11 @@
                                     </option>
                                 </select>
                             </div>
-
                             <div id="monthlySection" class="hidden">
                                 <label class="block text-sm font-semibold text-gray-900 mb-2">Month</label>
-
                                 <select id="fiscalMonth" name="fiscal_month"
                                     class="w-full h-14 px-4 rounded-xl border border-red-300 bg-white focus:outline-none focus:ring-2 focus:ring-red-400">
                                     <option value="">Select month</option>
-
                                     @foreach([
                                         1=>'January',
                                         2=>'February',
@@ -319,10 +283,8 @@
                                     @endforeach
                                 </select>
                             </div>
-
                             <div id="quarterlySection" class="hidden">
                                 <label class="block text-sm font-semibold text-gray-900 mb-2">Quarter</label>
-
                                 <select id="fiscalQuarter" name="fiscal_quarter"
                                     class="w-full h-14 px-4 rounded-xl border border-red-300 bg-white focus:outline-none focus:ring-2 focus:ring-red-400">
                                     <option value="">Select quarter</option>
@@ -340,12 +302,10 @@
                                     </option>
                                 </select>
                             </div>
-
                             <div id="semiAnnualSection" class="hidden">
                                 <label class="block text-sm font-semibold text-gray-900 mb-2">
                                     Semi-Annual Period
                                 </label>
-
                                 <select id="fiscalHalf" name="fiscal_half"
                                     class="w-full h-14 px-4 rounded-xl border border-red-300 bg-white focus:outline-none focus:ring-2 focus:ring-red-400">
                                     <option value="">Select period</option>
@@ -358,34 +318,28 @@
                                 </select>
                             </div>
                         </div>
-
                         <div>
                             <label class="block text-lg font-semibold text-gray-900 mb-2">
                                 Submission Title
                             </label>
-
-                            <input type="text" id="submissionTitle" name="submission_title"
+                            <input type="text" id="submissionTitle" name="submission_title" maxlength="255" required
                                 class="w-full h-14 px-4 rounded-xl border border-red-300 bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-400"
                                 value="{{ old('submission_title') }}"
                                 placeholder="Enter the specific report or program title">
                         </div>
-
                         <div>
                             <label class="block text-lg font-semibold text-gray-900 mb-2">
                                 Description
                             </label>
-
-                            <input type="text" id="submissionDescription" name="description"
+                            <input type="text" id="submissionDescription" name="description" maxlength="2000" required
                                 class="w-full h-14 px-4 rounded-xl border border-red-300 bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-400"
                                 value="{{ old('description') }}">
                         </div>
-
                         <div>
                             <label class="block text-lg font-semibold text-gray-900 mb-2">
                                 Who Can Submit
                             </label>
-
-                            <select id="submissionRole" name="submission_role"
+                            <select id="submissionRole" name="submission_role" required
                                 class="w-full h-14 px-4 rounded-xl border border-red-300 bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-400">
                                 <option value="SK Chairman"
                                     @selected(old('submission_role') === 'SK Chairman')>
@@ -401,29 +355,24 @@
                                 </option>
                             </select>
                         </div>
-
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
                             <div>
                                 <label class="block text-lg font-semibold text-gray-900 mb-2">
                                     Start Date
                                 </label>
-
-                                <input type="date" id="startDate" name="start_date"
+                                <input type="date" id="startDate" name="start_date" required
                                     class="w-full h-14 px-4 rounded-xl border border-red-300 bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-400"
-                                    value="{{ old('start_date') }}">
+                                    value="{{ old('start_date',now('Asia/Manila')->toDateString()) }}">
                             </div>
-
                             <div>
                                 <label class="block text-lg font-semibold text-gray-900 mb-2">
                                     Submission Deadline
                                 </label>
-
-                                <input type="date" id="endDate" name="end_date"
+                                <input type="date" id="endDate" name="end_date" required
                                     class="w-full h-14 px-4 rounded-xl border border-red-300 bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-400"
                                     value="{{ old('end_date') }}">
                             </div>
                         </div>
-
                         <button id="slotSubmitButton" type="submit"
                             class="w-full bg-red-600 hover:bg-red-700 text-white text-2xl font-bold py-4 rounded-2xl transition">
                             Create Slot
@@ -431,7 +380,6 @@
                     </form>
                 </div>
             </div>
-
             <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5 mb-10">
                 @foreach($summaryCards as $card)
                     <div class="bg-white rounded-2xl border {{ $card['border'] }} p-5">
@@ -442,7 +390,6 @@
                                     {{ $card['value'] }}
                                 </h3>
                             </div>
-
                             <div class="w-12 h-12 rounded-xl {{ $card['iconBg'] }} flex items-center justify-center {{ $card['iconColor'] }} text-xl">
                                 {{ $card['icon'] }}
                             </div>
@@ -450,27 +397,23 @@
                     </div>
                 @endforeach
             </div>
-
             @php
                 $accomplishmentCategoryLabels=[
                     'general'=>'General Accomplishment',
                     'youth_development_program'=>'Youth Development Program',
                     'kk_assembly'=>'KK Assembly',
                 ];
-
                 $budgetCategoryLabels=[
                     'annual_budget'=>'Annual Budget',
                     'supplemental_budget'=>'Supplemental Budget',
                     'coa_report'=>'Financial / COA Report',
                 ];
-
                 $budgetPeriodLabels=[
                     'monthly'=>'Monthly',
                     'quarterly'=>'Quarterly',
                     'semi_annual'=>'Semi-Annual',
                     'annual'=>'Annual',
                 ];
-
                 $monthNames=[
                     1=>'January',
                     2=>'February',
@@ -485,7 +428,6 @@
                     11=>'November',
                     12=>'December',
                 ];
-
                 $slotGroupSettings=[
                     'past_deadline'=>[
                         'title'=>'Past Deadline',
@@ -521,33 +463,27 @@
                     ],
                 ];
             @endphp
-
             <div id="slotContainer" class="space-y-8">
                 @foreach($slotGroupSettings as $groupKey=>$group)
                     @php
                         $groupSlots=$slotGroups[$groupKey];
                     @endphp
-
                     <section id="{{ $groupKey }}-slots"
                         class="rounded-3xl border {{ $group['sectionBorder'] }} {{ $group['sectionBg'] }} overflow-hidden">
-
                         <div class="px-6 py-5 bg-white/80 border-b {{ $group['sectionBorder'] }} flex items-center justify-between gap-4">
                             <div class="flex items-start gap-3">
                                 <div class="w-10 h-10 rounded-xl bg-white border {{ $group['sectionBorder'] }} flex items-center justify-center text-lg">
                                     {{ $group['icon'] }}
                                 </div>
-
                                 <div>
                                     <h3 class="text-lg font-bold text-gray-900">{{ $group['title'] }}</h3>
                                     <p class="text-sm text-gray-500 mt-1">{{ $group['description'] }}</p>
                                 </div>
                             </div>
-
                             <span class="shrink-0 min-w-9 h-9 px-3 rounded-full bg-white border {{ $group['sectionBorder'] }} flex items-center justify-center text-sm font-bold text-gray-700">
                                 {{ $groupSlots->total() }}
                             </span>
                         </div>
-
                         <div class="p-5">
                             @if($groupSlots->isEmpty())
                                 <div class="rounded-2xl border border-dashed {{ $group['sectionBorder'] }} bg-white/60 p-8 text-center text-sm text-gray-400">
@@ -563,16 +499,13 @@
                                                         <span class="text-[10px] font-black uppercase tracking-wider text-gray-400">
                                                             {{ $slot->submission_type === 'budget_report' ? 'Budget / Financial Report' : 'Accomplishment Report' }}
                                                         </span>
-
                                                         <span class="text-[10px] font-black uppercase px-2.5 py-1 rounded-full {{ $slot->management_state_badge ?? 'bg-gray-100 text-gray-600' }}">
                                                             {{ $slot->management_state_label ?? ucfirst($slot->status) }}
                                                         </span>
                                                     </div>
-
                                                     <h4 class="text-lg font-bold text-gray-900 break-words">
                                                         {{ $slot->title }}
                                                     </h4>
-
                                                     @if(!empty($slot->description))
                                                         <p class="text-sm text-gray-500 mt-1 break-words">
                                                             {{ $slot->description }}
@@ -580,7 +513,6 @@
                                                     @endif
                                                 </div>
                                             </div>
-
                                             @if($slot->submission_type === 'accomplishment_report')
                                                 <div class="mb-4 flex flex-wrap gap-2">
                                                     @if(!empty($slot->accomplishment_category))
@@ -588,7 +520,6 @@
                                                             {{ $accomplishmentCategoryLabels[$slot->accomplishment_category] ?? $slot->accomplishment_category }}
                                                         </span>
                                                     @endif
-
                                                     @if($slot->accomplishment_category === 'youth_development_program' && !empty($slot->ydp_program_type))
                                                         <span class="text-xs bg-green-50 text-green-600 border border-green-100 px-3 py-1.5 rounded-full font-medium">
                                                             {{ $ydpProgramTypes[$slot->ydp_program_type] ?? $slot->ydp_program_type }}
@@ -596,7 +527,6 @@
                                                     @endif
                                                 </div>
                                             @endif
-
                                             @if($slot->submission_type === 'budget_report')
                                                 <div class="mb-4 flex flex-wrap gap-2">
                                                     @if(!empty($slot->budget_category))
@@ -604,17 +534,14 @@
                                                             {{ $budgetCategoryLabels[$slot->budget_category] ?? $slot->budget_category }}
                                                         </span>
                                                     @endif
-
                                                     @if(!empty($slot->fiscal_year))
                                                         <span class="text-xs bg-blue-50 text-blue-600 border border-blue-100 px-3 py-1.5 rounded-full font-medium">
                                                             FY {{ $slot->fiscal_year }}
                                                         </span>
                                                     @endif
-
                                                     @if($slot->budget_category === 'coa_report' && !empty($slot->budget_period_type))
                                                         <span class="text-xs bg-purple-50 text-purple-600 border border-purple-100 px-3 py-1.5 rounded-full font-medium">
                                                             {{ $budgetPeriodLabels[$slot->budget_period_type] ?? $slot->budget_period_type }}
-
                                                             @if($slot->budget_period_type === 'monthly' && !empty($slot->fiscal_month))
                                                                 - {{ $monthNames[(int)$slot->fiscal_month] ?? '' }}
                                                             @elseif($slot->budget_period_type === 'quarterly' && !empty($slot->fiscal_quarter))
@@ -626,7 +553,6 @@
                                                     @endif
                                                 </div>
                                             @endif
-
                                             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
                                                 <div class="rounded-xl bg-gray-50 px-4 py-3">
                                                     <p class="text-[10px] font-black uppercase tracking-wider text-gray-400">
@@ -636,7 +562,6 @@
                                                         {{ \Carbon\Carbon::parse($slot->start_date)->format('M d, Y') }}
                                                     </p>
                                                 </div>
-
                                                 <div class="rounded-xl {{ $groupKey === 'past_deadline' ? 'bg-orange-50' : 'bg-gray-50' }} px-4 py-3">
                                                     <p class="text-[10px] font-black uppercase tracking-wider {{ $groupKey === 'past_deadline' ? 'text-orange-500' : 'text-gray-400' }}">
                                                         Submission Deadline
@@ -646,53 +571,48 @@
                                                     </p>
                                                 </div>
                                             </div>
-
                                             <div class="flex flex-wrap items-center gap-2">
                                                 <span class="text-xs bg-gray-100 text-gray-600 px-3 py-1.5 rounded-full font-medium">
                                                     {{ $slot->role }}
                                                 </span>
-
                                                 @if($groupKey === 'past_deadline')
                                                     <span class="text-xs bg-orange-100 text-orange-700 px-3 py-1.5 rounded-full font-bold">
                                                         Deadline Passed
                                                     </span>
                                                 @endif
                                             </div>
-
                                             <div class="mt-5 pt-5 border-t border-gray-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                                                 <span class="text-xs text-gray-400">
                                                     Slot #{{ $slot->slot_id }}
                                                 </span>
-
                                                 <div class="flex flex-wrap gap-2">
-                                                    <button type="button"
-                                                        class="edit-slot-btn inline-flex items-center justify-center gap-2 rounded-xl border border-blue-200 bg-blue-50 hover:bg-blue-100 px-4 py-2.5 text-xs font-bold text-blue-600 transition"
-                                                        data-update-url="{{ route('sk_pres.module.update',$slot->slot_id) }}"
-                                                        data-submission-type="{{ $slot->submission_type }}"
-                                                        data-accomplishment-category="{{ $slot->accomplishment_category }}"
-                                                        data-ydp-program-type="{{ $slot->ydp_program_type }}"
-                                                        data-budget-category="{{ $slot->budget_category }}"
-                                                        data-fiscal-year="{{ $slot->fiscal_year }}"
-                                                        data-budget-period-type="{{ $slot->budget_period_type }}"
-                                                        data-fiscal-month="{{ $slot->fiscal_month }}"
-                                                        data-fiscal-quarter="{{ $slot->fiscal_quarter }}"
-                                                        data-fiscal-half="{{ $slot->fiscal_half }}"
-                                                        data-title="{{ $slot->title }}"
-                                                        data-description="{{ $slot->description }}"
-                                                        data-role="{{ $slot->role }}"
-                                                        data-start-date="{{ $slot->start_date }}"
-                                                        data-end-date="{{ $slot->end_date }}">
-                                                        ✎ Edit
-                                                    </button>
-
                                                     @if($slot->status === 'open')
+                                                        <button type="button"
+                                                            class="edit-slot-btn inline-flex items-center justify-center gap-2 rounded-xl border border-blue-200 bg-blue-50 hover:bg-blue-100 px-4 py-2.5 text-xs font-bold text-blue-600 transition"
+                                                            data-slot-id="{{ $slot->slot_id }}"
+                                                            data-update-url="{{ route('sk_pres.module.update',$slot->slot_id) }}"
+                                                            data-submission-type="{{ $slot->submission_type }}"
+                                                            data-accomplishment-category="{{ $slot->accomplishment_category }}"
+                                                            data-ydp-program-type="{{ $slot->ydp_program_type }}"
+                                                            data-budget-category="{{ $slot->budget_category }}"
+                                                            data-fiscal-year="{{ $slot->fiscal_year }}"
+                                                            data-budget-period-type="{{ $slot->budget_period_type }}"
+                                                            data-fiscal-month="{{ $slot->fiscal_month }}"
+                                                            data-fiscal-quarter="{{ $slot->fiscal_quarter }}"
+                                                            data-fiscal-half="{{ $slot->fiscal_half }}"
+                                                            data-title="{{ $slot->title }}"
+                                                            data-description="{{ $slot->description }}"
+                                                            data-role="{{ $slot->role }}"
+                                                            data-start-date="{{ $slot->start_date }}"
+                                                            data-end-date="{{ $slot->end_date }}">
+                                                            ✎ Edit
+                                                        </button>
                                                         <button type="button"
                                                             onclick="closeSlot({{ $slot->slot_id }},@js($slot->title))"
                                                             class="inline-flex items-center justify-center gap-2 rounded-xl bg-gray-900 hover:bg-black px-4 py-2.5 text-xs font-bold text-white transition">
                                                             🔒 Close Slot
                                                         </button>
                                                     @endif
-
                                                     <button type="button"
                                                         onclick="deleteSlot({{ $slot->slot_id }},@js($slot->title))"
                                                         class="inline-flex items-center justify-center gap-2 rounded-xl border border-red-200 bg-red-50 hover:bg-red-100 px-4 py-2.5 text-xs font-bold text-red-600 transition">
@@ -700,7 +620,6 @@
                                                     </button>
                                                 </div>
                                             </div>
-
                                             @if($slot->status === 'open')
                                                 <form id="close-slot-{{ $slot->slot_id }}" method="POST"
                                                     action="{{ route('sk_pres.module.close',$slot->slot_id) }}" class="hidden">
@@ -708,7 +627,6 @@
                                                     @method('PATCH')
                                                 </form>
                                             @endif
-
                                             <form id="delete-slot-{{ $slot->slot_id }}" method="POST"
                                                 action="{{ route('sk_pres.module.destroy',$slot->slot_id) }}" class="hidden">
                                                 @csrf
@@ -716,7 +634,6 @@
                                         </article>
                                     @endforeach
                                 </div>
-
                                 @if($groupSlots->hasPages())
                                     <div class="mt-6 pt-5 border-t {{ $group['sectionBorder'] }}">
                                         {{ $groupSlots->onEachSide(1)->fragment($groupKey.'-slots')->links() }}
@@ -731,10 +648,8 @@
     </div>
 </div>
 @endsection
-
 @push('scripts')
 @vite(['resources/js/app.js'])
-
 <script>
     const notifBtn=document.getElementById('notifBtn');
     const notifDropdown=document.getElementById('notifDropdown');
@@ -745,6 +660,8 @@
     const submissionModal=document.getElementById('submissionModal');
     const slotForm=document.getElementById('slotForm');
     const slotFormMethod=document.getElementById('slotFormMethod');
+    const slotFormContext=document.getElementById('slotFormContext');
+    const editingSlotId=document.getElementById('editingSlotId');
     const slotModalTitle=document.getElementById('slotModalTitle');
     const slotModalDescription=document.getElementById('slotModalDescription');
     const slotSubmitButton=document.getElementById('slotSubmitButton');
@@ -770,17 +687,15 @@
     const startDate=document.getElementById('startDate');
     const endDate=document.getElementById('endDate');
     const createSlotUrl=@js(route('sk_pres.module.store'));
-
+    const todayDate=@js(now('Asia/Manila')->toDateString());
     function syncAccomplishmentFields(){
         const isAccomplishment=submissionType.value==='accomplishment_report';
         const isYdp=isAccomplishment && accomplishmentCategory.value==='youth_development_program';
-
         accomplishmentDetails.classList.toggle('hidden',!isAccomplishment);
         accomplishmentCategory.required=isAccomplishment;
         ydpProgramSection.classList.toggle('hidden',!isYdp);
         ydpProgramType.required=isYdp;
     }
-
     function syncBudgetFields(){
         const isBudget=submissionType.value==='budget_report';
         const isCoaReport=isBudget && budgetCategory.value==='coa_report';
@@ -788,7 +703,6 @@
         const isMonthly=isCoaReport && period==='monthly';
         const isQuarterly=isCoaReport && period==='quarterly';
         const isSemiAnnual=isCoaReport && period==='semi_annual';
-
         budgetDetails.classList.toggle('hidden',!isBudget);
         budgetCategory.required=isBudget;
         fiscalYear.required=isBudget;
@@ -801,75 +715,74 @@
         fiscalQuarter.required=isQuarterly;
         fiscalHalf.required=isSemiAnnual;
     }
-
     function syncSlotFields(){
         syncAccomplishmentFields();
         syncBudgetFields();
     }
-
     notifBtn.addEventListener('click',function(e){
         e.stopPropagation();
         notifDropdown.classList.toggle('hidden');
         userDropdown.classList.add('hidden');
     });
-
     userMenuBtn.addEventListener('click',function(e){
         e.stopPropagation();
         userDropdown.classList.toggle('hidden');
         notifDropdown.classList.add('hidden');
     });
-
     document.addEventListener('click',function(e){
         if(!notifBtn.contains(e.target) && !notifDropdown.contains(e.target)){
             notifDropdown.classList.add('hidden');
         }
-
         if(!userMenuBtn.contains(e.target) && !userDropdown.contains(e.target)){
             userDropdown.classList.add('hidden');
         }
     });
-
     function openSlotModal(){
         submissionModal.classList.remove('hidden');
         submissionModal.classList.add('flex');
         syncSlotFields();
     }
-
     function closeSlotModal(){
         submissionModal.classList.add('hidden');
         submissionModal.classList.remove('flex');
     }
-
     function openCreateSlotModal(){
         slotForm.reset();
         slotForm.action=createSlotUrl;
         slotFormMethod.disabled=true;
+        slotFormContext.value='create';
+        editingSlotId.value='';
         slotModalTitle.textContent='Create New Submission Slot';
         slotModalDescription.textContent='Set up a new submission period for SK officials to submit reports';
         slotSubmitButton.textContent='Create Slot';
         fiscalYear.value=new Date().getFullYear();
         submissionType.value='accomplishment_report';
         accomplishmentCategory.value='general';
+        ydpProgramType.value='';
         budgetCategory.value='';
         budgetPeriodType.value='';
         fiscalMonth.value='';
         fiscalQuarter.value='';
         fiscalHalf.value='';
+        submissionTitle.value='';
+        submissionDescription.value='';
+        submissionRole.value='Both';
+        startDate.value=todayDate;
+        endDate.value='';
         openSlotModal();
     }
-
     function setFieldValue(field,value){
         field.value=value || '';
     }
-
     function openEditSlotModal(button){
         slotForm.reset();
         slotForm.action=button.dataset.updateUrl;
         slotFormMethod.disabled=false;
+        slotFormContext.value='edit';
+        editingSlotId.value=button.dataset.slotId || '';
         slotModalTitle.textContent='Edit Submission Slot';
-        slotModalDescription.textContent='Update this submission slot without changing its current status.';
+        slotModalDescription.textContent='Update the deadline, description, authorized role, or allowed submission settings.';
         slotSubmitButton.textContent='Save Changes';
-
         setFieldValue(submissionType,button.dataset.submissionType);
         setFieldValue(accomplishmentCategory,button.dataset.accomplishmentCategory || 'general');
         setFieldValue(ydpProgramType,button.dataset.ydpProgramType);
@@ -884,33 +797,66 @@
         setFieldValue(submissionRole,button.dataset.role);
         setFieldValue(startDate,button.dataset.startDate);
         setFieldValue(endDate,button.dataset.endDate);
-
         openSlotModal();
     }
-
     openModalBtn.addEventListener('click',openCreateSlotModal);
-
     closeModalBtn.addEventListener('click',function(){
         closeSlotModal();
     });
-
     submissionModal.addEventListener('click',function(e){
         if(e.target===submissionModal){
             closeSlotModal();
         }
     });
-
     document.querySelectorAll('.edit-slot-btn').forEach(button=>{
         button.addEventListener('click',()=>{
             openEditSlotModal(button);
         });
     });
-
     submissionType.addEventListener('change',syncSlotFields);
     accomplishmentCategory.addEventListener('change',syncAccomplishmentFields);
     budgetCategory.addEventListener('change',syncBudgetFields);
     budgetPeriodType.addEventListener('change',syncBudgetFields);
-
+    function fieldLabel(field){
+        const labels={
+            submission_type:'Submission Type',
+            accomplishment_category:'Accomplishment Category',
+            ydp_program_type:'YDP Program Type',
+            budget_category:'Report Category',
+            fiscal_year:'Fiscal Year',
+            budget_period_type:'Reporting Period',
+            fiscal_month:'Month',
+            fiscal_quarter:'Quarter',
+            fiscal_half:'Semi-Annual Period',
+            submission_title:'Submission Title',
+            description:'Description',
+            submission_role:'Who Can Submit',
+            start_date:'Start Date',
+            end_date:'Submission Deadline'
+        };
+        return labels[field.name] || field.name;
+    }
+    slotForm.addEventListener('submit',function(e){
+        syncSlotFields();
+        const invalidFields=Array.from(slotForm.querySelectorAll('[required]'))
+            .filter(field=>!field.checkValidity());
+        if(invalidFields.length===0 && slotForm.checkValidity()){
+            return;
+        }
+        e.preventDefault();
+        const labels=[...new Set(invalidFields.map(field=>fieldLabel(field)))];
+        Swal.fire({
+            icon:'warning',
+            title:'Incomplete or Invalid Fields',
+            html:labels.length
+                ? `Please complete or correct:<br><strong>${labels.join(', ')}</strong>`
+                : 'Please complete all required fields correctly.',
+            confirmButtonColor:'#dc2626'
+        }).then(()=>{
+            invalidFields[0]?.focus();
+            slotForm.reportValidity();
+        });
+    });
     function closeSlot(id,title){
         Swal.fire({
             title:'Close Submission Slot?',
@@ -925,7 +871,6 @@
             }
         });
     }
-
     function deleteSlot(id,title){
         Swal.fire({
             title:'Delete Slot?',
@@ -940,15 +885,30 @@
             }
         });
     }
-
     document.addEventListener('DOMContentLoaded',function(){
         syncSlotFields();
     });
-
     @if($errors->any())
+        slotForm.action=@js(old('form_context')==='edit' && old('editing_slot_id')
+            ? route('sk_pres.module.update',old('editing_slot_id'))
+            : route('sk_pres.module.store'));
+        slotFormMethod.disabled={{ old('form_context')==='edit' && old('editing_slot_id') ? 'false' : 'true' }};
+        slotFormContext.value=@js(old('form_context','create'));
+        editingSlotId.value=@js(old('editing_slot_id',''));
+        slotModalTitle.textContent=@js(old('form_context')==='edit' ? 'Edit Submission Slot' : 'Create New Submission Slot');
+        slotModalDescription.textContent=@js(old('form_context')==='edit'
+            ? 'Correct the invalid fields. The previous saved slot data has not been changed.'
+            : 'Complete the required fields to create a submission slot.');
+        slotSubmitButton.textContent=@js(old('form_context')==='edit' ? 'Save Changes' : 'Create Slot');
         submissionModal.classList.remove('hidden');
         submissionModal.classList.add('flex');
         syncSlotFields();
+        Swal.fire({
+            icon:'warning',
+            title:'Incomplete or Invalid Fields',
+            html:{!! json_encode(implode('<br>',$errors->all())) !!},
+            confirmButtonColor:'#dc2626'
+        });
     @endif
 </script>
 @endpush

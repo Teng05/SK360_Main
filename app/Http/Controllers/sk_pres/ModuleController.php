@@ -1,7 +1,5 @@
 <?php
-
 namespace App\Http\Controllers\sk_pres;
-
 use App\Http\Controllers\Controller;
 use App\Services\NotificationService;
 use Carbon\Carbon;
@@ -12,18 +10,16 @@ use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
-
 class ModuleController extends Controller
 {
     public function index(): View
     {
         abort_unless(auth()->check() && auth()->user()->role === 'sk_president',403);
-
         $user=auth()->user();
         $fullName=trim(($user->first_name ?? '').' '.($user->last_name ?? '')) ?: 'User';
         $currentTermId=$this->currentTermId();
-
         $menuItems=[
             ['link'=>route('sk_pres.home'),'icon'=>'🏠','label'=>'Home'],
             ['link'=>route('sk_pres.dashboard'),'icon'=>'📊','label'=>'Dashboard'],
@@ -38,10 +34,8 @@ class ModuleController extends Controller
             ['link'=>route('sk_pres.archive'),'icon'=>'🗂️','label'=>'Archive'],
             ['link'=>route('sk_pres.user-management'),'icon'=>'👤','label'=>'User Management'],
         ];
-
         $slotGroups=$this->paginatedSlotGroups($currentTermId);
         $counts=$this->slotStateCounts($currentTermId);
-
         return view('sk_pres.module',[
             'fullName'=>$fullName,
             'menuItems'=>$menuItems,
@@ -84,33 +78,25 @@ class ModuleController extends Controller
             ],
         ]);
     }
-
     public function live(): JsonResponse
     {
         abort_unless(auth()->check() && auth()->user()->role === 'sk_president',403);
-
         return response()->json($this->modulePayload());
     }
-
     public function storeLive(Request $request,NotificationService $notifications): JsonResponse
     {
         abort_unless(auth()->check() && auth()->user()->role === 'sk_president',403);
-
         $currentTermId=$this->currentTermId();
-
         if(!$currentTermId){
             return response()->json([
                 'message'=>'There is no active administration term. Start a new administration term first.',
             ],422);
         }
-
         $validated=$this->validateSlot($request);
-
         $slotId=DB::table('submission_slots')->insertGetId(
             $this->slotData($validated,$currentTermId),
             'slot_id'
         );
-
         $notifications->notifySubmissionSlotCreated([
             'slot_id'=>$slotId,
             'submission_type'=>$validated['submission_type'],
@@ -119,40 +105,31 @@ class ModuleController extends Controller
             'start_date'=>$validated['start_date'],
             'end_date'=>$validated['end_date'],
         ],auth()->user());
-
         return response()->json($this->modulePayload());
     }
-
     public function closeLive(int $slotId): JsonResponse
     {
         abort_unless(auth()->check() && auth()->user()->role === 'sk_president',403);
-
         $currentTermId=$this->currentTermId();
-
         if(!$currentTermId){
             return response()->json([
                 'message'=>'There is no active administration term.',
             ],422);
         }
-
         $slot=DB::table('submission_slots')
             ->where('slot_id',$slotId)
             ->where('term_id',$currentTermId)
             ->first();
-
         if(!$slot){
             return response()->json([
                 'message'=>'Submission slot was not found in the current administration.',
             ],404);
         }
-
         if($slot->status==='closed'){
             $payload=$this->modulePayload();
             $payload['message']='Submission slot is already closed.';
-
             return response()->json($payload);
         }
-
         DB::table('submission_slots')
             ->where('slot_id',$slotId)
             ->where('term_id',$currentTermId)
@@ -160,58 +137,52 @@ class ModuleController extends Controller
             ->update([
                 'status'=>'closed',
             ]);
-
         $payload=$this->modulePayload();
         $payload['message']='Submission slot closed successfully.';
-
         return response()->json($payload);
     }
-
     public function destroyLive(int $slotId): JsonResponse
     {
         abort_unless(auth()->check() && auth()->user()->role === 'sk_president',403);
-
         $currentTermId=$this->currentTermId();
-
         if(!$currentTermId){
             return response()->json([
                 'message'=>'There is no active administration term.',
             ],422);
         }
-
         $deleted=DB::table('submission_slots')
             ->where('slot_id',$slotId)
             ->where('term_id',$currentTermId)
             ->delete();
-
         if(!$deleted){
             return response()->json([
                 'message'=>'Submission slot was not found in the current administration.',
             ],404);
         }
-
         return response()->json($this->modulePayload());
     }
-
     public function store(Request $request,NotificationService $notifications): RedirectResponse
     {
         abort_unless(auth()->check() && auth()->user()->role === 'sk_president',403);
-
         $currentTermId=$this->currentTermId();
-
         if(!$currentTermId){
             return back()
                 ->withInput()
                 ->with('warning','There is no active administration term. Start a new administration term first.');
         }
-
-        $validated=$this->validateSlot($request);
-
+        try{
+            $validated=$this->validateSlot($request);
+        }catch(ValidationException $exception){
+            return redirect()
+                ->route('sk_pres.module')
+                ->withInput()
+                ->withErrors($exception->errors())
+                ->with('warning','Submission slot was not created. Please complete all required fields correctly.');
+        }
         $slotId=DB::table('submission_slots')->insertGetId(
             $this->slotData($validated,$currentTermId),
             'slot_id'
         );
-
         $notifications->notifySubmissionSlotCreated([
             'slot_id'=>$slotId,
             'submission_type'=>$validated['submission_type'],
@@ -220,44 +191,36 @@ class ModuleController extends Controller
             'start_date'=>$validated['start_date'],
             'end_date'=>$validated['end_date'],
         ],auth()->user());
-
         return redirect()
             ->route('sk_pres.module')
             ->with('status','Submission slot created successfully.');
     }
-
     public function close(int $slotId): RedirectResponse
     {
         abort_unless(auth()->check() && auth()->user()->role === 'sk_president',403);
-
         $currentTermId=$this->currentTermId();
-
         if(!$currentTermId){
             return back()->with(
                 'warning',
                 'There is no active administration term.'
             );
         }
-
         $slot=DB::table('submission_slots')
             ->where('slot_id',$slotId)
             ->where('term_id',$currentTermId)
             ->first();
-
         if(!$slot){
             return back()->with(
                 'warning',
                 'Submission slot was not found in the current administration.'
             );
         }
-
         if($slot->status==='closed'){
             return back()->with(
                 'warning',
                 'Submission slot is already closed.'
             );
         }
-
         DB::table('submission_slots')
             ->where('slot_id',$slotId)
             ->where('term_id',$currentTermId)
@@ -265,127 +228,114 @@ class ModuleController extends Controller
             ->update([
                 'status'=>'closed',
             ]);
-
         return redirect()
             ->route('sk_pres.module')
             ->with('status','Submission slot closed successfully.');
     }
-
-    public function update(Request $request,int $slotId): RedirectResponse
+    public function update(Request $request,int $slotId,NotificationService $notifications): RedirectResponse
     {
         abort_unless(auth()->check() && auth()->user()->role === 'sk_president',403);
-
         $currentTermId=$this->currentTermId();
-
         if(!$currentTermId){
-            return back()->with(
-                'warning',
-                'There is no active administration term.'
-            );
+            return back()
+                ->withInput()
+                ->with('warning','There is no active administration term.');
         }
-
         $slot=DB::table('submission_slots')
             ->where('slot_id',$slotId)
             ->where('term_id',$currentTermId)
             ->first();
-
         if(!$slot){
-            return back()->with(
-                'warning',
-                'Submission slot was not found in the current administration.'
-            );
+            return back()
+                ->withInput()
+                ->with('warning','Submission slot was not found in the current administration.');
         }
-
-        $validated=$this->validateSlot($request);
+        if($slot->status==='closed'){
+            return redirect()
+                ->route('sk_pres.module')
+                ->with('warning','Closed submission slots can no longer be edited.');
+        }
+        try{
+            $validated=$this->validateSlot($request);
+        }catch(ValidationException $exception){
+            return redirect()
+                ->route('sk_pres.module')
+                ->withInput()
+                ->withErrors($exception->errors())
+                ->with('warning','Submission slot was not updated. The previous valid data was retained. Please correct the invalid or incomplete fields.');
+        }
         $changes=$this->slotData($validated,$currentTermId);
-
         unset(
             $changes['term_id'],
             $changes['status'],
             $changes['created_at']
         );
-
         DB::table('submission_slots')
             ->where('slot_id',$slotId)
             ->where('term_id',$currentTermId)
+            ->where('status','open')
             ->update($changes);
-
+        $notifications->notifySubmissionSlotUpdated([
+            'slot_id'=>$slotId,
+            'submission_type'=>$validated['submission_type'],
+            'title'=>$validated['submission_title'],
+            'role'=>$validated['submission_role'],
+            'start_date'=>$validated['start_date'],
+            'end_date'=>$validated['end_date'],
+        ],auth()->user());
         return redirect()
             ->route('sk_pres.module')
-            ->with('status','Submission slot updated successfully.');
+            ->with('status','Submission slot updated successfully. Authorized officials have been notified.');
     }
-
     public function destroy(int $slotId): RedirectResponse
     {
         abort_unless(auth()->check() && auth()->user()->role === 'sk_president',403);
-
         $currentTermId=$this->currentTermId();
-
         if(!$currentTermId){
             return back()->with(
                 'warning',
                 'There is no active administration term.'
             );
         }
-
         $deleted=DB::table('submission_slots')
             ->where('slot_id',$slotId)
             ->where('term_id',$currentTermId)
             ->delete();
-
         if(!$deleted){
             return back()->with(
                 'warning',
                 'Submission slot was not found in the current administration.'
             );
         }
-
         return redirect()
             ->route('sk_pres.module')
             ->with('status','Submission slot deleted successfully.');
     }
-
     protected function validateSlot(Request $request): array
     {
-        $isAccomplishment=$request->input('submission_type') === 'accomplishment_report';
-        $isBudget=$request->input('submission_type') === 'budget_report';
+        $isAccomplishment=$request->input('submission_type')==='accomplishment_report';
+        $isBudget=$request->input('submission_type')==='budget_report';
         $accomplishmentCategory=$request->input('accomplishment_category');
-        $isYdp=$isAccomplishment && $accomplishmentCategory === 'youth_development_program';
-        $isCoaReport=$isBudget && $request->input('budget_category') === 'coa_report';
+        $isYdp=$isAccomplishment && $accomplishmentCategory==='youth_development_program';
+        $isCoaReport=$isBudget && $request->input('budget_category')==='coa_report';
         $period=$request->input('budget_period_type');
-
         return $request->validate([
-            'submission_type'=>[
-                'required',
-                'in:accomplishment_report,budget_report',
-            ],
-
+            'submission_type'=>['required','in:accomplishment_report,budget_report'],
             'accomplishment_category'=>[
                 Rule::requiredIf($isAccomplishment),
                 'nullable',
-                Rule::in([
-                    'general',
-                    'youth_development_program',
-                    'kk_assembly',
-                ]),
+                Rule::in(['general','youth_development_program','kk_assembly']),
             ],
-
             'ydp_program_type'=>[
                 Rule::requiredIf($isYdp),
                 'nullable',
                 Rule::in(array_keys($this->ydpProgramTypes())),
             ],
-
             'budget_category'=>[
                 Rule::requiredIf($isBudget),
                 'nullable',
-                Rule::in([
-                    'annual_budget',
-                    'supplemental_budget',
-                    'coa_report',
-                ]),
+                Rule::in(['annual_budget','supplemental_budget','coa_report']),
             ],
-
             'fiscal_year'=>[
                 Rule::requiredIf($isBudget),
                 'nullable',
@@ -393,128 +343,90 @@ class ModuleController extends Controller
                 'min:2000',
                 'max:2100',
             ],
-
             'budget_period_type'=>[
                 Rule::requiredIf($isCoaReport),
                 'nullable',
-                Rule::in([
-                    'monthly',
-                    'quarterly',
-                    'semi_annual',
-                    'annual',
-                ]),
+                Rule::in(['monthly','quarterly','semi_annual','annual']),
             ],
-
             'fiscal_month'=>[
-                Rule::requiredIf($isCoaReport && $period === 'monthly'),
+                Rule::requiredIf($isCoaReport && $period==='monthly'),
                 'nullable',
                 'integer',
                 'min:1',
                 'max:12',
             ],
-
             'fiscal_quarter'=>[
-                Rule::requiredIf($isCoaReport && $period === 'quarterly'),
+                Rule::requiredIf($isCoaReport && $period==='quarterly'),
                 'nullable',
-                Rule::in([
-                    'Q1',
-                    'Q2',
-                    'Q3',
-                    'Q4',
-                ]),
+                Rule::in(['Q1','Q2','Q3','Q4']),
             ],
-
             'fiscal_half'=>[
-                Rule::requiredIf($isCoaReport && $period === 'semi_annual'),
+                Rule::requiredIf($isCoaReport && $period==='semi_annual'),
                 'nullable',
-                Rule::in([
-                    'H1',
-                    'H2',
-                ]),
+                Rule::in(['H1','H2']),
             ],
-
-            'submission_title'=>[
-                'required',
-                'string',
-                'max:255',
-            ],
-
-            'description'=>[
-                'nullable',
-                'string',
-            ],
-
-            'submission_role'=>[
-                'required',
-                'in:SK Chairman,SK Secretary,Both',
-            ],
-
-            'start_date'=>[
-                'required',
-                'date',
-            ],
-
-            'end_date'=>[
-                'required',
-                'date',
-                'after_or_equal:start_date',
-            ],
+            'submission_title'=>['required','string','max:255'],
+            'description'=>['required','string','max:2000'],
+            'submission_role'=>['required','in:SK Chairman,SK Secretary,Both'],
+            'start_date'=>['required','date'],
+            'end_date'=>['required','date','after_or_equal:start_date'],
+        ],[
+            'submission_type.required'=>'Submission type is required.',
+            'accomplishment_category.required'=>'Accomplishment category is required.',
+            'ydp_program_type.required'=>'YDP program type is required.',
+            'budget_category.required'=>'Budget report category is required.',
+            'fiscal_year.required'=>'Fiscal year is required.',
+            'budget_period_type.required'=>'Reporting period is required.',
+            'fiscal_month.required'=>'Month is required.',
+            'fiscal_quarter.required'=>'Quarter is required.',
+            'fiscal_half.required'=>'Semi-annual period is required.',
+            'submission_title.required'=>'Submission title is required.',
+            'description.required'=>'Description is required.',
+            'submission_role.required'=>'Authorized submission role is required.',
+            'start_date.required'=>'Start date is required.',
+            'end_date.required'=>'Submission deadline is required.',
+            'end_date.after_or_equal'=>'Submission deadline must be on or after the start date.',
         ]);
     }
-
     protected function slotData(array $validated,int $termId): array
     {
         $isAccomplishment=$validated['submission_type'] === 'accomplishment_report';
         $isBudget=$validated['submission_type'] === 'budget_report';
-
         $accomplishmentCategory=$isAccomplishment
             ? ($validated['accomplishment_category'] ?? null)
             : null;
-
         $isYdp=$isAccomplishment &&
             $accomplishmentCategory === 'youth_development_program';
-
         $isCoaReport=$isBudget &&
             ($validated['budget_category'] ?? null) === 'coa_report';
-
         $period=$isCoaReport
             ? ($validated['budget_period_type'] ?? null)
             : null;
-
         return [
             'term_id'=>$termId,
             'submission_type'=>$validated['submission_type'],
-
             'accomplishment_category'=>$accomplishmentCategory,
-
             'ydp_program_type'=>$isYdp
                 ? ($validated['ydp_program_type'] ?? null)
                 : null,
-
             'budget_category'=>$isBudget
                 ? ($validated['budget_category'] ?? null)
                 : null,
-
             'fiscal_year'=>$isBudget
                 ? ($validated['fiscal_year'] ?? null)
                 : null,
-
             'budget_period_type'=>$isCoaReport
                 ? $period
                 : null,
-
             'fiscal_month'=>$isCoaReport && $period === 'monthly'
                 ? ($validated['fiscal_month'] ?? null)
                 : null,
-
             'fiscal_quarter'=>$isCoaReport && $period === 'quarterly'
                 ? ($validated['fiscal_quarter'] ?? null)
                 : null,
-
             'fiscal_half'=>$isCoaReport && $period === 'semi_annual'
                 ? ($validated['fiscal_half'] ?? null)
                 : null,
-
             'title'=>$validated['submission_title'],
             'description'=>$validated['description'] ?? null,
             'role'=>$validated['submission_role'],
@@ -524,7 +436,6 @@ class ModuleController extends Controller
             'created_at'=>now(),
         ];
     }
-
     protected function paginatedSlotGroups(?int $currentTermId): array
     {
         if(!$currentTermId){
@@ -535,9 +446,7 @@ class ModuleController extends Controller
                 'closed'=>$this->emptyPaginator('closed_page'),
             ];
         }
-
         $today=Carbon::now('Asia/Manila')->toDateString();
-
         $pastDeadline=DB::table('submission_slots')
             ->where('term_id',$currentTermId)
             ->where('status','open')
@@ -550,7 +459,6 @@ class ModuleController extends Controller
                 'past_page'
             )
             ->withQueryString();
-
         $open=DB::table('submission_slots')
             ->where('term_id',$currentTermId)
             ->where('status','open')
@@ -564,7 +472,6 @@ class ModuleController extends Controller
                 'open_page'
             )
             ->withQueryString();
-
         $upcoming=DB::table('submission_slots')
             ->where('term_id',$currentTermId)
             ->where('status','open')
@@ -577,7 +484,6 @@ class ModuleController extends Controller
                 'upcoming_page'
             )
             ->withQueryString();
-
         $closed=DB::table('submission_slots')
             ->where('term_id',$currentTermId)
             ->where('status','closed')
@@ -588,7 +494,6 @@ class ModuleController extends Controller
                 'closed_page'
             )
             ->withQueryString();
-
         return [
             'past_deadline'=>$this->decoratePaginator(
                 $pastDeadline,
@@ -608,7 +513,6 @@ class ModuleController extends Controller
             ),
         ];
     }
-
     protected function slotStateCounts(?int $currentTermId): array
     {
         if(!$currentTermId){
@@ -620,34 +524,26 @@ class ModuleController extends Controller
                 'closed'=>0,
             ];
         }
-
         $today=Carbon::now('Asia/Manila')->toDateString();
-
         $base=DB::table('submission_slots')
             ->where('term_id',$currentTermId);
-
         $total=(clone $base)->count();
-
         $open=(clone $base)
             ->where('status','open')
             ->whereDate('start_date','<=',$today)
             ->whereDate('end_date','>=',$today)
             ->count();
-
         $pastDeadline=(clone $base)
             ->where('status','open')
             ->whereDate('end_date','<',$today)
             ->count();
-
         $upcoming=(clone $base)
             ->where('status','open')
             ->whereDate('start_date','>',$today)
             ->count();
-
         $closed=(clone $base)
             ->where('status','closed')
             ->count();
-
         return [
             'total'=>$total,
             'open'=>$open,
@@ -656,7 +552,6 @@ class ModuleController extends Controller
             'closed'=>$closed,
         ];
     }
-
     protected function decoratePaginator(
         LengthAwarePaginator $paginator,
         string $state
@@ -670,16 +565,13 @@ class ModuleController extends Controller
                     )
                 )
         );
-
         return $paginator;
     }
-
     protected function decorateSlot(
         object $slot,
         ?string $state=null
     ): object {
         $today=Carbon::now('Asia/Manila')->toDateString();
-
         if(!$state){
             if($slot->status==='closed'){
                 $state='closed';
@@ -691,9 +583,7 @@ class ModuleController extends Controller
                 $state='open';
             }
         }
-
         $slot->management_state=$state;
-
         if($state==='closed'){
             $slot->management_state_label='Closed';
             $slot->management_state_badge='bg-gray-100 text-gray-600';
@@ -707,10 +597,8 @@ class ModuleController extends Controller
             $slot->management_state_label='Open';
             $slot->management_state_badge='bg-green-100 text-green-600';
         }
-
         return $slot;
     }
-
     protected function emptyPaginator(
         string $pageName
     ): LengthAwarePaginator {
@@ -725,13 +613,11 @@ class ModuleController extends Controller
             ]
         );
     }
-
     protected function currentTermSlots(?int $currentTermId): Collection
     {
         if(!$currentTermId){
             return collect();
         }
-
         return DB::table('submission_slots')
             ->where('term_id',$currentTermId)
             ->orderByDesc('created_at')
@@ -747,7 +633,6 @@ class ModuleController extends Controller
                     'closed'=>4,
                     default=>5,
                 };
-
                 return sprintf(
                     '%d-%s',
                     $order,
@@ -756,28 +641,23 @@ class ModuleController extends Controller
             })
             ->values();
     }
-
     protected function groupSlots(Collection $slots): array
     {
         return [
             'past_deadline'=>$slots
                 ->where('management_state','past_deadline')
                 ->values(),
-
             'open'=>$slots
                 ->where('management_state','open')
                 ->values(),
-
             'upcoming'=>$slots
                 ->where('management_state','upcoming')
                 ->values(),
-
             'closed'=>$slots
                 ->where('management_state','closed')
                 ->values(),
         ];
     }
-
     protected function ydpProgramTypes(): array
     {
         return [
@@ -795,17 +675,14 @@ class ModuleController extends Controller
             'youth_employment_livelihood'=>'Youth Employment and Livelihood',
         ];
     }
-
     protected function modulePayload(): array
     {
         $currentTermId=$this->currentTermId();
         $slots=$this->currentTermSlots($currentTermId);
         $slotGroups=$this->groupSlots($slots);
-
         return [
             'slots'=>$slots,
             'slotGroups'=>$slotGroups,
-
             'summary'=>[
                 'totalSlots'=>$slots->count(),
                 'openSlots'=>$slotGroups['open']->count(),
@@ -813,18 +690,15 @@ class ModuleController extends Controller
                 'upcomingSlots'=>$slotGroups['upcoming']->count(),
                 'closedSlots'=>$slotGroups['closed']->count(),
             ],
-
             'updatedAt'=>now()->format('M d, Y h:i A'),
         ];
     }
-
     protected function currentTermId(): ?int
     {
         $termId=DB::table('administration_terms')
             ->where('status','current')
             ->orderByDesc('term_id')
             ->value('term_id');
-
         return $termId
             ? (int)$termId
             : null;
