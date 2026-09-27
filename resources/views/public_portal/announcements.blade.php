@@ -6,56 +6,21 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>Announcements | SK360 Public Portal</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    @include('public_portal.partials.assets')
 </head>
 
-<body class="bg-gray-50 text-gray-800">
+<body class="sk-public sk-app sk-portal bg-gray-50 text-gray-800">
 
-{{-- HEADER --}}
-<header class="sticky top-0 z-40 bg-red-600 text-white shadow">
-    <div class="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
-
-        <a href="{{ route('public.home') }}" class="flex items-center gap-3">
-            <img src="{{ asset('images/logo.png') }}"
-                class="w-10 h-10 rounded-full object-cover"
-                alt="SK360 Logo">
-
-            <div>
-                <h1 class="text-xl font-black">SK 360°</h1>
-                <p class="text-[10px] opacity-80 uppercase tracking-widest">
-                    Public Information Portal
-                </p>
-            </div>
-        </a>
-
-        <a href="{{ route('public.home') }}"
-            class="text-xs font-bold hover:text-yellow-300 transition">
-            ← Public Portal
-        </a>
-
-    </div>
-</header>
+@include('public_portal.partials.header')
 
 <main>
 
 {{-- PAGE HEADER --}}
-<section class="bg-gradient-to-br from-red-600 to-red-700 text-white">
-    <div class="max-w-4xl mx-auto px-6 py-12">
-
-        <p class="text-xs font-black uppercase tracking-[0.2em] text-red-100">
-            Public Information
-        </p>
-
-        <h2 class="text-4xl font-black mt-2">
-            Announcements
-        </h2>
-
-        <p class="text-red-100 text-sm mt-3 max-w-2xl leading-relaxed">
-            Stay informed with the latest public announcements and community updates
-            from the Sangguniang Kabataan Federation of Lipa City.
-        </p>
-
-    </div>
-</section>
+@include('public_portal.partials.hero',[
+    'eyebrow'=>'Public Information',
+    'title'=>'Announcements',
+    'description'=>'Stay informed with the latest public announcements and community updates from the Sangguniang Kabataan Federation of Lipa City.'
+])
 
 {{-- SEARCH --}}
 <section class="max-w-4xl mx-auto px-6 pt-8">
@@ -81,7 +46,7 @@
                         class="w-full rounded-xl border border-gray-200 pl-10 pr-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-red-300">
 
                     <span class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">
-                        🔎
+                        @include('public_portal.partials.icon',['icon'=>'search'])
                     </span>
 
                 </div>
@@ -178,7 +143,7 @@
                         <div class="flex gap-3">
 
                             <div class="w-11 h-11 bg-red-100 text-red-600 rounded-full flex items-center justify-center shrink-0">
-                                📢
+                                @include('public_portal.partials.icon',['icon'=>'megaphone','iconSize'=>18])
                             </div>
 
                             <div>
@@ -251,7 +216,7 @@
                         data-feedback-list-url="{{ route('public.announcements.feedback-list',$announcement->announcement_id) }}"
                         data-feedback-submit-url="{{ route('public.announcements.feedback',$announcement->announcement_id) }}">
 
-                        💬
+                        @include('public_portal.partials.icon',['icon'=>'chat','iconSize'=>17])
 
                         <strong data-feedback-count>
                             {{ $announcement->feedback_count }}
@@ -266,7 +231,7 @@
                     {{-- VIEWS --}}
                     <span class="flex items-center gap-1">
 
-                        👁
+                        @include('public_portal.partials.icon',['icon'=>'eye','iconSize'=>17])
 
                         <strong data-view-count>
                             {{ $announcement->views_count }}
@@ -286,8 +251,8 @@
 
             <div class="bg-white rounded-2xl border border-gray-100 shadow-sm text-center px-6 py-16">
 
-                <div class="text-4xl mb-4">
-                    📭
+                <div class="sk-empty-icon mx-auto mb-4">
+                    @include('public_portal.partials.icon',['icon'=>'inbox','iconSize'=>24])
                 </div>
 
                 <h3 class="font-black text-gray-700">
@@ -390,7 +355,7 @@
                     <button id="openIdentityStepBtn"
                         type="button"
                         class="w-10 h-10 shrink-0 rounded-full bg-red-600 text-white flex items-center justify-center font-black hover:bg-red-700 transition">
-                        ➤
+                        @include('public_portal.partials.icon',['icon'=>'arrow-right','iconSize'=>17])
                     </button>
 
                 </div>
@@ -412,7 +377,7 @@
                 <button id="backToCommentsBtn"
                     type="button"
                     class="text-xs font-bold text-gray-500 hover:text-red-600 mb-5">
-                    ← Back to feedback
+                    <span class="inline-flex align-[-2px]">@include('public_portal.partials.icon',['icon'=>'chevron-left','iconSize'=>14])</span> Back to feedback
                 </button>
 
                 <p class="text-xs font-black uppercase tracking-widest text-red-600">
@@ -501,8 +466,8 @@
 
                 <div class="text-center mb-6">
 
-                    <div class="w-14 h-14 mx-auto rounded-full bg-red-50 text-red-600 flex items-center justify-center text-2xl mb-3">
-                        ✉
+                    <div class="w-14 h-14 mx-auto rounded-full bg-red-50 text-red-600 flex items-center justify-center mb-3">
+                        @include('public_portal.partials.icon',['icon'=>'mail','iconSize'=>22])
                     </div>
 
                     <h4 class="text-xl font-black text-gray-800">
@@ -580,11 +545,7 @@
     ↑
 </button>
 
-<footer class="bg-gray-900 text-gray-400">
-    <div class="max-w-6xl mx-auto px-6 py-6 text-center text-xs">
-        &copy; {{ date('Y') }} SK360 • Sangguniang Kabataan Federation of Lipa City
-    </div>
-</footer>
+@include('public_portal.partials.footer')
 
 <script>
 const csrfToken=document.querySelector('meta[name="csrf-token"]').content;

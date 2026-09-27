@@ -60,6 +60,14 @@
         background: #fff;
         color: var(--sk-red);
         font-size: 34px;
+        overflow: hidden;
+    }
+
+    .sk-logo img {
+        display: block;
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
     }
 
     .success-icon-circle {
@@ -235,6 +243,7 @@
         display: none;
     }
 </style>
+    @include('public_portal.partials.assets')
 @endsection
 
 @section('content')
@@ -247,10 +256,10 @@
     $showSuccess = session()->has('reset_success') || $showCodeVerify;
 @endphp
 
-<div class="reset-page">
+<div class="sk-public sk-public-auth reset-page">
     <div class="reset-container">
         <div id="request-view" class="{{ $showSuccess ? 'hidden' : '' }}">
-            <div class="sk-logo">SK</div>
+            <div class="sk-logo"><img src="{{ asset('images/logo.png') }}" alt="SK 360 logo"></div>
             <h2 class="main-title">Reset Your Password</h2>
             <p class="sub-text">Choose your preferred reset method</p>
 
@@ -276,7 +285,7 @@
                     @csrf
                     <input type="hidden" name="method" value="email">
                     <label class="form-label-custom">
-                        <span class="label-icon">@</span> Email Address
+                        <span class="label-icon">@include('auth.partials.login-icon', ['icon' => 'mail', 'iconSize' => 16])</span> Email Address
                     </label>
                     <input type="email" name="email" class="form-control-custom" placeholder="sk360@gmail.com" value="{{ old('email') }}" required>
                     <button type="submit" class="btn-sk-primary">Send Reset Code</button>
@@ -286,7 +295,7 @@
                     @csrf
                     <input type="hidden" name="method" value="phone">
                     <label class="form-label-custom">
-                        <span class="label-icon">P</span> Phone Number
+                        <span class="label-icon">@include('auth.partials.login-icon', ['icon' => 'phone', 'iconSize' => 16])</span> Phone Number
                     </label>
                     <input type="text" name="phone" class="form-control-custom" placeholder="+639123456789" value="{{ old('phone') }}" required>
                     <button type="submit" class="btn-sk-primary">Send Reset Code</button>
@@ -297,7 +306,7 @@
         </div>
 
         <div id="success-view" class="{{ $showSuccess ? '' : 'hidden' }}">
-            <div class="success-icon-circle">{{ $resetMethod === 'phone' ? '#' : '@' }}</div>
+            <div class="success-icon-circle">@include('auth.partials.login-icon', ['icon' => $resetMethod === 'phone' ? 'phone' : 'mail', 'iconSize' => 30])</div>
             <h2 class="main-title">Reset Code Sent!</h2>
             <p class="sub-text">
                 {{ $resetMethod === 'phone' ? 'Check your phone for password reset instructions' : 'Check your email for password reset instructions' }}
@@ -323,17 +332,17 @@
                     <form method="POST" action="{{ $showEmailVerify ? route('password.verify-email') : route('password.verify-phone') }}">
                         @csrf
                         <label class="form-label-custom">
-                            <span class="label-icon">#</span> {{ $showEmailVerify ? 'Email Code' : 'SMS Code' }}
+                            <span class="label-icon">@include('auth.partials.login-icon', ['icon' => 'key-round', 'iconSize' => 16])</span> {{ $showEmailVerify ? 'Email Code' : 'SMS Code' }}
                         </label>
                         <input type="text" name="code" class="form-control-custom" placeholder="6-digit code" maxlength="6" inputmode="numeric" required>
 
                         <label class="form-label-custom" style="margin-top: 16px;">
-                            <span class="label-icon">*</span> New Password
+                            <span class="label-icon">@include('auth.partials.login-icon', ['icon' => 'lock', 'iconSize' => 16])</span> New Password
                         </label>
                         <input type="password" name="password" class="form-control-custom" placeholder="New password" required>
 
                         <label class="form-label-custom" style="margin-top: 16px;">
-                            <span class="label-icon">*</span> Confirm Password
+                            <span class="label-icon">@include('auth.partials.login-icon', ['icon' => 'lock', 'iconSize' => 16])</span> Confirm Password
                         </label>
                         <input type="password" name="password_confirmation" class="form-control-custom" placeholder="Confirm password" required>
 

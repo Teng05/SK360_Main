@@ -7,104 +7,28 @@
     <title>SK360 Public Portal</title>
 
     <script src="https://cdn.tailwindcss.com"></script>
+    @include('public_portal.partials.assets')
 </head>
 
-<body class="bg-gray-50 text-gray-800">
+<body class="sk-public sk-app sk-portal bg-gray-50 text-gray-800">
 
-{{-- HEADER --}}
-<header class="sticky top-0 z-40 bg-red-600 text-white shadow">
-
-    <div class="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
-
-        <div class="flex items-center gap-3">
-
-            <img
-                src="{{ asset('images/logo.png') }}"
-                class="w-10 h-10 rounded-full object-cover"
-                alt="SK360 Logo"
-            >
-
-            <div>
-
-                <h1 class="text-xl font-black">
-                    SK 360°
-                </h1>
-
-                <p class="text-[10px] opacity-80 uppercase tracking-widest">
-                    Public Information Portal
-                </p>
-
-            </div>
-
-        </div>
-
-        <a
-            href="{{ url('/') }}"
-            class="text-xs font-bold hover:text-yellow-300 transition"
-        >
-            ← Main Website
-        </a>
-
-    </div>
-
-</header>
+@include('public_portal.partials.header')
 
 <main>
 
 {{-- HERO --}}
-<section class="bg-gradient-to-br from-red-600 to-red-700 text-white">
-
-    <div class="max-w-4xl mx-auto px-6 py-14 text-center">
-
-        <p class="text-xs font-black uppercase tracking-[0.2em] text-red-100 mb-3">
-            City of Lipa
-        </p>
-
-        <h2 class="text-4xl md:text-5xl font-black mb-4">
-            SK360 Public Portal
-        </h2>
-
-        <p class="max-w-2xl mx-auto text-red-100 leading-relaxed">
-            Access official public information from the Sangguniang Kabataan
-            Federation of Lipa City. Stay informed about announcements,
-            upcoming activities, current barangay SK leadership, and
-            Annual Budget information.
-        </p>
-
+<section class="sk-phero">
+    <div class="max-w-4xl mx-auto px-6 text-center">
+        <span class="sk-eyebrow"><span class="sk-dot"></span>City of Lipa</span>
+        <h2 class="sk-phero__title mx-auto">SK360 Public Portal</h2>
+        <p class="sk-phero__lead mx-auto">Access official public information from the Sangguniang Kabataan Federation of Lipa City. Stay informed about announcements, upcoming activities, current barangay SK leadership, and Annual Budget information.</p>
         <div class="flex flex-wrap justify-center gap-3 mt-8">
-
-            <a
-                href="{{ route('public.announcements') }}"
-                class="bg-white text-red-600 px-6 py-3 rounded-xl font-black text-sm hover:bg-red-50 transition"
-            >
-                📢 Announcements
-            </a>
-
-            <a
-                href="{{ route('public.calendar') }}"
-                class="bg-white text-red-600 px-6 py-3 rounded-xl font-black text-sm hover:bg-red-50 transition"
-            >
-                📅 Calendar
-            </a>
-
-            <a
-                href="{{ route('public.leadership') }}"
-                class="bg-white text-red-600 px-6 py-3 rounded-xl font-black text-sm hover:bg-red-50 transition"
-            >
-                👥 Leadership
-            </a>
-
-            <a
-                href="{{ route('public.budgets') }}"
-                class="bg-white text-red-600 px-6 py-3 rounded-xl font-black text-sm hover:bg-red-50 transition"
-            >
-                💰 Annual Budget
-            </a>
-
+            <a href="{{ route('public.announcements') }}" class="sk-btn sk-btn--secondary">@include('public_portal.partials.icon',['icon'=>'megaphone']) Announcements</a>
+            <a href="{{ route('public.calendar') }}" class="sk-btn sk-btn--secondary">@include('public_portal.partials.icon',['icon'=>'calendar-days']) Calendar</a>
+            <a href="{{ route('public.leadership') }}" class="sk-btn sk-btn--secondary">@include('public_portal.partials.icon',['icon'=>'id-card']) Leadership</a>
+            <a href="{{ route('public.budgets') }}" class="sk-btn sk-btn--secondary">@include('public_portal.partials.icon',['icon'=>'wallet']) Annual Budget & LYDP</a>
         </div>
-
     </div>
-
 </section>
 
 {{-- LATEST UPDATES --}}
@@ -133,12 +57,12 @@
             @if($item->feed_type === 'announcement')
 
                 {{-- ANNOUNCEMENT PREVIEW --}}
-                <div class="bg-white border border-gray-100 rounded-2xl shadow-sm p-5">
+                <div class="bg-white border border-gray-100 rounded-2xl shadow-sm p-5" data-sk-tone="blue">
 
                     <div class="flex items-start gap-3 mb-4">
 
                         <div class="w-11 h-11 bg-red-50 text-red-600 rounded-xl flex items-center justify-center shrink-0">
-                            📢
+                            @include('public_portal.partials.icon',['icon'=>'megaphone','iconSize'=>18])
                         </div>
 
                         <div class="min-w-0">
@@ -179,7 +103,7 @@
                                 href="{{ route('public.announcements') }}"
                                 class="text-xs font-black text-red-600 hover:text-red-700 whitespace-nowrap"
                             >
-                                View →
+                                View <span class="inline-flex align-[-2px]">@include('public_portal.partials.icon',['icon'=>'arrow-right','iconSize'=>14])</span>
                             </a>
 
                         </div>
@@ -191,12 +115,12 @@
             @else
 
                 {{-- EVENT PREVIEW --}}
-                <div class="bg-white border border-gray-100 rounded-2xl shadow-sm p-5">
+                <div class="bg-white border border-gray-100 rounded-2xl shadow-sm p-5" data-sk-tone="yellow">
 
                     <div class="flex items-start gap-3 mb-4">
 
-                        <div class="w-11 h-11 bg-red-50 text-red-600 rounded-xl flex items-center justify-center shrink-0">
-                            📅
+                        <div class="w-11 h-11 bg-yellow-50 text-yellow-700 rounded-xl flex items-center justify-center shrink-0">
+                            @include('public_portal.partials.icon',['icon'=>'calendar-days','iconSize'=>18])
                         </div>
 
                         <div class="min-w-0">
@@ -223,18 +147,18 @@
 
                     <div class="space-y-1 mt-4 text-xs text-gray-500">
 
-                        <p>
-                            📅
+                        <p class="flex items-center gap-2">
+                            @include('public_portal.partials.icon',['icon'=>'calendar-days','iconSize'=>16])
                             {{ \Carbon\Carbon::parse($item->start_datetime)->format('M d, Y') }}
                         </p>
 
-                        <p>
-                            🕐
+                        <p class="flex items-center gap-2">
+                            @include('public_portal.partials.icon',['icon'=>'clock','iconSize'=>16])
                             {{ \Carbon\Carbon::parse($item->start_datetime)->format('h:i A') }}
                         </p>
 
-                        <p class="truncate">
-                            📍
+                        <p class="truncate flex items-center gap-2">
+                            @include('public_portal.partials.icon',['icon'=>'map-pin','iconSize'=>16])
                             {{ $item->location ?: 'Location not specified' }}
                         </p>
 
@@ -246,7 +170,7 @@
                             href="{{ route('public.calendar') }}"
                             class="text-xs font-black text-red-600 hover:text-red-700"
                         >
-                            View Calendar →
+                            View Calendar <span class="inline-flex align-[-2px]">@include('public_portal.partials.icon',['icon'=>'arrow-right','iconSize'=>14])</span>
                         </a>
 
                     </div>
@@ -259,8 +183,8 @@
 
             <div class="md:col-span-2 bg-white border border-gray-100 rounded-2xl px-6 py-12 text-center">
 
-                <div class="text-4xl mb-3">
-                    📭
+                <div class="sk-empty-icon mx-auto mb-3">
+                    @include('public_portal.partials.icon',['icon'=>'inbox','iconSize'=>24])
                 </div>
 
                 <h3 class="font-black text-gray-700">
@@ -286,8 +210,8 @@
 
         <div class="flex flex-col md:flex-row md:items-center gap-5">
 
-            <div class="w-14 h-14 bg-red-50 text-red-600 rounded-2xl flex items-center justify-center text-2xl shrink-0">
-                🏛️
+            <div class="w-14 h-14 bg-red-50 text-red-600 rounded-2xl flex items-center justify-center shrink-0">
+                @include('public_portal.partials.icon',['icon'=>'building-2','iconSize'=>24])
             </div>
 
             <div>
@@ -323,14 +247,7 @@
     ↑
 </button>
 
-{{-- FOOTER --}}
-<footer class="bg-gray-900 text-gray-400">
-
-    <div class="max-w-6xl mx-auto px-6 py-6 text-center text-xs">
-        &copy; {{ date('Y') }} SK360 • Sangguniang Kabataan Federation of Lipa City
-    </div>
-
-</footer>
+@include('public_portal.partials.footer')
 
 <script>
 const backToTopBtn = document.getElementById('backToTopBtn');
