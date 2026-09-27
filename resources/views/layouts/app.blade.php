@@ -22,8 +22,13 @@
             </style>
         @endif
     @endif
+    {{-- Batch 1: shared role-based web presentation only; calls also serve the mobile app. --}}
+    @if (!empty($menuItems) && request()->routeIs('sk_pres.*', 'sk_chairman.*', 'sk_secretary.*') && !request()->routeIs('*.meetings.call'))
+        <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+        <link rel="stylesheet" href="{{ asset('css/sk360-web.css') }}?v={{ filemtime(public_path('css/sk360-web.css')) }}">
+    @endif
 </head>
-<body>
+<body class="{{ !empty($menuItems) && request()->routeIs('sk_pres.*', 'sk_chairman.*', 'sk_secretary.*') && !request()->routeIs('*.meetings.call') ? 'sk-web' : '' }}">
     @yield('content')
 
     @stack('scripts')
