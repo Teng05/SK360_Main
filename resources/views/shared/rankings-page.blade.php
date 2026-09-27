@@ -203,6 +203,25 @@
 @push('scripts')
 <script>
 document.addEventListener('DOMContentLoaded',function(){
+    const notifBtn=document.getElementById('notifBtn'),notifDropdown=document.getElementById('notifDropdown'),userMenuBtn=document.getElementById('userMenuBtn'),userDropdown=document.getElementById('userDropdown');
+
+    if(notifBtn&&notifDropdown)notifBtn.addEventListener('click',function(e){
+        e.stopPropagation();
+        notifDropdown.classList.toggle('hidden');
+        if(userDropdown)userDropdown.classList.add('hidden');
+    });
+
+    if(userMenuBtn&&userDropdown)userMenuBtn.addEventListener('click',function(e){
+        e.stopPropagation();
+        userDropdown.classList.toggle('hidden');
+        if(notifDropdown)notifDropdown.classList.add('hidden');
+    });
+
+    document.addEventListener('click',function(e){
+        if(notifBtn&&notifDropdown&&!notifBtn.contains(e.target)&&!notifDropdown.contains(e.target))notifDropdown.classList.add('hidden');
+        if(userMenuBtn&&userDropdown&&!userMenuBtn.contains(e.target)&&!userDropdown.contains(e.target))userDropdown.classList.add('hidden');
+    });
+
     const search=document.getElementById('leaderboardSearch'),clear=document.getElementById('clearLeaderboardSearch'),rows=[...document.querySelectorAll('.leaderboard-row')],empty=document.getElementById('leaderboardEmpty'),pagination=document.getElementById('leaderboardPaginationWrapper'),info=document.getElementById('leaderboardInfo'),previous=document.getElementById('leaderboardPrevious'),next=document.getElementById('leaderboardNext'),pages=document.getElementById('leaderboardPages');
     const perPage=10;
     let currentPage=1,filteredRows=rows;
@@ -236,7 +255,6 @@ document.addEventListener('DOMContentLoaded',function(){
         filterRows();
         const total=filteredRows.length,totalPages=Math.max(1,Math.ceil(total/perPage));
         if(currentPage>totalPages)currentPage=totalPages;
-
         rows.forEach(row=>row.classList.add('hidden'));
 
         if(total===0){
