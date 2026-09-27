@@ -1,76 +1,17 @@
 {{-- File guide: Blade view template for resources/views/shared/profile-settings.blade.php. --}}
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Profile Settings | SK 360&deg;</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
-    <style>
-        [x-cloak] { display: none !important; }
-        .tab-active { border-bottom: 2px solid #ef4444; color: #ef4444; }
-    </style>
-</head>
-<body class="bg-gray-50 font-sans" x-data="{ activeTab: 'personal', isEditing: false, showPassModal: false }">
-<div class="flex h-screen overflow-hidden">
-    <div class="w-64 bg-red-600 text-white flex flex-col p-3 shadow-xl z-20">
-        <div class="flex items-center gap-3 mb-4">
-    <img src="{{ asset('images/logo.png') }}" class="w-8 h-8 rounded-full object-cover"  alt="logo">
-    <div class="leading-tight">
-        <h2 class="text-lg font-extrabold tracking-wide">SK 360°</h2>
-        <p class="text-[10px] opacity-80">Management System</p>
-    </div>
-</div>
-        <div class="bg-red-500 rounded-lg p-2 flex items-center gap-2 mb-3 shadow text-xs">
-            <div class="bg-yellow-400 text-red-600 p-1 rounded-full font-bold px-2">&#128100;</div>
-            <div>
-                <p class="font-semibold">{{ $userName }}</p>
-                <p class="opacity-80 text-[10px]">{{ $roleLabel }}</p>
-            </div>
-        </div>
-        <nav class="space-y-1 text-xs">
-            @foreach ($menuItems as $item)
-                @php $isActive = $currentUrl === $item['link']; @endphp
-                <a href="{{ $item['link'] }}" class="flex items-center gap-2 p-2 rounded-lg transition {{ $isActive ? 'bg-red-500 text-yellow-300 font-bold border-l-4 border-yellow-300' : 'hover:bg-red-500' }}">
-                    <span class="{{ $isActive ? 'bg-yellow-400 text-red-600' : 'bg-red-400' }} p-1 rounded">{!! $item['icon'] !!}</span>
-                    <span>{{ $item['label'] }}</span>
-                </a>
-            @endforeach
-        </nav>
-    </div>
-
+@extends('layouts.app')
+@section('title','Profile Settings | SK 360°')
+@section('page_css')
+<script src="https://cdn.tailwindcss.com"></script>
+<script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+<style>[x-cloak]{display:none!important}.tab-active{border-bottom:2px solid var(--sk-red);color:var(--sk-red)}</style>
+@endsection
+@section('content')
+<div x-data="{ activeTab: 'personal', isEditing: false, showPassModal: false }">
+<div class="flex h-screen overflow-hidden bg-gray-100">
+    @include('partials.app.sidebar')
     <div class="flex-1 flex flex-col min-w-0 overflow-hidden">
-        <div class="bg-red-600 text-white px-6 py-3 flex justify-between items-center shadow relative z-10">
-            <div class="w-1/4"></div>
-            <div class="w-1/3">
-                <input type="text" placeholder="Search settings..." class="w-full px-4 py-2 rounded-full text-black text-sm outline-none">
-            </div>
-            <div class="w-1/4 flex justify-end items-center gap-5 text-sm">
-                <button class="hover:opacity-80">&#128276;</button>
-                <div class="relative">
-                    <button id="profileDropdownBtn" type="button" class="flex items-center gap-2 font-semibold focus:outline-none hover:opacity-80 transition">
-                        <span>{{ $userName }}</span>
-                        <span class="text-[10px]">&#9660;</span>
-                    </button>
-                    <div id="profileMenu" class="absolute right-0 mt-3 w-48 bg-white rounded-xl shadow-2xl py-2 z-[9999] hidden border border-gray-100">
-                        <div class="px-4 py-3 border-b border-gray-50">
-                            <p class="text-[10px] text-gray-400 uppercase font-black tracking-widest">Account Settings</p>
-                        </div>
-                        <a href="{{ $profileRoute }}" class="block px-4 py-3 text-gray-700 hover:bg-gray-50 text-xs flex items-center gap-2 transition">
-                            <span>&#128100;</span> View Profile
-                        </a>
-                        <form action="{{ route('logout') }}" method="POST">
-                            @csrf
-                            <button type="submit" class="w-full text-left px-4 py-3 text-red-600 hover:bg-red-50 text-xs font-bold flex items-center gap-2 transition">
-                                <span>&#128682;</span> Log Out
-                            </button>
-                        </form>
-                    </div>
-                </div>
-            </div>
-        </div>
-
+        @include('partials.app.topbar', ['accountButtonId'=>'profileDropdownBtn','accountMenuId'=>'profileMenu','bindBell'=>true,'search'=>['placeholder'=>'Search settings...']])
         <main class="flex-1 overflow-y-auto p-8 bg-gray-50">
             <div class="max-w-5xl mx-auto">
                 @if (session('status'))
@@ -88,8 +29,9 @@
                 @endif
 
                 <header class="mb-6">
-                    <h1 class="text-2xl font-bold text-gray-800">Profile Settings</h1>
-                    <p class="text-sm text-gray-500">{{ $pageDescription }}</p>
+                    <span class="sk-eyebrow"><span class="sk-dot"></span>Account</span>
+                    <h1 class="sk-page-title">Profile Settings</h1>
+                    <p class="sk-page-subtitle">{{ $pageDescription }}</p>
                 </header>
 
                 <div class="bg-white rounded-[32px] p-6 shadow-sm border border-gray-100 flex items-center justify-between mb-8">
@@ -103,9 +45,9 @@
                         </div>
                         <div>
                             <h2 class="text-xl font-bold text-gray-900">{{ $userName }}</h2>
-                            <p class="text-xs font-bold text-gray-400 uppercase tracking-widest">{{ $roleLabel }} - Barangay {{ $barangayName }}</p>
-                            <div class="mt-2 inline-flex items-center gap-1.5 px-3 py-1 bg-green-100 text-green-700 rounded-full text-[10px] font-black">
-                                <span class="w-1.5 h-1.5 bg-green-500 rounded-full"></span> VERIFIED
+                            <p class="text-xs font-bold text-gray-500 uppercase tracking-widest">{{ $roleLabel }} - Barangay {{ $barangayName }}</p>
+                            <div class="mt-2 inline-flex items-center gap-1.5 px-3 py-1 bg-green-100 text-green-800 rounded-full text-[10px] font-black">
+                                <span class="w-1.5 h-1.5 bg-green-600 rounded-full"></span> VERIFIED
                             </div>
                         </div>
                     </div>
@@ -157,7 +99,7 @@
                             </div>
 
                             <div class="mt-10 p-5 bg-blue-50/50 border border-blue-100 rounded-3xl flex gap-4 items-center">
-                                <span class="text-xl">&#8505;</span>
+                                @include('partials.ui.icon', ['icon'=>'info','iconSize'=>19])
                                 <p class="text-[11px] text-blue-700 font-medium">To update your <strong>Email</strong> or <strong>Phone Number</strong>, update the current backend flow first. These fields are intentionally locked here.</p>
                             </div>
 
@@ -173,7 +115,7 @@
                         <h3 class="text-sm font-black text-gray-400 uppercase tracking-widest mb-8">Manage Password</h3>
                         <div class="flex items-center justify-between p-6 bg-gray-50 rounded-3xl group hover:bg-red-50 transition">
                             <div class="flex items-center gap-4">
-                                <div class="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-xl shadow-sm">&#128273;</div>
+                                <span class="sk-icon-tile sk-icon-tile--lg sk-icon-tile--yellow">@include('partials.ui.icon', ['icon'=>'key-round','iconSize'=>22])</span>
                                 <div>
                                     <p class="text-sm font-bold text-gray-800">Password</p>
                                     <p class="text-[11px] text-gray-400">Update your account password regularly.</p>
@@ -231,6 +173,5 @@ if (dropdownBtn && profileMenu) {
     });
 }
 </script>
-</body>
-</html>
-
+</div>
+@endsection

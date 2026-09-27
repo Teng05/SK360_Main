@@ -7,73 +7,24 @@
 @endsection
 @section('content')
 <div class="flex h-screen bg-[#f1f5f9] overflow-hidden">
-    <div class="w-64 bg-red-600 text-white flex flex-col p-3 overflow-y-auto">
-        <div class="flex items-center gap-3 mb-4">
-            <img src="{{ asset('images/logo.png') }}" class="w-8 h-8 rounded-full object-cover" alt="logo">
-            <div class="leading-tight">
-                <h2 class="text-lg font-extrabold tracking-wide">SK 360°</h2>
-                <p class="text-[10px] opacity-80">Management System</p>
-            </div>
-        </div>
-        <div class="bg-red-500 rounded-lg p-2 flex items-center gap-2 mb-3 shadow text-xs">
-            <div class="bg-yellow-400 text-red-600 p-1 rounded-full text-sm">👤</div>
-            <div>
-                <p class="font-semibold text-xs">SK President</p>
-                <p class="text-xs opacity-80">Active Role</p>
-            </div>
-        </div>
-        <nav class="space-y-1 text-xs">
-            @foreach($menuItems as $item)
-                <a href="{{ $item['link'] }}" class="flex items-center gap-2 p-2 rounded-lg {{ $item['link']===$currentUrl ? 'bg-red-500' : 'hover:bg-red-500 transition' }}">
-                    <span class="{{ $item['link']===$currentUrl ? 'bg-yellow-400 text-red-600' : 'bg-red-400' }} p-1 rounded text-sm">{{ $item['icon'] }}</span>
-                    <span class="{{ $item['link']===$currentUrl ? 'text-yellow-300 font-semibold' : '' }} text-xs">{{ $item['label'] }}</span>
-                </a>
-            @endforeach
-        </nav>
-    </div>
+        @include('partials.app.sidebar')
+
     <div class="flex-1 flex flex-col">
-        <div class="bg-red-600 text-white px-6 py-3 flex justify-between items-center shadow">
-            <input type="text" placeholder="Search..." class="px-4 py-2 rounded-full text-black w-1/3 focus:outline-none">
-            <div class="flex items-center gap-3 relative">
-                <div class="relative">
-                    <button id="notifBtn" type="button" class="text-xl hover:bg-red-500 p-2 rounded-lg transition">🔔</button>
-                    <div id="notifDropdown" class="hidden absolute right-0 mt-3 w-72 bg-white rounded-2xl shadow-xl border z-50 overflow-hidden">
-                        <div class="px-4 py-3 font-semibold border-b text-gray-800">Notifications</div>
-                        <div class="max-h-64 overflow-y-auto">
-                            <div class="px-4 py-3 hover:bg-gray-100 text-sm text-gray-700">No notifications yet</div>
-                        </div>
-                    </div>
-                </div>
-                <div class="relative">
-                    <button id="userMenuBtn" type="button" class="flex items-center gap-2 hover:bg-red-500 px-3 py-2 rounded-lg transition">
-                        <span class="font-semibold">{{ $fullName }}</span>
-                    </button>
-                    <div id="userDropdown" class="hidden absolute right-0 mt-3 w-64 bg-white rounded-2xl shadow-xl border overflow-hidden z-50">
-                        <div class="px-5 py-4 font-semibold text-gray-800 border-b">My Account</div>
-                        <a href="{{ route('sk_pres.profile') }}" class="flex items-center gap-3 px-5 py-3 hover:bg-gray-100 transition">
-                            <span>👤</span>
-                            <span class="text-gray-700">Profile Settings</span>
-                        </a>
-                        <form method="POST" action="{{ route('logout') }}">
-                            @csrf
-                            <button type="submit" class="w-full text-left flex items-center gap-3 px-5 py-3 text-red-500 hover:bg-gray-100 transition">
-                                <span>↩️</span>
-                                <span>Log Out</span>
-                            </button>
-                        </form>
-                    </div>
-                </div>
-            </div>
-        </div>
+                @include('partials.app.topbar')
+
         <main class="flex-1 overflow-y-auto p-8 bg-[#f8fafc]">
-            <div class="flex items-start justify-between mb-8">
-                <div>
-                    <h2 class="text-[38px] font-bold text-gray-900 leading-tight">Submission Slot Management</h2>
-                    <p class="text-gray-500 mt-2 text-base">Create and manage submission periods, and publish public portal documents</p>
+            <div class="sk-page-head">
+                <div class="sk-page-head__text">
+                    <span class="sk-eyebrow"><span class="sk-dot"></span>Module Management</span>
+                    <h1 class="sk-page-title">Submission &amp; Document Management</h1>
+                    <p class="sk-page-subtitle">Create and manage submission periods and public portal documents.</p>
                 </div>
-                <button id="openModalBtn" class="bg-red-600 hover:bg-red-700 text-white px-5 py-3 rounded-lg text-sm font-semibold shadow-sm">
-                    ＋ Create Submission Slot
-                </button>
+                <div class="sk-page-head__actions">
+                    <button id="openModalBtn" class="sk-btn sk-btn--primary sk-btn--lg">
+                        @include('partials.ui.icon',['icon'=>'plus','iconSize'=>19,'iconStroke'=>2.4])
+                        Create Submission Slot
+                    </button>
+                </div>
             </div>
             @if(session('status'))
                 <div class="mb-6 rounded-2xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">{{ session('status') }}</div>
@@ -94,7 +45,7 @@
             <section id="lydp-public-document" class="mb-8 overflow-hidden rounded-3xl border border-blue-100 bg-white shadow-sm">
                 <div class="flex flex-col gap-4 border-b border-blue-100 bg-gradient-to-r from-blue-50 to-white px-6 py-5 md:flex-row md:items-center md:justify-between">
                     <div class="flex items-start gap-4">
-                        <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-blue-100 text-xl">📘</div>
+                        <span class="sk-icon-tile sk-icon-tile--lg sk-icon-tile--blue">@include('partials.ui.icon', ['icon'=>'file-text','iconSize'=>23])</span>
                         <div>
                             <p class="text-[11px] font-black uppercase tracking-[0.18em] text-blue-600">Public Portal Documents</p>
                             <h3 class="mt-1 text-xl font-black text-gray-900">Local Youth Development Plan (LYDP)</h3>
@@ -124,7 +75,7 @@
                                 <p class="text-sm font-bold text-gray-800">Current public document is available.</p>
                                 <p class="mt-1 text-xs text-gray-500">Last updated: {{ $lydpUpdatedAt ? $lydpUpdatedAt->format('M d, Y h:i A') : 'Unknown' }}</p>
                                 <p class="mt-3 text-xs leading-relaxed text-gray-500">Uploading another PDF replaces the current LYDP shown to public visitors. The public page remains the same.</p>
-                                <a href="{{ $lydpUrl }}" target="_blank" rel="noopener" class="mt-4 inline-flex items-center gap-2 rounded-xl bg-gray-900 px-4 py-2.5 text-xs font-bold text-white transition hover:bg-gray-700">📄 View Current LYDP</a>
+                                <a href="{{ $lydpUrl }}" target="_blank" rel="noopener" class="mt-4 inline-flex items-center gap-2 rounded-xl bg-gray-900 px-4 py-2.5 text-xs font-bold text-white transition hover:bg-gray-700">@include('partials.ui.icon', ['icon'=>'eye','iconSize'=>15]) View Current LYDP</a>
                             @else
                                 <p class="text-sm font-bold text-gray-800">No LYDP PDF has been published yet.</p>
                                 <p class="mt-1 text-xs leading-relaxed text-gray-500">Once published, the PDF automatically becomes available in the existing Annual Budget & LYDP public page.</p>
@@ -283,15 +234,23 @@
                     </form>
                 </div>
             </div>
+            @php
+                $summaryStyles=[
+                    'Total Slots'=>['icon'=>'layout-grid','tone'=>''],
+                    'Open Slots'=>['icon'=>'lock-open','tone'=>'green'],
+                    'Past Deadline'=>['icon'=>'triangle-alert','tone'=>'yellow'],
+                    'Closed Slots'=>['icon'=>'lock','tone'=>''],
+                    'Current Submissions'=>['icon'=>'file-text','tone'=>'blue'],
+                    'All-Time Total'=>['icon'=>'archive','tone'=>'yellow'],
+                ];
+            @endphp
             <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5 mb-10">
                 @foreach($summaryCards as $card)
-                    <div class="bg-white rounded-2xl border {{ $card['border'] }} p-5">
-                        <div class="flex justify-between items-start">
-                            <div>
-                                <p class="text-sm text-gray-500 mb-2">{{ $card['label'] }}</p>
-                                <h3 class="text-4xl font-bold text-gray-900 leading-none">{{ $card['value'] }}</h3>
-                            </div>
-                            <div class="w-12 h-12 rounded-xl {{ $card['iconBg'] }} flex items-center justify-center {{ $card['iconColor'] }} text-xl">{{ $card['icon'] }}</div>
+                    @php $style=$summaryStyles[$card['label']] ?? ['icon'=>'layout-grid','tone'=>'']; @endphp
+                    <div class="sk-stat">
+                        <div class="sk-stat__top">
+                            <div><p class="sk-stat__label">{{ $card['label'] }}</p><p class="sk-stat__value">{{ $card['value'] }}</p></div>
+                            <span class="sk-icon-tile {{ $style['tone'] ? 'sk-icon-tile--'.$style['tone'] : '' }}">@include('partials.ui.icon',['icon'=>$style['icon'],'iconSize'=>21])</span>
                         </div>
                     </div>
                 @endforeach
@@ -331,7 +290,7 @@
                     'past_deadline'=>[
                         'title'=>'Past Deadline',
                         'description'=>'Deadline has passed. Late submissions may still be accepted until the slot is closed.',
-                        'icon'=>'⚠️',
+                        'icon'=>'triangle-alert','tone'=>'orange',
                         'sectionBorder'=>'border-orange-200',
                         'sectionBg'=>'bg-orange-50/40',
                         'cardBorder'=>'border-orange-200',
@@ -339,7 +298,7 @@
                     'open'=>[
                         'title'=>'Open Now',
                         'description'=>'Submission slots currently within their active submission period.',
-                        'icon'=>'🔓',
+                        'icon'=>'lock-open','tone'=>'green',
                         'sectionBorder'=>'border-green-200',
                         'sectionBg'=>'bg-green-50/30',
                         'cardBorder'=>'border-green-200',
@@ -347,7 +306,7 @@
                     'upcoming'=>[
                         'title'=>'Upcoming',
                         'description'=>'Scheduled submission slots that have not started yet.',
-                        'icon'=>'🕒',
+                        'icon'=>'calendar-clock','tone'=>'blue',
                         'sectionBorder'=>'border-blue-200',
                         'sectionBg'=>'bg-blue-50/30',
                         'cardBorder'=>'border-blue-200',
@@ -355,7 +314,7 @@
                     'closed'=>[
                         'title'=>'Closed',
                         'description'=>'Submission slots that no longer accept submissions.',
-                        'icon'=>'🔒',
+                        'icon'=>'lock','tone'=>'gray',
                         'sectionBorder'=>'border-gray-200',
                         'sectionBg'=>'bg-gray-50/70',
                         'cardBorder'=>'border-gray-200',
@@ -364,11 +323,15 @@
             @endphp
             <div id="slotContainer" class="space-y-8">
                 @foreach($slotGroupSettings as $groupKey=>$group)
-                    @php($groupSlots=$slotGroups[$groupKey])
+                    @php
+                        $groupSlots=$slotGroups[$groupKey];
+                    @endphp
                     <section id="{{ $groupKey }}-slots" class="rounded-3xl border {{ $group['sectionBorder'] }} {{ $group['sectionBg'] }} overflow-hidden">
                         <div class="px-6 py-5 bg-white/80 border-b {{ $group['sectionBorder'] }} flex items-center justify-between gap-4">
                             <div class="flex items-start gap-3">
-                                <div class="w-10 h-10 rounded-xl bg-white border {{ $group['sectionBorder'] }} flex items-center justify-center text-lg">{{ $group['icon'] }}</div>
+                                <span class="sk-icon-tile sk-icon-tile--sm {{ !empty($group['tone']) ? 'sk-icon-tile--'.$group['tone'] : '' }}">
+                                    @include('partials.ui.icon', ['icon'=>$group['icon'],'iconSize'=>17])
+                                </span>
                                 <div>
                                     <h3 class="text-lg font-bold text-gray-900">{{ $group['title'] }}</h3>
                                     <p class="text-sm text-gray-500 mt-1">{{ $group['description'] }}</p>
@@ -377,114 +340,109 @@
                             <span class="shrink-0 min-w-9 h-9 px-3 rounded-full bg-white border {{ $group['sectionBorder'] }} flex items-center justify-center text-sm font-bold text-gray-700">{{ $groupSlots->total() }}</span>
                         </div>
                         <div class="p-5">
-                            @if($groupSlots->isEmpty())
-                                <div class="rounded-2xl border border-dashed {{ $group['sectionBorder'] }} bg-white/60 p-8 text-center text-sm text-gray-400">No {{ strtolower($group['title']) }} submission slots.</div>
-                            @else
-                                <div class="grid grid-cols-1 xl:grid-cols-2 gap-5">
-                                    @foreach($groupSlots as $slot)
-                                        <article class="bg-white rounded-2xl border {{ $group['cardBorder'] }} p-6 shadow-sm">
-                                            <div class="flex justify-between items-start gap-4 mb-5">
-                                                <div class="min-w-0">
-                                                    <div class="flex flex-wrap items-center gap-2 mb-2">
-                                                        <span class="text-[10px] font-black uppercase tracking-wider text-gray-400">{{ $slot->submission_type==='budget_report' ? 'Budget / Financial Report' : 'Accomplishment Report' }}</span>
-                                                        <span class="text-[10px] font-black uppercase px-2.5 py-1 rounded-full {{ $slot->management_state_badge ?? 'bg-gray-100 text-gray-600' }}">{{ $slot->management_state_label ?? ucfirst($slot->status) }}</span>
-                                                    </div>
-                                                    <h4 class="text-lg font-bold text-gray-900 break-words">{{ $slot->title }}</h4>
-                                                    @if(!empty($slot->description))
-                                                        <p class="text-sm text-gray-500 mt-1 break-words">{{ $slot->description }}</p>
-                                                    @endif
+                            <div class="grid grid-cols-1 xl:grid-cols-2 gap-5">
+                                @forelse($groupSlots as $slot)
+                                    @php
+                                        $isBudget=$slot->submission_type==='budget_report';
+                                        $isOpen=$slot->status==='open';
+                                        $slotIcon=$isBudget ? 'wallet' : 'clipboard-list';
+                                        $recordTone=!$isOpen ? 'sk-record--muted' : ($isBudget ? 'sk-record--blue' : ($groupKey==='past_deadline' ? 'sk-record--yellow' : ''));
+                                    @endphp
+                                    <article class="sk-record {{ $recordTone }}" data-slot-card data-status="{{ $slot->status }}" data-search="{{ \Illuminate\Support\Str::lower($slot->title.' '.$slot->description.' '.$slot->role) }}">
+                                        <div class="flex items-start gap-4">
+                                            <span class="sk-thumb {{ !$isOpen ? 'sk-thumb--muted' : ($isBudget ? 'sk-thumb--blue' : '') }}">
+                                                @include('partials.ui.icon', ['icon'=>$slotIcon,'iconSize'=>24])
+                                            </span>
+                                            <div class="min-w-0 flex-1">
+                                                <div class="flex flex-wrap items-center gap-2">
+                                                    <p class="sk-overline">{{ $isBudget ? 'Budget / Financial Report' : 'Accomplishment Report' }}</p>
+                                                    <span class="text-[10px] font-black uppercase px-2.5 py-1 rounded-full {{ $slot->management_state_badge ?? 'bg-gray-100 text-gray-600' }}">{{ $slot->management_state_label ?? ucfirst($slot->status) }}</span>
                                                 </div>
-                                            </div>
-                                            @if($slot->submission_type==='accomplishment_report')
-                                                <div class="mb-4 flex flex-wrap gap-2">
-                                                    @if(!empty($slot->accomplishment_category))
-                                                        <span class="text-xs bg-blue-50 text-blue-600 border border-blue-100 px-3 py-1.5 rounded-full font-medium">{{ $accomplishmentCategoryLabels[$slot->accomplishment_category] ?? $slot->accomplishment_category }}</span>
-                                                    @endif
-                                                    @if($slot->accomplishment_category==='youth_development_program' && !empty($slot->ydp_program_type))
-                                                        <span class="text-xs bg-green-50 text-green-600 border border-green-100 px-3 py-1.5 rounded-full font-medium">{{ $ydpProgramTypes[$slot->ydp_program_type] ?? $slot->ydp_program_type }}</span>
-                                                    @endif
-                                                </div>
-                                            @endif
-                                            @if($slot->submission_type==='budget_report')
-                                                <div class="mb-4 flex flex-wrap gap-2">
-                                                    @if(!empty($slot->budget_category))
-                                                        <span class="text-xs bg-red-50 text-red-600 border border-red-100 px-3 py-1.5 rounded-full font-medium">{{ $budgetCategoryLabels[$slot->budget_category] ?? $slot->budget_category }}</span>
-                                                    @endif
-                                                    @if(!empty($slot->fiscal_year))
-                                                        <span class="text-xs bg-blue-50 text-blue-600 border border-blue-100 px-3 py-1.5 rounded-full font-medium">FY {{ $slot->fiscal_year }}</span>
-                                                    @endif
-                                                    @if($slot->budget_category==='coa_report' && !empty($slot->budget_period_type))
-                                                        <span class="text-xs bg-purple-50 text-purple-600 border border-purple-100 px-3 py-1.5 rounded-full font-medium">
-                                                            {{ $budgetPeriodLabels[$slot->budget_period_type] ?? $slot->budget_period_type }}
-                                                            @if($slot->budget_period_type==='monthly' && !empty($slot->fiscal_month))
-                                                                - {{ $monthNames[(int)$slot->fiscal_month] ?? '' }}
-                                                            @elseif($slot->budget_period_type==='quarterly' && !empty($slot->fiscal_quarter))
-                                                                - {{ $slot->fiscal_quarter }}
-                                                            @elseif($slot->budget_period_type==='semi_annual' && !empty($slot->fiscal_half))
-                                                                - {{ $slot->fiscal_half==='H1' ? 'First Half' : 'Second Half' }}
-                                                            @endif
-                                                        </span>
-                                                    @endif
-                                                </div>
-                                            @endif
-                                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
-                                                <div class="rounded-xl bg-gray-50 px-4 py-3">
-                                                    <p class="text-[10px] font-black uppercase tracking-wider text-gray-400">Start Date</p>
-                                                    <p class="text-sm font-semibold text-gray-700 mt-1">{{ \Carbon\Carbon::parse($slot->start_date)->format('M d, Y') }}</p>
-                                                </div>
-                                                <div class="rounded-xl {{ $groupKey==='past_deadline' ? 'bg-orange-50' : 'bg-gray-50' }} px-4 py-3">
-                                                    <p class="text-[10px] font-black uppercase tracking-wider {{ $groupKey==='past_deadline' ? 'text-orange-500' : 'text-gray-400' }}">Submission Deadline</p>
-                                                    <p class="text-sm font-semibold {{ $groupKey==='past_deadline' ? 'text-orange-700' : 'text-gray-700' }} mt-1">{{ \Carbon\Carbon::parse($slot->end_date)->format('M d, Y') }}</p>
-                                                </div>
-                                            </div>
-                                            <div class="flex flex-wrap items-center gap-2">
-                                                <span class="text-xs bg-gray-100 text-gray-600 px-3 py-1.5 rounded-full font-medium">{{ $slot->role }}</span>
-                                                @if($groupKey==='past_deadline')
-                                                    <span class="text-xs bg-orange-100 text-orange-700 px-3 py-1.5 rounded-full font-bold">Deadline Passed</span>
+                                                <h4 class="mt-1 text-[17px] font-bold leading-snug text-gray-900 break-words">{{ $slot->title }}</h4>
+                                                @if(!empty($slot->description))
+                                                    <p class="mt-1 text-sm leading-relaxed text-gray-500 break-words">{{ $slot->description }}</p>
                                                 @endif
                                             </div>
-                                            <div class="mt-5 pt-5 border-t border-gray-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                                                <span class="text-xs text-gray-400">Slot #{{ $slot->slot_id }}</span>
-                                                <div class="flex flex-wrap gap-2">
-                                                    @if($slot->status==='open')
-                                                        <button type="button"
-                                                            class="edit-slot-btn inline-flex items-center justify-center gap-2 rounded-xl border border-blue-200 bg-blue-50 hover:bg-blue-100 px-4 py-2.5 text-xs font-bold text-blue-600 transition"
-                                                            data-slot-id="{{ $slot->slot_id }}"
-                                                            data-update-url="{{ route('sk_pres.module.update',$slot->slot_id) }}"
-                                                            data-submission-type="{{ $slot->submission_type }}"
-                                                            data-accomplishment-category="{{ $slot->accomplishment_category }}"
-                                                            data-ydp-program-type="{{ $slot->ydp_program_type }}"
-                                                            data-budget-category="{{ $slot->budget_category }}"
-                                                            data-fiscal-year="{{ $slot->fiscal_year }}"
-                                                            data-budget-period-type="{{ $slot->budget_period_type }}"
-                                                            data-fiscal-month="{{ $slot->fiscal_month }}"
-                                                            data-fiscal-quarter="{{ $slot->fiscal_quarter }}"
-                                                            data-fiscal-half="{{ $slot->fiscal_half }}"
-                                                            data-title="{{ $slot->title }}"
-                                                            data-description="{{ $slot->description }}"
-                                                            data-role="{{ $slot->role }}"
-                                                            data-start-date="{{ $slot->start_date }}"
-                                                            data-end-date="{{ $slot->end_date }}">✎ Edit</button>
-                                                        <button type="button" onclick="closeSlot({{ $slot->slot_id }},@js($slot->title))" class="inline-flex items-center justify-center gap-2 rounded-xl bg-gray-900 hover:bg-black px-4 py-2.5 text-xs font-bold text-white transition">🔒 Close Slot</button>
-                                                    @endif
-                                                    <button type="button" onclick="deleteSlot({{ $slot->slot_id }},@js($slot->title))" class="inline-flex items-center justify-center gap-2 rounded-xl border border-red-200 bg-red-50 hover:bg-red-100 px-4 py-2.5 text-xs font-bold text-red-600 transition">🗑 Delete</button>
-                                                </div>
+                                            <button type="button" onclick="deleteSlot({{ $slot->slot_id }},@js($slot->title))" class="sk-icon-btn text-gray-400 hover:!text-red-600 hover:!bg-red-50" title="Delete slot" aria-label="Delete {{ $slot->title }}">
+                                                @include('partials.ui.icon', ['icon'=>'trash-2','iconSize'=>18])
+                                            </button>
+                                        </div>
+                                        @if($slot->submission_type==='accomplishment_report')
+                                            <div class="flex flex-wrap gap-2">
+                                                @if(!empty($slot->accomplishment_category))
+                                                    <span class="sk-badge sk-badge--blue">{{ $accomplishmentCategoryLabels[$slot->accomplishment_category] ?? $slot->accomplishment_category }}</span>
+                                                @endif
+                                                @if($slot->accomplishment_category==='youth_development_program' && !empty($slot->ydp_program_type))
+                                                    <span class="sk-badge sk-badge--green">{{ $ydpProgramTypes[$slot->ydp_program_type] ?? $slot->ydp_program_type }}</span>
+                                                @endif
                                             </div>
+                                        @endif
+                                        @if($slot->submission_type==='budget_report')
+                                            <div class="flex flex-wrap gap-2">
+                                                @if(!empty($slot->budget_category))
+                                                    <span class="sk-badge sk-badge--red">{{ $budgetCategoryLabels[$slot->budget_category] ?? $slot->budget_category }}</span>
+                                                @endif
+                                                @if(!empty($slot->fiscal_year))
+                                                    <span class="sk-badge sk-badge--blue">FY {{ $slot->fiscal_year }}</span>
+                                                @endif
+                                                @if($slot->budget_category==='coa_report' && !empty($slot->budget_period_type))
+                                                    <span class="sk-badge sk-badge--yellow">
+                                                        {{ $budgetPeriodLabels[$slot->budget_period_type] ?? $slot->budget_period_type }}
+                                                        @if($slot->budget_period_type==='monthly' && !empty($slot->fiscal_month))
+                                                            - {{ $monthNames[(int)$slot->fiscal_month] ?? '' }}
+                                                        @elseif($slot->budget_period_type==='quarterly' && !empty($slot->fiscal_quarter))
+                                                            - {{ $slot->fiscal_quarter }}
+                                                        @elseif($slot->budget_period_type==='semi_annual' && !empty($slot->fiscal_half))
+                                                            - {{ $slot->fiscal_half==='H1' ? 'First Half' : 'Second Half' }}
+                                                        @endif
+                                                    </span>
+                                                @endif
+                                            </div>
+                                        @endif
+                                        <div class="flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 pt-4">
+                                            <div class="sk-meta">
+                                                <span class="sk-meta__item">@include('partials.ui.icon', ['icon'=>'calendar-days','iconSize'=>16]) {{ \Carbon\Carbon::parse($slot->start_date)->format('M d, Y') }} &ndash; {{ \Carbon\Carbon::parse($slot->end_date)->format('M d, Y') }}</span>
+                                                <span class="sk-meta__item">@include('partials.ui.icon', ['icon'=>'users','iconSize'=>16]) {{ $slot->role }}</span>
+                                                <span class="sk-meta__item text-gray-400">Slot #{{ $slot->slot_id }}</span>
+                                            </div>
+                                            <span class="sk-badge sk-badge--dot {{ $isOpen ? 'sk-badge--green' : 'sk-badge--gray' }}">{{ $slot->management_state_label ?? ucfirst($slot->status) }}</span>
+                                        </div>
+                                        <div class="flex flex-wrap justify-end gap-2 border-t border-gray-100 pt-4">
                                             @if($slot->status==='open')
-                                                <form id="close-slot-{{ $slot->slot_id }}" method="POST" action="{{ route('sk_pres.module.close',$slot->slot_id) }}" class="hidden">
-                                                    @csrf
-                                                    @method('PATCH')
-                                                </form>
+                                                <button type="button" class="edit-slot-btn sk-btn sk-btn--secondary sk-btn--sm"
+                                                    data-slot-id="{{ $slot->slot_id }}"
+                                                    data-update-url="{{ route('sk_pres.module.update',$slot->slot_id) }}"
+                                                    data-submission-type="{{ $slot->submission_type }}"
+                                                    data-accomplishment-category="{{ $slot->accomplishment_category }}"
+                                                    data-ydp-program-type="{{ $slot->ydp_program_type }}"
+                                                    data-budget-category="{{ $slot->budget_category }}"
+                                                    data-fiscal-year="{{ $slot->fiscal_year }}"
+                                                    data-budget-period-type="{{ $slot->budget_period_type }}"
+                                                    data-fiscal-month="{{ $slot->fiscal_month }}"
+                                                    data-fiscal-quarter="{{ $slot->fiscal_quarter }}"
+                                                    data-fiscal-half="{{ $slot->fiscal_half }}"
+                                                    data-title="{{ $slot->title }}"
+                                                    data-description="{{ $slot->description }}"
+                                                    data-role="{{ $slot->role }}"
+                                                    data-start-date="{{ $slot->start_date }}"
+                                                    data-end-date="{{ $slot->end_date }}">@include('partials.ui.icon', ['icon'=>'pencil','iconSize'=>14]) Edit</button>
+                                                <button type="button" onclick="closeSlot({{ $slot->slot_id }},@js($slot->title))" class="sk-btn sk-btn--dark sk-btn--sm">@include('partials.ui.icon', ['icon'=>'lock','iconSize'=>14]) Close Slot</button>
                                             @endif
-                                            <form id="delete-slot-{{ $slot->slot_id }}" method="POST" action="{{ route('sk_pres.module.destroy',$slot->slot_id) }}" class="hidden">
+                                        </div>
+                                        @if($slot->status==='open')
+                                            <form id="close-slot-{{ $slot->slot_id }}" method="POST" action="{{ route('sk_pres.module.close',$slot->slot_id) }}" class="hidden">
                                                 @csrf
+                                                @method('PATCH')
                                             </form>
-                                        </article>
-                                    @endforeach
-                                </div>
-                                @if($groupSlots->hasPages())
-                                    <div class="mt-6 pt-5 border-t {{ $group['sectionBorder'] }}">{{ $groupSlots->onEachSide(1)->fragment($groupKey.'-slots')->links() }}</div>
-                                @endif
+                                        @endif
+                                        <form id="delete-slot-{{ $slot->slot_id }}" method="POST" action="{{ route('sk_pres.module.destroy',$slot->slot_id) }}" class="hidden">@csrf</form>
+                                    </article>
+                                @empty
+                                    <div class="xl:col-span-2 rounded-2xl border border-dashed {{ $group['sectionBorder'] }} bg-white/60 p-8 text-center text-sm text-gray-400">No {{ strtolower($group['title']) }} submission slots.</div>
+                                @endforelse
+                            </div>
+                            @if($groupSlots->hasPages())
+                                <div class="mt-6 pt-5 border-t {{ $group['sectionBorder'] }}">{{ $groupSlots->onEachSide(1)->fragment($groupKey.'-slots')->links() }}</div>
                             @endif
                         </div>
                     </section>

@@ -10,97 +10,40 @@
 <style>
 .fc .fc-toolbar{gap:12px;margin-bottom:18px}
 .fc .fc-toolbar-title{font-size:1.05rem;font-weight:800;color:#111827}
-.fc .fc-button{background:#fff!important;border:1px solid #e5e7eb!important;color:#4b5563!important;box-shadow:none!important;border-radius:10px!important;padding:.45rem .75rem!important;font-size:.72rem!important;font-weight:800!important;text-transform:capitalize!important}
-.fc .fc-button:hover{background:#fef2f2!important;border-color:#fecaca!important;color:#dc2626!important}
+.fc .fc-button{background:#f8fafc!important;border:1px solid #cbd5e1!important;color:#475569!important;box-shadow:none!important;border-radius:10px!important;padding:.45rem .75rem!important;font-size:.72rem!important;font-weight:800!important;text-transform:capitalize!important}
+.fc .fc-button:hover{background:#fff1f2!important;border-color:#fda4af!important;color:#be123c!important}
+.fc .fc-button:focus{box-shadow:0 0 0 3px rgba(225,29,72,.10)!important}
 .fc .fc-col-header-cell{background:#f8fafc}
-.fc .fc-col-header-cell-cushion{padding:10px 4px!important;color:#6b7280;font-size:10px;font-weight:900;text-transform:uppercase;text-decoration:none!important}
+.fc .fc-col-header-cell-cushion{padding:10px 4px!important;color:#64748b;font-size:10px;font-weight:900;text-transform:uppercase;text-decoration:none!important}
 .fc .fc-daygrid-day{background:#fff}
 .fc .fc-daygrid-day-frame{min-height:112px}
-.fc .fc-daygrid-day-number{color:#6b7280;font-size:11px;font-weight:700;text-decoration:none!important;padding:8px!important}
+.fc .fc-daygrid-day-number{color:#64748b;font-size:11px;font-weight:700;text-decoration:none!important;padding:8px!important}
 .fc .fc-day-today{background:#fff7f7!important}
-.fc .fc-day-today .fc-daygrid-day-number{background:#dc2626;color:#fff;border-radius:999px;width:26px;height:26px;display:flex;align-items:center;justify-content:center;margin:5px}
-.fc-theme-standard td,.fc-theme-standard th,.fc-theme-standard .fc-scrollgrid{border-color:#eef2f7}
+.fc .fc-day-today .fc-daygrid-day-number{background:#d12234;color:#fff;border-radius:999px;width:26px;height:26px;display:flex;align-items:center;justify-content:center;margin:5px}
+.fc-theme-standard td,.fc-theme-standard th,.fc-theme-standard .fc-scrollgrid{border-color:#e8edf3}
 .fc-event{border:none!important;padding:3px 6px!important;border-radius:7px!important;font-size:10px!important;font-weight:700!important;cursor:pointer!important;box-shadow:0 1px 2px rgb(15 23 42/.08)}
 </style>
 @endsection
 
 @section('content')
 <div class="flex h-screen bg-gray-100 overflow-hidden">
-    <div class="w-64 bg-red-600 text-white flex flex-col p-3 overflow-y-auto">
-        <div class="flex items-center gap-3 mb-4">
-            <img src="{{ asset('images/logo.png') }}" class="w-8 h-8 rounded-full object-cover" alt="logo">
-            <div class="leading-tight">
-                <h2 class="text-lg font-extrabold tracking-wide">SK 360°</h2>
-                <p class="text-[10px] opacity-80">Management System</p>
-            </div>
-        </div>
+        @include('partials.app.sidebar')
 
-        <div class="bg-red-500 rounded-lg p-2 flex items-center gap-2 mb-3 shadow text-xs">
-            <div class="bg-yellow-400 text-red-600 p-1 rounded-full text-sm">👤</div>
-            <div>
-                <p class="font-semibold text-xs">SK President</p>
-                <p class="text-xs opacity-80">Active Role</p>
-            </div>
-        </div>
-
-        <nav class="space-y-1 text-xs">
-            @foreach($menuItems as $item)
-                <a href="{{ $item['link'] }}" class="flex items-center gap-2 p-2 rounded-lg {{ $item['link']===$currentUrl ? 'bg-red-500' : 'hover:bg-red-500 transition' }}">
-                    <span class="{{ $item['link']===$currentUrl ? 'bg-yellow-400 text-red-600' : 'bg-red-400' }} p-1 rounded text-sm">{{ $item['icon'] }}</span>
-                    <span class="{{ $item['link']===$currentUrl ? 'text-yellow-300 font-semibold' : '' }} text-xs">{{ $item['label'] }}</span>
-                </a>
-            @endforeach
-        </nav>
-    </div>
 
     <div class="flex-1 flex flex-col overflow-hidden">
-        <div class="bg-red-600 text-white px-6 py-3 flex justify-between items-center shadow">
-            <input type="text" placeholder="Search" class="px-4 py-2 rounded-full text-black w-1/3 focus:outline-none">
+                @include('partials.app.topbar')
 
-            <div class="flex items-center gap-3 relative">
-                <div class="relative">
-                    <button id="notifBtn" type="button" class="text-xl hover:bg-red-500 p-2 rounded-lg transition">🔔</button>
-                    <div id="notifDropdown" class="hidden absolute right-0 mt-3 w-72 bg-white rounded-2xl shadow-xl border z-50 overflow-hidden">
-                        <div class="px-4 py-3 font-semibold border-b text-gray-800">Notifications</div>
-                        <div class="max-h-64 overflow-y-auto">
-                            <div class="px-4 py-3 hover:bg-gray-100 text-sm text-gray-700">No notifications yet</div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="relative">
-                    <button id="userMenuBtn" type="button" class="flex items-center gap-2 hover:bg-red-500 px-3 py-2 rounded-lg transition">
-                        <span class="font-semibold">{{ $fullName }}</span>
-                    </button>
-
-                    <div id="userDropdown" class="hidden absolute right-0 mt-3 w-64 bg-white rounded-2xl shadow-xl border overflow-hidden z-50">
-                        <div class="px-5 py-4 font-semibold text-gray-800 border-b">My Account</div>
-                        <a href="{{ route('sk_pres.profile') }}" class="flex items-center gap-3 px-5 py-3 hover:bg-gray-100 transition">
-                            <span>👤</span>
-                            <span class="text-gray-700">Profile Settings</span>
-                        </a>
-                        <form method="POST" action="{{ route('logout') }}">
-                            @csrf
-                            <button type="submit" class="w-full text-left flex items-center gap-3 px-5 py-3 text-red-500 hover:bg-gray-100 transition">
-                                <span>↩️</span>
-                                <span>Log Out</span>
-                            </button>
-                        </form>
-                    </div>
-                </div>
-            </div>
-        </div>
 
         <main class="flex-1 overflow-y-auto p-8 bg-[#f8fafc]">
             <div class="flex flex-col xl:flex-row xl:items-end xl:justify-between gap-5 mb-7">
                 <div>
-                    <div class="inline-flex items-center gap-2 rounded-full bg-red-50 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-red-600 mb-3">📅 Schedule Management</div>
-                    <h1 class="text-3xl md:text-4xl font-black text-gray-900 tracking-tight">Event Calendar</h1>
-                    <p class="text-gray-500 mt-2 text-sm">Create, review, and update SK events, meetings, programs, and deadlines.</p>
+                    <span class="sk-eyebrow"><span class="sk-dot"></span>Calendar</span>
+                    <h1 class="sk-page-title">Event Calendar</h1>
+                    <p class="sk-page-subtitle">Create, review, and update SK events, meetings, programs, and deadlines.</p>
                 </div>
 
                 <button id="openEventModalBtn" type="button" class="inline-flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 text-white px-5 py-3 rounded-xl text-sm font-black shadow-sm transition">
-                    <span class="text-lg leading-none">＋</span>
+                    @include('partials.ui.icon', ['icon' => 'plus', 'iconSize' => 18, 'iconStroke' => 2.4])
                     Add Event
                 </button>
             </div>
@@ -117,27 +60,22 @@
                 <div class="mb-5 rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-sm font-semibold text-red-700">{{ $errors->first() }}</div>
             @endif
 
+            <div class="sk-calendar-legend bg-white rounded-2xl border border-gray-100 shadow-sm px-5 py-4 mb-5 flex flex-wrap items-center gap-x-7 gap-y-3">
+                @foreach($legendItems as [$color,$label])
+                    <div class="flex items-center gap-2.5">
+                        <span class="w-4 h-4 rounded-md {{ $color }} inline-block shadow-sm"></span>
+                        <span class="text-sm font-semibold text-gray-600">{{ $label }}</span>
+                    </div>
+                @endforeach
+            </div>
+
             <div class="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_320px] gap-6">
                 <section class="bg-white rounded-[24px] border border-gray-100 shadow-sm overflow-hidden">
-                    <div class="px-6 py-5 border-b border-gray-100">
-                        <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-                            <div>
-                                <h2 class="text-sm font-black text-gray-900">Calendar Schedule</h2>
-                                <p class="text-xs text-gray-400 mt-1">Click any calendar item to view its full details.</p>
-                            </div>
-
-                            <div class="flex flex-wrap gap-2">
-                                @foreach($legendItems as [$color,$label])
-                                    <div class="flex items-center gap-2 rounded-full border border-gray-100 bg-gray-50 px-3 py-1.5">
-                                        <span class="w-2.5 h-2.5 rounded-full {{ $color }}"></span>
-                                        <span class="text-[9px] font-bold text-gray-600">{{ $label }}</span>
-                                    </div>
-                                @endforeach
-                            </div>
-                        </div>
+                    <div class="px-6 pt-5">
+                        <h2 class="text-sm font-black text-gray-900">Calendar Schedule</h2>
+                        <p class="text-xs text-gray-400 mt-1">Click any calendar item to view its full details.</p>
                     </div>
-
-                    <div class="p-5 md:p-6">
+                    <div class="p-5 md:p-6 pt-4 md:pt-4">
                         <div id="calendar"></div>
                     </div>
                 </section>
@@ -578,12 +516,9 @@ document.addEventListener('DOMContentLoaded',()=>{
             fixedWeekCount:false,
             dayMaxEventRows:3,
             headerToolbar:{
-                left:'prev,next today',
-                center:'title',
-                right:''
-            },
-            buttonText:{
-                today:'Today'
+                left:'title',
+                center:'',
+                right:'prev,next'
             },
             events:@json($calendarEvents),
             eventClick:info=>{
