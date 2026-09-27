@@ -9,6 +9,8 @@ use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
@@ -16,7 +18,7 @@ class ModuleController extends Controller
 {
     public function index(): View
     {
-        abort_unless(auth()->check() && auth()->user()->role === 'sk_president',403);
+        abort_unless(auth()->check() && auth()->user()->role==='sk_president',403);
         $user=auth()->user();
         $fullName=trim(($user->first_name ?? '').' '.($user->last_name ?? '')) ?: 'User';
         $currentTermId=$this->currentTermId();
@@ -36,12 +38,21 @@ class ModuleController extends Controller
         ];
         $slotGroups=$this->paginatedSlotGroups($currentTermId);
         $counts=$this->slotStateCounts($currentTermId);
+        $lydpRelativePath='uploads/public_documents/lydp.pdf';
+        $lydpFullPath=public_path($lydpRelativePath);
+        $lydpAvailable=File::isFile($lydpFullPath);
+        $lydpUpdatedAt=$lydpAvailable
+            ? Carbon::createFromTimestamp(File::lastModified($lydpFullPath),'Asia/Manila')
+            : null;
         return view('sk_pres.module',[
             'fullName'=>$fullName,
             'menuItems'=>$menuItems,
             'currentUrl'=>url()->current(),
             'slotGroups'=>$slotGroups,
             'ydpProgramTypes'=>$this->ydpProgramTypes(),
+            'lydpAvailable'=>$lydpAvailable,
+            'lydpUrl'=>$lydpAvailable ? asset($lydpRelativePath) : null,
+            'lydpUpdatedAt'=>$lydpUpdatedAt,
             'summaryCards'=>[
                 [
                     'label'=>'Total Slots',
@@ -80,12 +91,12 @@ class ModuleController extends Controller
     }
     public function live(): JsonResponse
     {
-        abort_unless(auth()->check() && auth()->user()->role === 'sk_president',403);
+        abort_unless(auth()->check() && auth()->user()->role==='sk_president',403);
         return response()->json($this->modulePayload());
     }
     public function storeLive(Request $request,NotificationService $notifications): JsonResponse
     {
-        abort_unless(auth()->check() && auth()->user()->role === 'sk_president',403);
+        abort_unless(auth()->check() && auth()->user()->role==='sk_president',403);
         $currentTermId=$this->currentTermId();
         if(!$currentTermId){
             return response()->json([
@@ -109,7 +120,7 @@ class ModuleController extends Controller
     }
     public function closeLive(int $slotId): JsonResponse
     {
-        abort_unless(auth()->check() && auth()->user()->role === 'sk_president',403);
+        abort_unless(auth()->check() && auth()->user()->role==='sk_president',403);
         $currentTermId=$this->currentTermId();
         if(!$currentTermId){
             return response()->json([
@@ -143,7 +154,7 @@ class ModuleController extends Controller
     }
     public function destroyLive(int $slotId): JsonResponse
     {
-        abort_unless(auth()->check() && auth()->user()->role === 'sk_president',403);
+        abort_unless(auth()->check() && auth()->user()->role==='sk_president',403);
         $currentTermId=$this->currentTermId();
         if(!$currentTermId){
             return response()->json([
@@ -163,7 +174,10 @@ class ModuleController extends Controller
     }
     public function store(Request $request,NotificationService $notifications): RedirectResponse
     {
-        abort_unless(auth()->check() && auth()->user()->role === 'sk_president',403);
+        abort_unless(auth()->check() && auth()->user()->role==='sk_president',403);
+        if($request->input('form_context')==='lydp_upload'){
+            return $this->storeLydp($request);
+        }
         $currentTermId=$this->currentTermId();
         if(!$currentTermId){
             return back()
@@ -197,7 +211,7 @@ class ModuleController extends Controller
     }
     public function close(int $slotId): RedirectResponse
     {
-        abort_unless(auth()->check() && auth()->user()->role === 'sk_president',403);
+        abort_unless(auth()->check() && auth()->user()->role==='sk_president',403);
         $currentTermId=$this->currentTermId();
         if(!$currentTermId){
             return back()->with(
@@ -234,7 +248,7 @@ class ModuleController extends Controller
     }
     public function update(Request $request,int $slotId,NotificationService $notifications): RedirectResponse
     {
-        abort_unless(auth()->check() && auth()->user()->role === 'sk_president',403);
+        abort_unless(auth()->check() && auth()->user()->role==='sk_president',403);
         $currentTermId=$this->currentTermId();
         if(!$currentTermId){
             return back()
@@ -289,7 +303,7 @@ class ModuleController extends Controller
     }
     public function destroy(int $slotId): RedirectResponse
     {
-        abort_unless(auth()->check() && auth()->user()->role === 'sk_president',403);
+        abort_unless(auth()->check() && auth()->user()->role==='sk_president',403);
         $currentTermId=$this->currentTermId();
         if(!$currentTermId){
             return back()->with(
@@ -310,6 +324,65 @@ class ModuleController extends Controller
         return redirect()
             ->route('sk_pres.module')
             ->with('status','Submission slot deleted successfully.');
+    }
+    protected function storeLydp(Request $request): RedirectResponse
+    {
+        $validator=Validator::make($request->all(),[
+            'lydp_file'=>['required','file','mimes:pdf'],
+        ],[
+            'lydp_file.required'=>'Please select an LYDP PDF to publish.',
+            'lydp_file.file'=>'The selected LYDP document is invalid.',
+            'lydp_file.mimes'=>'The LYDP document must be a PDF file.',
+        ]);
+        if($validator->fails()){
+            return redirect()
+                ->route('sk_pres.module')
+                ->withErrors($validator,'lydpUpload');
+        }
+        $directory=public_path('uploads/public_documents');
+        $targetPath=$directory.DIRECTORY_SEPARATOR.'lydp.pdf';
+        $temporaryPath=null;
+        $backupPath=null;
+        try{
+            File::ensureDirectoryExists($directory);
+            $file=$request->file('lydp_file');
+            $token=now()->format('YmdHis').'_'.bin2hex(random_bytes(4));
+            $temporaryName='lydp_upload_'.$token.'.pdf';
+            $file->move($directory,$temporaryName);
+            $temporaryPath=$directory.DIRECTORY_SEPARATOR.$temporaryName;
+            if(File::isFile($targetPath)){
+                $backupPath=$directory.DIRECTORY_SEPARATOR.'lydp_backup_'.$token.'.pdf';
+                if(!File::move($targetPath,$backupPath)){
+                    throw new \RuntimeException('Unable to prepare the existing LYDP for replacement.');
+                }
+            }
+            if(!File::move($temporaryPath,$targetPath)){
+                if($backupPath && File::isFile($backupPath)){
+                    File::move($backupPath,$targetPath);
+                    $backupPath=null;
+                }
+                throw new \RuntimeException('Unable to publish the LYDP PDF.');
+            }
+            $temporaryPath=null;
+            if($backupPath && File::isFile($backupPath)){
+                File::delete($backupPath);
+                $backupPath=null;
+            }
+        }catch(\Throwable $e){
+            if($temporaryPath && File::isFile($temporaryPath)){
+                File::delete($temporaryPath);
+            }
+            if($backupPath && File::isFile($backupPath) && !File::isFile($targetPath)){
+                File::move($backupPath,$targetPath);
+            }
+            report($e);
+            return redirect()
+                ->route('sk_pres.module')
+                ->with('warning','The LYDP PDF could not be published. The previous public document, if any, was retained.');
+        }
+        return redirect()
+            ->route('sk_pres.module')
+            ->with('status','LYDP PDF published successfully. The Public Portal now uses the latest document.');
     }
     protected function validateSlot(Request $request): array
     {
@@ -390,15 +463,13 @@ class ModuleController extends Controller
     }
     protected function slotData(array $validated,int $termId): array
     {
-        $isAccomplishment=$validated['submission_type'] === 'accomplishment_report';
-        $isBudget=$validated['submission_type'] === 'budget_report';
+        $isAccomplishment=$validated['submission_type']==='accomplishment_report';
+        $isBudget=$validated['submission_type']==='budget_report';
         $accomplishmentCategory=$isAccomplishment
             ? ($validated['accomplishment_category'] ?? null)
             : null;
-        $isYdp=$isAccomplishment &&
-            $accomplishmentCategory === 'youth_development_program';
-        $isCoaReport=$isBudget &&
-            ($validated['budget_category'] ?? null) === 'coa_report';
+        $isYdp=$isAccomplishment && $accomplishmentCategory==='youth_development_program';
+        $isCoaReport=$isBudget && ($validated['budget_category'] ?? null)==='coa_report';
         $period=$isCoaReport
             ? ($validated['budget_period_type'] ?? null)
             : null;
@@ -418,13 +489,13 @@ class ModuleController extends Controller
             'budget_period_type'=>$isCoaReport
                 ? $period
                 : null,
-            'fiscal_month'=>$isCoaReport && $period === 'monthly'
+            'fiscal_month'=>$isCoaReport && $period==='monthly'
                 ? ($validated['fiscal_month'] ?? null)
                 : null,
-            'fiscal_quarter'=>$isCoaReport && $period === 'quarterly'
+            'fiscal_quarter'=>$isCoaReport && $period==='quarterly'
                 ? ($validated['fiscal_quarter'] ?? null)
                 : null,
-            'fiscal_half'=>$isCoaReport && $period === 'semi_annual'
+            'fiscal_half'=>$isCoaReport && $period==='semi_annual'
                 ? ($validated['fiscal_half'] ?? null)
                 : null,
             'title'=>$validated['submission_title'],
@@ -552,10 +623,8 @@ class ModuleController extends Controller
             'closed'=>$closed,
         ];
     }
-    protected function decoratePaginator(
-        LengthAwarePaginator $paginator,
-        string $state
-    ): LengthAwarePaginator {
+    protected function decoratePaginator(LengthAwarePaginator $paginator,string $state): LengthAwarePaginator
+    {
         $paginator->setCollection(
             $paginator->getCollection()
                 ->map(
@@ -567,10 +636,8 @@ class ModuleController extends Controller
         );
         return $paginator;
     }
-    protected function decorateSlot(
-        object $slot,
-        ?string $state=null
-    ): object {
+    protected function decorateSlot(object $slot,?string $state=null): object
+    {
         $today=Carbon::now('Asia/Manila')->toDateString();
         if(!$state){
             if($slot->status==='closed'){
@@ -599,9 +666,8 @@ class ModuleController extends Controller
         }
         return $slot;
     }
-    protected function emptyPaginator(
-        string $pageName
-    ): LengthAwarePaginator {
+    protected function emptyPaginator(string $pageName): LengthAwarePaginator
+    {
         return new LengthAwarePaginator(
             collect(),
             0,
