@@ -1,177 +1,772 @@
-{{-- File guide: Blade view template for resources/views/shared/profile-settings.blade.php. --}}
+{{-- File guide: Shared profile settings page for SK President, Chairman, and Secretary. --}}
 @extends('layouts.app')
+
 @section('title','Profile Settings | SK 360°')
+
 @section('page_css')
 <script src="https://cdn.tailwindcss.com"></script>
-<script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
-<style>[x-cloak]{display:none!important}.tab-active{border-bottom:2px solid var(--sk-red);color:var(--sk-red)}</style>
+<style>
+.pf-avatar-wrap{position:relative;flex:none}
+.pf-avatar{display:flex;align-items:center;justify-content:center;width:88px;height:88px;border-radius:24px;overflow:hidden;background:#fff1f2;color:#bd1e2d;font-size:30px;font-weight:800;letter-spacing:.02em;box-shadow:0 0 0 3px #fff,0 0 0 5px #fecdd3}
+.pf-avatar img{width:100%;height:100%;object-fit:cover}
+.pf-avatar-btn{position:absolute;right:-6px;bottom:-6px;display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border:2px solid #fff;border-radius:99px;background:#c92336;color:#fff;cursor:pointer;box-shadow:0 4px 12px rgba(15,23,42,.16)}
+.pf-avatar-btn:hover{background:#a91c2c}
+.pf-tabs{display:flex;gap:4px;margin-bottom:24px;border-bottom:1px solid #dfe5ee;overflow-x:auto;scrollbar-width:none}
+.pf-tabs::-webkit-scrollbar{display:none}
+.pf-tab{position:relative;display:inline-flex;align-items:center;gap:8px;padding:13px 16px;border:0;border-radius:10px 10px 0 0;background:transparent;color:#64748b;font-size:14px;font-weight:700;white-space:nowrap;cursor:pointer;transition:.2s}
+.pf-tab:hover{color:#0f172a;background:#f8fafc}
+.pf-tab[aria-selected="true"]{background:#c92336;color:#fff}
+.pf-panel[hidden]{display:none}
+.pf-field{min-width:0}
+.pf-label{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:7px;font-size:11px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:#64748b}
+.pf-lock{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:99px;background:#e9eef5;color:#64748b;font-size:9px;font-weight:800;letter-spacing:.06em}
+.pf-input{width:100%;height:50px;padding:0 14px;border:1px solid transparent;border-radius:13px;background:#f4f6fa;color:#0f172a;font-size:14px;font-weight:600;transition:.2s}
+.pf-input:not([readonly]):not(:disabled){background:#fff;border-color:#cbd5e1}
+.pf-input:focus{outline:none;background:#fff;border-color:#f3a5ae;box-shadow:0 0 0 4px rgba(201,35,54,.12)}
+.pf-input[readonly]{cursor:default}
+.pf-input:disabled{color:#64748b;opacity:1;cursor:not-allowed}
+.pf-input.has-error:not([readonly]){border-color:#fecaca;background:#fff1f2}
+.pf-error{margin-top:6px;font-size:12px;font-weight:600;color:#dc2626}
+.pf-hint{font-size:12px;line-height:1.5;color:#64748b}
+.pf-actions{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:10px;margin-top:22px;padding-top:18px;border-top:1px solid #e5e7eb}
+.pf-actions[hidden]{display:none}
+.pf-rows{display:grid;gap:1px;border:1px solid #dfe5ee;border-radius:14px;background:#dfe5ee;overflow:hidden}
+.pf-row{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:4px 16px;padding:13px 16px;background:#fff}
+.pf-row dt{font-size:13px;font-weight:700;color:#64748b}
+.pf-row dd{font-size:14px;font-weight:700;color:#0f172a;text-align:right}
+.pf-security{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:16px;padding:18px;border:1px solid #e5e7eb;border-radius:16px;background:#f8fafc}
+.pf-modal{position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;padding:24px}
+.pf-modal:not(.is-open){display:none}
+.pf-modal__backdrop{position:absolute;inset:0;background:rgba(30,41,59,.42);backdrop-filter:blur(5px)}
+.pf-modal__panel{position:relative;width:100%;max-width:505px;max-height:calc(100vh - 48px);overflow-y:auto;background:#fff;border:1px solid #e5e7eb;border-radius:24px;box-shadow:0 25px 60px rgba(15,23,42,.24)}
+.pf-modal__panel .sk-modal__close{position:absolute;top:20px;right:20px;z-index:2}
+.pf-modal__panel .sk-modal__title{font-size:25px;line-height:1.25;font-weight:800;color:#18233a}
+.pf-modal__panel .sk-modal__subtitle{margin-top:6px;font-size:14px;color:#64748b}
+.pf-pass{position:relative}
+.pf-pass .pf-input{height:52px;padding-right:48px;background:#fff;border:1px solid #cbd5e1;border-radius:13px}
+.pf-pass .pf-input:focus{border-color:#f3a5ae;box-shadow:0 0 0 4px rgba(201,35,54,.12)}
+.pf-eye{position:absolute;top:50%;right:8px;transform:translateY(-50%);display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;border:0;border-radius:9px;background:transparent;color:#64748b;cursor:pointer}
+.pf-eye:hover{background:#f8fafc;color:#334155}
+.pf-eye span{display:flex;align-items:center;justify-content:center}
+.pf-eye span[hidden]{display:none!important}
+.pf-checks{display:grid;gap:10px;margin-top:20px}
+.pf-check{display:flex;align-items:center;gap:10px;font-size:14px;font-weight:600;color:#64748b}
+.pf-check:before{content:'';flex:none;width:16px;height:16px;border:2px solid currentColor;border-radius:999px}
+.pf-check.is-ok{color:#16a34a}
+.pf-check.is-ok:before{background:#16a34a;box-shadow:inset 0 0 0 3px #fff}
+.pf-modal__panel .sk-btn{min-height:45px;border-radius:12px;font-size:14px;font-weight:800}
+.pf-modal__panel .sk-btn--primary:disabled{background:#e58b98!important;color:#fff!important;opacity:1!important;cursor:not-allowed;box-shadow:none}
+.pf-dismiss{flex:none;margin:-4px -6px -4px 0;padding:4px;border:0;border-radius:8px;background:transparent;color:inherit;opacity:.6;cursor:pointer}
+.pf-dismiss:hover{opacity:1;background:rgba(0,0,0,.06)}
+</style>
 @endsection
-@section('content')
-<div x-data="{ activeTab: 'personal', isEditing: false, showPassModal: false }">
-<div class="flex h-screen overflow-hidden bg-gray-100">
-    @include('partials.app.sidebar')
-    <div class="flex-1 flex flex-col min-w-0 overflow-hidden">
-        @include('partials.app.topbar', ['accountButtonId'=>'profileDropdownBtn','accountMenuId'=>'profileMenu','bindBell'=>true,'search'=>['placeholder'=>'Search settings...']])
-        <main class="flex-1 overflow-y-auto p-8 bg-gray-50">
-            <div class="max-w-5xl mx-auto">
-                @if (session('status'))
-                    <div class="mb-6 rounded-2xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">{{ session('status') }}</div>
-                @endif
 
-                @if ($errors->any())
-                    <div class="mb-6 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                        <ul class="list-disc pl-5">
-                            @foreach ($errors->all() as $error)
-                                <li>{{ $error }}</li>
-                            @endforeach
-                        </ul>
+@php
+$skInitials=collect(preg_split('/\s+/',trim($userName)))
+    ->filter()
+    ->take(2)
+    ->map(fn($part)=>mb_strtoupper(mb_substr($part,0,1)))
+    ->implode('')?:'SK';
+
+$profilePic=$user->profile_pic??null;
+$photoUrl=($hasProfilePicColumn&&!empty($profilePic))
+    ? asset(\Illuminate\Support\Str::startsWith($profilePic,'uploads/')
+        ? $profilePic
+        : 'uploads/profile_pics/'.$profilePic)
+    : null;
+
+$profileErrors=$errors->getBag('profile');
+$passwordErrors=$errors->getBag('password');
+$startEditing=$profileErrors->hasAny(['first_name','last_name']);
+$startTab=$passwordErrors->any()?'security':(session('tab')?:'personal');
+
+$formatDate=fn($value)=>$value
+    ? \Illuminate\Support\Carbon::parse($value)->format('M j, Y')
+    : null;
+
+$termStart=$formatDate($user->term_start??null);
+$termEnd=$formatDate($user->term_end??null);
+$termLabel=($termStart||$termEnd)
+    ? ($termStart??'Start not set').' – '.($termEnd??'Present')
+    : null;
+
+$isVerified=(bool)($user->is_verified??false);
+$isActive=($user->status??'active')==='active';
+@endphp
+
+@section('content')
+<div class="flex h-screen bg-gray-100 overflow-hidden">
+    @include('partials.app.sidebar')
+
+    <div class="flex-1 flex flex-col overflow-hidden min-w-0">
+        @include('partials.app.topbar',[
+            'accountButtonId'=>'profileDropdownBtn',
+            'accountMenuId'=>'profileMenu',
+            'bindBell'=>false,
+        ])
+
+        <main class="flex-1 overflow-y-auto p-5 sm:p-8">
+            <div class="max-w-4xl mx-auto">
+
+                <div class="sk-page-head">
+                    <div class="sk-page-head__text">
+                        <span class="sk-eyebrow"><span class="sk-dot"></span>Profile</span>
+                        <h1 class="sk-page-title">Profile Settings</h1>
+                        <p class="sk-page-subtitle">{{ $pageDescription }}</p>
+                    </div>
+                </div>
+
+                @if(session('status'))
+                    <div class="sk-alert sk-alert--success mb-5" role="status" data-dismissible>
+                        @include('partials.ui.icon',['icon'=>'circle-check','iconSize'=>18])
+                        <span class="flex-1">{{ session('status') }}</span>
+                        <button type="button" class="pf-dismiss" data-dismiss aria-label="Dismiss">
+                            @include('partials.ui.icon',['icon'=>'x','iconSize'=>16])
+                        </button>
                     </div>
                 @endif
 
-                <header class="mb-6">
-                    <span class="sk-eyebrow"><span class="sk-dot"></span>Account</span>
-                    <h1 class="sk-page-title">Profile Settings</h1>
-                    <p class="sk-page-subtitle">{{ $pageDescription }}</p>
-                </header>
+                @if($profileErrors->has('profile_pic'))
+                    <div class="sk-alert sk-alert--error mb-5" role="alert">
+                        @include('partials.ui.icon',['icon'=>'circle-alert','iconSize'=>18])
+                        <span class="flex-1">{{ $profileErrors->first('profile_pic') }}</span>
+                    </div>
+                @endif
 
-                <div class="bg-white rounded-[32px] p-6 shadow-sm border border-gray-100 flex items-center justify-between mb-8">
-                    <div class="flex items-center gap-6">
-                        <div class="w-24 h-24 bg-red-600 rounded-2xl flex items-center justify-center text-white text-4xl font-bold border-4 border-white shadow-md overflow-hidden">
-                            @if ($hasProfilePicColumn && !empty($user->profile_pic ?? null))
-                                <img src="{{ asset('uploads/profile_pics/' . $user->profile_pic) }}" class="w-full h-full object-cover" alt="Profile picture">
-                            @else
-                                {{ strtoupper(substr($user->first_name ?? 'U', 0, 1)) }}
+                <div class="sk-card p-5 sm:p-7 mb-7">
+                    <div class="flex flex-col sm:flex-row sm:items-center gap-5">
+                        <div class="pf-avatar-wrap">
+                            <span class="pf-avatar">
+                                @if($photoUrl)
+                                    <img src="{{ $photoUrl }}" alt="Your profile photo">
+                                @else
+                                    {{ $skInitials }}
+                                @endif
+                            </span>
+
+                            @if($hasProfilePicColumn)
+                                <button type="button" class="pf-avatar-btn" data-photo-pick aria-label="Change profile photo" title="Change profile photo">
+                                    @include('partials.ui.icon',['icon'=>'image','iconSize'=>15])
+                                </button>
                             @endif
                         </div>
-                        <div>
-                            <h2 class="text-xl font-bold text-gray-900">{{ $userName }}</h2>
-                            <p class="text-xs font-bold text-gray-500 uppercase tracking-widest">{{ $roleLabel }} - Barangay {{ $barangayName }}</p>
-                            <div class="mt-2 inline-flex items-center gap-1.5 px-3 py-1 bg-green-100 text-green-800 rounded-full text-[10px] font-black">
-                                <span class="w-1.5 h-1.5 bg-green-600 rounded-full"></span> VERIFIED
+
+                        <div class="min-w-0 flex-1">
+                            <h2 class="sk-section-title truncate">{{ $userName }}</h2>
+                            <p class="sk-section-subtitle">{{ $roleLabel }} &middot; Barangay {{ $barangayName }}</p>
+
+                            <div class="flex flex-wrap gap-2 mt-3">
+                                @if($isVerified)
+                                    <span class="sk-badge sk-badge--green sk-badge--dot">Verified</span>
+                                @else
+                                    <span class="sk-badge sk-badge--yellow sk-badge--dot">Pending verification</span>
+                                @endif
+
+                                <span class="sk-badge {{ $isActive?'sk-badge--blue':'sk-badge--gray' }}">
+                                    {{ $isActive?'Active account':'Inactive account' }}
+                                </span>
+
+                                @if($termLabel)
+                                    <span class="sk-badge sk-badge--gray">Term {{ $termLabel }}</span>
+                                @endif
                             </div>
                         </div>
+
+                        @if($hasProfilePicColumn)
+                            <div class="flex sm:flex-col gap-2">
+                                <button type="button" class="sk-btn sk-btn--secondary sk-btn--sm" data-photo-pick>
+                                    @include('partials.ui.icon',['icon'=>'upload','iconSize'=>16])
+                                    {{ $photoUrl?'Change photo':'Add photo' }}
+                                </button>
+
+                                @if($photoUrl)
+                                    <button type="button" class="sk-btn sk-btn--ghost sk-btn--sm" data-photo-remove>
+                                        @include('partials.ui.icon',['icon'=>'trash-2','iconSize'=>16])
+                                        Remove
+                                    </button>
+                                @endif
+                            </div>
+                        @endif
                     </div>
-                </div>
 
-                @unless ($hasProfilePicColumn)
-                    <div class="mb-8 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-                        Photo upload is disabled because `users.profile_pic` does not exist in the current database schema.
-                    </div>
-                @endunless
+                    @if($hasProfilePicColumn)
+                        <p class="pf-hint mt-4">JPG, PNG or WEBP &middot; up to 2 MB. Your photo appears beside your name across SK 360&deg;.</p>
 
-                <div class="flex gap-8 mb-8 border-b border-gray-200">
-                    <button @click="activeTab = 'personal'" :class="activeTab === 'personal' ? 'tab-active' : 'text-gray-400'" class="pb-4 text-xs font-black uppercase tracking-widest transition-all">Personal</button>
-                    <button @click="activeTab = 'security'" :class="activeTab === 'security' ? 'tab-active' : 'text-gray-400'" class="pb-4 text-xs font-black uppercase tracking-widest transition-all">Security</button>
-                </div>
-
-                <div x-show="activeTab === 'personal'" x-transition x-cloak class="space-y-6">
-                    <div class="bg-white rounded-[32px] p-8 shadow-sm border border-gray-100">
-                        <div class="flex justify-between items-center mb-10">
-                            <h3 class="text-sm font-black text-gray-400 uppercase tracking-widest">Personal Information</h3>
-                            <button @click="isEditing = !isEditing" type="button" class="text-xs font-bold text-red-600 hover:bg-red-50 px-4 py-2 rounded-xl transition" x-text="isEditing ? 'Cancel Edit' : 'Edit Information'"></button>
-                        </div>
-
-                        <form action="{{ $updateRoute }}" method="POST">
+                        <form id="photoForm" action="{{ $updateRoute }}" method="POST" enctype="multipart/form-data" hidden>
                             @csrf
-                            <div class="grid grid-cols-2 gap-x-12 gap-y-8">
-                                <div class="space-y-1">
-                                    <label class="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">First Name</label>
-                                    <input type="text" name="first_name" value="{{ old('first_name', $user->first_name) }}" :disabled="!isEditing" :class="isEditing ? 'bg-gray-50 border-gray-200' : 'bg-transparent border-transparent cursor-default'" class="w-full p-2 text-sm font-bold text-gray-700 border-b outline-none transition">
-                                </div>
-                                <div class="space-y-1">
-                                    <label class="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Last Name</label>
-                                    <input type="text" name="last_name" value="{{ old('last_name', $user->last_name) }}" :disabled="!isEditing" :class="isEditing ? 'bg-gray-50 border-gray-200' : 'bg-transparent border-transparent cursor-default'" class="w-full p-2 text-sm font-bold text-gray-700 border-b outline-none transition">
-                                </div>
-                                <div class="space-y-1">
-                                    <label class="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Email Address</label>
-                                    <div class="flex items-center gap-2 bg-gray-50 rounded-2xl px-3">
-                                        <input type="text" value="{{ $user->email }}" disabled class="w-full py-3 text-sm font-bold text-gray-400 bg-transparent outline-none cursor-not-allowed">
-                                        <span class="text-[8px] bg-gray-200 text-gray-500 px-2 py-1 rounded font-black tracking-widest">LOCKED</span>
-                                    </div>
-                                </div>
-                                <div class="space-y-1">
-                                    <label class="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Phone Number</label>
-                                    <div class="flex items-center gap-2 bg-gray-50 rounded-2xl px-3">
-                                        <input type="text" value="{{ $user->phone_number ?? '09XXXXXXXXX' }}" disabled class="w-full py-3 text-sm font-bold text-gray-400 bg-transparent outline-none cursor-not-allowed">
-                                        <span class="text-[8px] bg-gray-200 text-gray-500 px-2 py-1 rounded font-black tracking-widest">LOCKED</span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="mt-10 p-5 bg-blue-50/50 border border-blue-100 rounded-3xl flex gap-4 items-center">
-                                @include('partials.ui.icon', ['icon'=>'info','iconSize'=>19])
-                                <p class="text-[11px] text-blue-700 font-medium">To update your <strong>Email</strong> or <strong>Phone Number</strong>, update the current backend flow first. These fields are intentionally locked here.</p>
-                            </div>
-
-                            <div x-show="isEditing" class="mt-8 flex justify-end">
-                                <button class="bg-red-600 text-white px-10 py-3 rounded-xl text-xs font-black shadow-lg shadow-red-100 hover:bg-red-700 transition uppercase tracking-widest">Save Changes</button>
-                            </div>
+                            <input type="file" name="profile_pic" id="photoInput" accept="image/jpeg,image/png,image/webp">
+                            <input type="hidden" name="remove_photo" id="removePhotoFlag" value="0">
                         </form>
-                    </div>
+                    @endif
                 </div>
 
-                <div x-show="activeTab === 'security'" x-transition x-cloak class="space-y-6">
-                    <div class="bg-white rounded-3xl p-8 shadow-sm border border-gray-100">
-                        <h3 class="text-sm font-black text-gray-400 uppercase tracking-widest mb-8">Manage Password</h3>
-                        <div class="flex items-center justify-between p-6 bg-gray-50 rounded-3xl group hover:bg-red-50 transition">
-                            <div class="flex items-center gap-4">
-                                <span class="sk-icon-tile sk-icon-tile--lg sk-icon-tile--yellow">@include('partials.ui.icon', ['icon'=>'key-round','iconSize'=>22])</span>
-                                <div>
-                                    <p class="text-sm font-bold text-gray-800">Password</p>
-                                    <p class="text-[11px] text-gray-400">Update your account password regularly.</p>
+                <div class="pf-tabs" role="tablist" aria-label="Profile sections">
+                    <button type="button" class="pf-tab" role="tab" id="tab-personal" data-tab="personal" aria-controls="panel-personal" aria-selected="true">
+                        @include('partials.ui.icon',['icon'=>'user','iconSize'=>17])
+                        Personal
+                    </button>
+
+                    <button type="button" class="pf-tab" role="tab" id="tab-security" data-tab="security" aria-controls="panel-security" aria-selected="false" tabindex="-1">
+                        @include('partials.ui.icon',['icon'=>'shield-check','iconSize'=>17])
+                        Security
+                    </button>
+                </div>
+
+                <section class="pf-panel space-y-6" id="panel-personal" role="tabpanel" aria-labelledby="tab-personal" tabindex="0">
+                    <form id="personalForm" action="{{ $updateRoute }}" method="POST" class="sk-card p-5 sm:p-7">
+                        @csrf
+
+                        <div class="sk-card__header mb-6">
+                            <div class="min-w-0">
+                                <h3 class="sk-section-title">Personal information</h3>
+                                <p class="sk-section-subtitle">Your name appears on reports, announcements and the public leadership page.</p>
+                            </div>
+
+                            <button type="button" id="editToggle" class="sk-btn sk-btn--soft sk-btn--sm" aria-expanded="false">
+                                @include('partials.ui.icon',['icon'=>'pencil','iconSize'=>15])
+                                <span data-edit-label>Edit</span>
+                            </button>
+                        </div>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                            <div class="pf-field">
+                                <label class="pf-label" for="first_name">First name</label>
+
+                                <input id="first_name" name="first_name" type="text" maxlength="50" autocomplete="given-name"
+                                    class="pf-input {{ $profileErrors->has('first_name')?'has-error':'' }}"
+                                    value="{{ old('first_name',$user->first_name) }}"
+                                    data-initial="{{ $user->first_name }}"
+                                    data-editable readonly>
+
+                                @if($profileErrors->has('first_name'))
+                                    <p class="pf-error">{{ $profileErrors->first('first_name') }}</p>
+                                @endif
+                            </div>
+
+                            <div class="pf-field">
+                                <label class="pf-label" for="last_name">Last name</label>
+
+                                <input id="last_name" name="last_name" type="text" maxlength="50" autocomplete="family-name"
+                                    class="pf-input {{ $profileErrors->has('last_name')?'has-error':'' }}"
+                                    value="{{ old('last_name',$user->last_name) }}"
+                                    data-initial="{{ $user->last_name }}"
+                                    data-editable readonly>
+
+                                @if($profileErrors->has('last_name'))
+                                    <p class="pf-error">{{ $profileErrors->first('last_name') }}</p>
+                                @endif
+                            </div>
+
+                            <div class="pf-field">
+                                <label class="pf-label" for="profile_email">
+                                    Email address
+                                    <span class="pf-lock">
+                                        @include('partials.ui.icon',['icon'=>'lock','iconSize'=>11])
+                                        Locked
+                                    </span>
+                                </label>
+
+                                <input id="profile_email" type="email" class="pf-input" value="{{ $user->email }}" disabled>
+                            </div>
+
+                            <div class="pf-field">
+                                <label class="pf-label" for="profile_phone">
+                                    Phone number
+                                    <span class="pf-lock">
+                                        @include('partials.ui.icon',['icon'=>'lock','iconSize'=>11])
+                                        Locked
+                                    </span>
+                                </label>
+
+                                <input id="profile_phone" type="tel" class="pf-input" value="{{ $user->phone_number?:'Not set' }}" disabled>
+                            </div>
+                        </div>
+
+                        <div class="sk-alert sk-alert--info mt-6">
+                            @include('partials.ui.icon',['icon'=>'info','iconSize'=>18])
+                            <span>Your email address and phone number sign you in, so only the SK Federation office can change them. Message them if either one is wrong.</span>
+                        </div>
+
+                        <div class="pf-actions" data-edit-actions hidden>
+                            <button type="button" id="editCancel" class="sk-btn sk-btn--ghost">Cancel</button>
+
+                            <button type="submit" class="sk-btn sk-btn--primary">
+                                @include('partials.ui.icon',['icon'=>'circle-check','iconSize'=>17])
+                                Save changes
+                            </button>
+                        </div>
+                    </form>
+
+                    <div class="sk-card p-5 sm:p-7">
+                        <h3 class="sk-section-title mb-1">Council details</h3>
+                        <p class="sk-section-subtitle mb-5">Set by the SK Federation office. Shown here so you can check it is correct.</p>
+
+                        <dl class="pf-rows">
+                            <div class="pf-row">
+                                <dt>Position</dt>
+                                <dd>{{ $roleLabel }}</dd>
+                            </div>
+
+                            <div class="pf-row">
+                                <dt>Barangay</dt>
+                                <dd>{{ $barangayName }}</dd>
+                            </div>
+
+                            <div class="pf-row">
+                                <dt>Term</dt>
+                                <dd>{{ $termLabel??'Not set' }}</dd>
+                            </div>
+
+                            <div class="pf-row">
+                                <dt>Account status</dt>
+                                <dd>{{ $isActive?'Active':'Inactive' }} &middot; {{ $isVerified?'Verified':'Not yet verified' }}</dd>
+                            </div>
+                        </dl>
+                    </div>
+                </section>
+
+                <section class="pf-panel space-y-6" id="panel-security" role="tabpanel" aria-labelledby="tab-security" tabindex="0" hidden>
+                    <div class="sk-card p-5 sm:p-7">
+                        <h3 class="sk-section-title mb-1">Password</h3>
+                        <p class="sk-section-subtitle mb-5">Change it if you have shared it with anyone, or if you think someone else knows it.</p>
+
+                        <div class="pf-security">
+                            <div class="flex items-center gap-4 min-w-0">
+                                <span class="sk-icon-tile sk-icon-tile--lg">
+                                    @include('partials.ui.icon',['icon'=>'key-round','iconSize'=>22])
+                                </span>
+
+                                <div class="min-w-0">
+                                    <p class="text-sm font-bold text-gray-800">Account password</p>
+                                    <p class="pf-hint">At least 8 characters. You will need your current password to change it.</p>
                                 </div>
                             </div>
-                            <button @click="showPassModal = true" type="button" class="px-6 py-2.5 bg-white border border-gray-200 rounded-xl text-xs font-bold text-red-600 shadow-sm group-hover:bg-red-600 group-hover:text-white transition">Update Password</button>
+
+                            <button type="button" class="sk-btn sk-btn--primary" data-open-password>
+                                @include('partials.ui.icon',['icon'=>'lock','iconSize'=>16])
+                                Change password
+                            </button>
                         </div>
                     </div>
-                </div>
+
+                    <div class="sk-card p-5 sm:p-7">
+                        <h3 class="sk-section-title mb-1">Keeping your account safe</h3>
+                        <p class="sk-section-subtitle mb-5">Keep your SK360 account secure when using shared devices.</p>
+
+                        <ul class="space-y-3">
+                            <li class="flex gap-3 text-sm text-gray-600">
+                                @include('partials.ui.icon',['icon'=>'circle-check','iconSize'=>18,'iconClass'=>'text-green-600 shrink-0 mt-0.5'])
+                                <span>Use a password you do not use on any other website.</span>
+                            </li>
+
+                            <li class="flex gap-3 text-sm text-gray-600">
+                                @include('partials.ui.icon',['icon'=>'circle-check','iconSize'=>18,'iconClass'=>'text-green-600 shrink-0 mt-0.5'])
+                                <span>Never share your password with another user.</span>
+                            </li>
+
+                            <li class="flex gap-3 text-sm text-gray-600">
+                                @include('partials.ui.icon',['icon'=>'circle-check','iconSize'=>18,'iconClass'=>'text-green-600 shrink-0 mt-0.5'])
+                                <span>Log out when you finish using a shared or barangay hall computer.</span>
+                            </li>
+                        </ul>
+                    </div>
+                </section>
+
             </div>
         </main>
     </div>
 </div>
 
-<div x-show="showPassModal" x-cloak class="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/50 backdrop-blur-sm">
-    <div class="bg-white w-full max-w-md rounded-[40px] p-10 shadow-2xl">
-        <h2 class="text-2xl font-black text-gray-900 mb-2">Update Password</h2>
-        <p class="text-xs text-gray-400 font-bold uppercase tracking-widest mb-8">Security Preference</p>
-        <form action="{{ $passwordRoute }}" method="POST" class="space-y-6">
-            @csrf
-            <div class="space-y-1">
-                <label class="text-[10px] font-black text-gray-400 uppercase ml-1">Current Password</label>
-                <input type="password" name="current_password" required class="w-full bg-gray-50 p-4 rounded-2xl text-sm font-bold border-transparent focus:border-red-200 outline-none transition">
-            </div>
-            <div class="space-y-1">
-                <label class="text-[10px] font-black text-gray-400 uppercase ml-1">New Password</label>
-                <input type="password" name="password" required class="w-full bg-gray-50 p-4 rounded-2xl text-sm font-bold border-transparent focus:border-red-200 outline-none transition">
-            </div>
-            <div class="space-y-1">
-                <label class="text-[10px] font-black text-gray-400 uppercase ml-1">Confirm New Password</label>
-                <input type="password" name="password_confirmation" required class="w-full bg-gray-50 p-4 rounded-2xl text-sm font-bold border-transparent focus:border-red-200 outline-none transition">
-            </div>
-            <div class="flex gap-4 pt-6">
-                <button type="button" @click="showPassModal = false" class="flex-1 px-8 py-3 rounded-xl text-xs font-bold text-gray-400 hover:bg-gray-100 transition uppercase tracking-widest">Cancel</button>
-                <button type="submit" class="flex-1 px-8 py-3 bg-red-600 text-white rounded-xl text-xs font-black shadow-lg shadow-red-100 hover:bg-red-700 transition uppercase tracking-widest">Update</button>
-            </div>
-        </form>
+<div class="pf-modal" id="passwordModal" role="dialog" aria-modal="true" aria-labelledby="passwordModalTitle">
+    <div class="pf-modal__backdrop" data-close-password></div>
+
+    <div class="pf-modal__panel">
+        <button type="button" class="sk-icon-btn sk-modal__close" data-close-password aria-label="Close">
+            @include('partials.ui.icon',['icon'=>'x','iconSize'=>19])
+        </button>
+
+        <div class="p-7 sm:p-8">
+            <h2 class="sk-modal__title" id="passwordModalTitle">Change password</h2>
+            <p class="sk-modal__subtitle">You will stay signed in on this device.</p>
+
+            <form id="passwordForm" action="{{ $passwordRoute }}" method="POST" class="mt-7">
+                @csrf
+
+                <div class="space-y-5">
+                    <div class="pf-field">
+                        <label class="pf-label" for="current_password">Current password</label>
+
+                        <div class="pf-pass">
+                            <input id="current_password" name="current_password" type="password" required autocomplete="current-password"
+                                class="pf-input {{ $passwordErrors->has('current_password')?'has-error':'' }}">
+
+                            <button type="button" class="pf-eye" data-toggle-pass="current_password" aria-pressed="false" aria-label="Show password" title="Show password">
+                                <span data-eye-visible>
+                                    @include('partials.ui.icon',['icon'=>'eye','iconSize'=>18])
+                                </span>
+                                <span data-eye-hidden hidden>
+                                    @include('partials.ui.icon',['icon'=>'eye-off','iconSize'=>18])
+                                </span>
+                            </button>
+                        </div>
+
+                        @if($passwordErrors->has('current_password'))
+                            <p class="pf-error">{{ $passwordErrors->first('current_password') }}</p>
+                        @endif
+                    </div>
+
+                    <div class="pf-field">
+                        <label class="pf-label" for="password">New password</label>
+
+                        <div class="pf-pass">
+                            <input id="password" name="password" type="password" required minlength="8" autocomplete="new-password"
+                                class="pf-input {{ $passwordErrors->has('password')?'has-error':'' }}">
+
+                            <button type="button" class="pf-eye" data-toggle-pass="password" aria-pressed="false" aria-label="Show password" title="Show password">
+                                <span data-eye-visible>
+                                    @include('partials.ui.icon',['icon'=>'eye','iconSize'=>18])
+                                </span>
+                                <span data-eye-hidden hidden>
+                                    @include('partials.ui.icon',['icon'=>'eye-off','iconSize'=>18])
+                                </span>
+                            </button>
+                        </div>
+
+                        @if($passwordErrors->has('password'))
+                            <p class="pf-error">{{ $passwordErrors->first('password') }}</p>
+                        @endif
+                    </div>
+
+                    <div class="pf-field">
+                        <label class="pf-label" for="password_confirmation">Confirm new password</label>
+
+                        <div class="pf-pass">
+                            <input id="password_confirmation" name="password_confirmation" type="password" required minlength="8" autocomplete="new-password" class="pf-input">
+
+                            <button type="button" class="pf-eye" data-toggle-pass="password_confirmation" aria-pressed="false" aria-label="Show password" title="Show password">
+                                <span data-eye-visible>
+                                    @include('partials.ui.icon',['icon'=>'eye','iconSize'=>18])
+                                </span>
+                                <span data-eye-hidden hidden>
+                                    @include('partials.ui.icon',['icon'=>'eye-off','iconSize'=>18])
+                                </span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <ul class="pf-checks" aria-live="polite">
+                    <li class="pf-check" data-check="length">At least 8 characters</li>
+                    <li class="pf-check" data-check="match">Both new password fields match</li>
+                    <li class="pf-check" data-check="different">Different from your current password</li>
+                </ul>
+
+                <div class="flex gap-3 mt-8">
+                    <button type="button" class="sk-btn sk-btn--ghost flex-1" data-close-password>Cancel</button>
+                    <button type="submit" class="sk-btn sk-btn--primary flex-1" id="passwordSubmit" disabled>Update password</button>
+                </div>
+            </form>
+        </div>
     </div>
 </div>
+@endsection
 
+@push('scripts')
 <script>
-const dropdownBtn = document.getElementById('profileDropdownBtn');
-const profileMenu = document.getElementById('profileMenu');
+(function(){
+    'use strict';
 
-if (dropdownBtn && profileMenu) {
-    dropdownBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        profileMenu.classList.toggle('hidden');
-    });
+    const notifBtn=document.getElementById('notifBtn');
+    const notifDropdown=document.getElementById('notifDropdown');
+    const accountBtn=document.getElementById('profileDropdownBtn');
+    const accountMenu=document.getElementById('profileMenu');
 
-    window.addEventListener('click', (e) => {
-        if (!profileMenu.contains(e.target) && !dropdownBtn.contains(e.target)) {
-            profileMenu.classList.add('hidden');
+    if(notifBtn&&notifDropdown){
+        notifBtn.addEventListener('click',function(e){
+            e.stopPropagation();
+            notifDropdown.classList.toggle('hidden');
+            if(accountMenu)accountMenu.classList.add('hidden');
+        });
+    }
+
+    if(accountBtn&&accountMenu){
+        accountBtn.addEventListener('click',function(e){
+            e.stopPropagation();
+            accountMenu.classList.toggle('hidden');
+            if(notifDropdown)notifDropdown.classList.add('hidden');
+        });
+    }
+
+    document.addEventListener('click',function(e){
+        if(notifBtn&&notifDropdown&&!notifBtn.contains(e.target)&&!notifDropdown.contains(e.target)){
+            notifDropdown.classList.add('hidden');
+        }
+
+        if(accountBtn&&accountMenu&&!accountBtn.contains(e.target)&&!accountMenu.contains(e.target)){
+            accountMenu.classList.add('hidden');
         }
     });
-}
+
+    document.querySelectorAll('[data-dismiss]').forEach(function(button){
+        button.addEventListener('click',function(){
+            button.closest('[data-dismissible]')?.remove();
+        });
+    });
+
+    const tabs=Array.from(document.querySelectorAll('.pf-tab'));
+    const panels={
+        personal:document.getElementById('panel-personal'),
+        security:document.getElementById('panel-security')
+    };
+
+    function selectTab(name,moveFocus){
+        if(!panels[name])return;
+
+        tabs.forEach(function(tab){
+            const active=tab.dataset.tab===name;
+            tab.setAttribute('aria-selected',active?'true':'false');
+            tab.tabIndex=active?0:-1;
+            panels[tab.dataset.tab].hidden=!active;
+
+            if(active&&moveFocus)tab.focus();
+        });
+
+        if(history.replaceState){
+            history.replaceState(null,'','#'+name);
+        }
+    }
+
+    tabs.forEach(function(tab,index){
+        tab.addEventListener('click',function(){
+            selectTab(tab.dataset.tab,false);
+        });
+
+        tab.addEventListener('keydown',function(event){
+            const step=event.key==='ArrowRight'?1:(event.key==='ArrowLeft'?-1:0);
+
+            if(!step)return;
+
+            event.preventDefault();
+            selectTab(tabs[(index+step+tabs.length)%tabs.length].dataset.tab,true);
+        });
+    });
+
+    const hashTab=(window.location.hash||'').replace('#','');
+    selectTab(panels[hashTab]?hashTab:@json($startTab),false);
+
+    const personalForm=document.getElementById('personalForm');
+    const editToggle=document.getElementById('editToggle');
+    const editCancel=document.getElementById('editCancel');
+    const editables=Array.from(personalForm.querySelectorAll('[data-editable]'));
+    const editActions=personalForm.querySelector('[data-edit-actions]');
+    const editLabel=editToggle.querySelector('[data-edit-label]');
+
+    function setEditing(editing,focusFirst){
+        editables.forEach(function(field){
+            field.readOnly=!editing;
+        });
+
+        editActions.hidden=!editing;
+        editLabel.textContent=editing?'Cancel':'Edit';
+        editToggle.setAttribute('aria-expanded',editing?'true':'false');
+
+        if(editing&&focusFirst&&editables.length){
+            const first=editables[0];
+            first.focus();
+            first.setSelectionRange(first.value.length,first.value.length);
+        }
+    }
+
+    function resetFields(){
+        editables.forEach(function(field){
+            field.value=field.dataset.initial||'';
+            field.classList.remove('has-error');
+        });
+    }
+
+    editToggle.addEventListener('click',function(){
+        const startEditing=editActions.hidden;
+
+        if(!startEditing)resetFields();
+
+        setEditing(startEditing,true);
+    });
+
+    editCancel.addEventListener('click',function(){
+        resetFields();
+        setEditing(false,false);
+        editToggle.focus();
+    });
+
+    personalForm.addEventListener('submit',function(event){
+        const changed=editables.some(function(field){
+            return field.value.trim()!==(field.dataset.initial||'');
+        });
+
+        if(!changed){
+            event.preventDefault();
+            setEditing(false,false);
+        }
+    });
+
+    setEditing(@json($startEditing),false);
+
+    const photoForm=document.getElementById('photoForm');
+
+    if(photoForm){
+        const photoInput=document.getElementById('photoInput');
+        const removeFlag=document.getElementById('removePhotoFlag');
+
+        document.querySelectorAll('[data-photo-pick]').forEach(function(button){
+            button.addEventListener('click',function(){
+                removeFlag.value='0';
+                photoInput.click();
+            });
+        });
+
+        photoInput.addEventListener('change',function(){
+            const file=photoInput.files&&photoInput.files[0];
+
+            if(!file)return;
+
+            const allowed=['image/jpeg','image/png','image/webp'];
+
+            if(!allowed.includes(file.type)){
+                window.alert('Please choose a JPG, PNG or WEBP image.');
+                photoInput.value='';
+                return;
+            }
+
+            if(file.size>2*1024*1024){
+                window.alert('That photo is larger than 2 MB. Please choose a smaller one.');
+                photoInput.value='';
+                return;
+            }
+
+            photoForm.submit();
+        });
+
+        document.querySelectorAll('[data-photo-remove]').forEach(function(button){
+            button.addEventListener('click',function(){
+                if(!window.confirm('Remove your profile photo? Your initials will be shown instead.'))return;
+
+                removeFlag.value='1';
+                photoInput.value='';
+                photoForm.submit();
+            });
+        });
+    }
+
+    const modal=document.getElementById('passwordModal');
+    const passwordForm=document.getElementById('passwordForm');
+    const submitButton=document.getElementById('passwordSubmit');
+    const currentField=document.getElementById('current_password');
+    const newField=document.getElementById('password');
+    const confirmField=document.getElementById('password_confirmation');
+    let lastFocused=null;
+
+    function validatePassword(){
+        const current=currentField.value;
+        const next=newField.value;
+        const repeated=confirmField.value;
+
+        const state={
+            length:next.length>=8,
+            match:next.length>0&&next===repeated,
+            different:next.length>0&&next!==current
+        };
+
+        Object.keys(state).forEach(function(key){
+            const check=passwordForm.querySelector('[data-check="'+key+'"]');
+            if(check)check.classList.toggle('is-ok',state[key]);
+        });
+
+        submitButton.disabled=!(current.length>0&&state.length&&state.match&&state.different);
+    }
+
+    function resetEyeIcons(){
+        passwordForm.querySelectorAll('[data-toggle-pass]').forEach(function(button){
+            const field=document.getElementById(button.dataset.togglePass);
+            if(!field)return;
+
+            field.type='password';
+
+            const normalEye=button.querySelector('[data-eye-visible]');
+            const slashEye=button.querySelector('[data-eye-hidden]');
+
+            if(normalEye)normalEye.hidden=false;
+            if(slashEye)slashEye.hidden=true;
+
+            button.setAttribute('aria-pressed','false');
+            button.setAttribute('aria-label','Show password');
+            button.setAttribute('title','Show password');
+        });
+    }
+
+    function openModal(){
+        lastFocused=document.activeElement;
+        modal.classList.add('is-open');
+        setTimeout(()=>currentField.focus(),50);
+    }
+
+    function closeModal(){
+        modal.classList.remove('is-open');
+        passwordForm.reset();
+        resetEyeIcons();
+        validatePassword();
+
+        if(lastFocused)lastFocused.focus();
+    }
+
+    document.querySelectorAll('[data-open-password]').forEach(function(button){
+        button.addEventListener('click',openModal);
+    });
+
+    document.querySelectorAll('[data-close-password]').forEach(function(button){
+        button.addEventListener('click',closeModal);
+    });
+
+    document.addEventListener('keydown',function(event){
+        if(event.key!=='Escape')return;
+
+        if(modal.classList.contains('is-open')){
+            closeModal();
+        }else{
+            if(accountMenu)accountMenu.classList.add('hidden');
+            if(notifDropdown)notifDropdown.classList.add('hidden');
+        }
+    });
+
+    [currentField,newField,confirmField].forEach(function(field){
+        field.addEventListener('input',validatePassword);
+    });
+
+    passwordForm.querySelectorAll('[data-toggle-pass]').forEach(function(button){
+        button.addEventListener('click',function(){
+            const field=document.getElementById(button.dataset.togglePass);
+            if(!field)return;
+
+            const willShow=field.type==='password';
+            field.type=willShow?'text':'password';
+
+            const normalEye=button.querySelector('[data-eye-visible]');
+            const slashEye=button.querySelector('[data-eye-hidden]');
+
+            if(normalEye)normalEye.hidden=willShow;
+            if(slashEye)slashEye.hidden=!willShow;
+
+            button.setAttribute('aria-pressed',willShow?'true':'false');
+            button.setAttribute('aria-label',willShow?'Hide password':'Show password');
+            button.setAttribute('title',willShow?'Hide password':'Show password');
+        });
+    });
+
+    resetEyeIcons();
+    validatePassword();
+
+    @if($passwordErrors->any())
+        openModal();
+    @endif
+})();
 </script>
-</div>
-@endsection
+@endpush
