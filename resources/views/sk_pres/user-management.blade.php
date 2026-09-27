@@ -875,36 +875,69 @@
                 @endforeach
             </div>
         @endif
+        @php
+            $currentCalendarYear=(int)now('Asia/Manila')->year;
+            $minimumNewTermStartYear=$currentAdministration
+                ? max($currentCalendarYear,(int)$currentAdministration->end_year)
+                : $currentCalendarYear;
+            $selectedNewTermStartYear=(int)old('start_year',$minimumNewTermStartYear);
+            if($selectedNewTermStartYear<$minimumNewTermStartYear || $selectedNewTermStartYear>2099){
+                $selectedNewTermStartYear=$minimumNewTermStartYear;
+            }
+            $selectedNewTermEndYear=(int)old('end_year',min(2100,$selectedNewTermStartYear+3));
+            if($selectedNewTermEndYear<=$selectedNewTermStartYear || $selectedNewTermEndYear>2100){
+                $selectedNewTermEndYear=min(2100,$selectedNewTermStartYear+3);
+            }
+        @endphp
         <form
             action="{{ route('sk_pres.user-management.start-new-term') }}"
             method="POST"
             onsubmit="return confirm('Start this new administration? Current Chairman, Secretary, Treasurer and Councilor assignments will be completed.');"
             class="space-y-4">
             @csrf
+            <div class="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3">
+                <p class="text-[10px] font-black uppercase tracking-wider text-blue-500">
+                    Allowed Administration Years
+                </p>
+                <p class="mt-1 text-xs text-blue-700">
+                    The new administration cannot start before {{ $minimumNewTermStartYear }}.
+                    @if($currentAdministration && (int)$currentAdministration->end_year>=$currentCalendarYear)
+                        The current administration ends in {{ $currentAdministration->end_year }}, so earlier start years are unavailable.
+                    @else
+                        Past years are unavailable.
+                    @endif
+                </p>
+            </div>
             <div class="grid grid-cols-2 gap-3">
                 <div>
                     <label class="mb-1.5 block text-xs font-black uppercase text-gray-500">
                         Start Year
                     </label>
-                    <input type="number"
+                    <select id="newTermStartYear"
                         name="start_year"
-                        value="{{ old('start_year',$currentAdministration ? $currentAdministration->end_year : now()->year) }}"
-                        min="2000"
-                        max="2100"
                         class="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
                         required>
+                        @for($year=$minimumNewTermStartYear;$year<=2099;$year++)
+                            <option value="{{ $year }}" {{ $selectedNewTermStartYear===$year ? 'selected' : '' }}>
+                                {{ $year }}
+                            </option>
+                        @endfor
+                    </select>
                 </div>
                 <div>
                     <label class="mb-1.5 block text-xs font-black uppercase text-gray-500">
                         End Year
                     </label>
-                    <input type="number"
+                    <select id="newTermEndYear"
                         name="end_year"
-                        value="{{ old('end_year',$currentAdministration ? ((int)$currentAdministration->end_year+3) : (now()->year+3)) }}"
-                        min="2000"
-                        max="2100"
                         class="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
                         required>
+                        @for($year=$selectedNewTermStartYear+1;$year<=2100;$year++)
+                            <option value="{{ $year }}" {{ $selectedNewTermEndYear===$year ? 'selected' : '' }}>
+                                {{ $year }}
+                            </option>
+                        @endfor
+                    </select>
                 </div>
             </div>
             <div>
@@ -1410,6 +1443,8 @@ document.addEventListener('DOMContentLoaded',()=>{
     const openNewTermModal=document.getElementById('openNewTermModal');
     const newTermModal=document.getElementById('newTermModal');
     const closeNewTermModal=document.getElementById('closeNewTermModal');
+    const newTermStartYear=document.getElementById('newTermStartYear');
+    const newTermEndYear=document.getElementById('newTermEndYear');
     const presidentModeInputs=document.querySelectorAll('input[name="president_mode"]');
     const newPresidentFields=document.getElementById('newPresidentFields');
     const openImportModal=document.getElementById('openImportModal');
@@ -1440,6 +1475,33 @@ document.addEventListener('DOMContentLoaded',()=>{
         modal.classList.add('hidden');
         modal.classList.remove('flex');
     };
+    const syncNewTermEndYears=()=>{
+        if(!newTermStartYear || !newTermEndYear){
+            return;
+        }
+        const startYear=parseInt(newTermStartYear.value,10);
+        const previousEndYear=parseInt(newTermEndYear.value,10);
+        const preferredEndYear=
+            Number.isInteger(previousEndYear) &&
+            previousEndYear>startYear
+                ? previousEndYear
+                : Math.min(2100,startYear+3);
+        newTermEndYear.innerHTML='';
+        for(let year=startYear+1;year<=2100;year++){
+            const option=document.createElement('option');
+            option.value=String(year);
+            option.textContent=String(year);
+            option.selected=year===preferredEndYear;
+            newTermEndYear.appendChild(option);
+        }
+    };
+    if(newTermStartYear){
+        newTermStartYear.addEventListener(
+            'change',
+            syncNewTermEndYears
+        );
+    }
+    syncNewTermEndYears();
     // Profile Dropdown
     if(profileDropdownBtn && profileMenu){
         profileDropdownBtn.addEventListener('click',(e)=>{

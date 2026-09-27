@@ -722,14 +722,24 @@ class UserManagementController extends Controller
     public function startNewTerm(Request $request): RedirectResponse
     {
         abort_unless(auth()->check() && auth()->user()->role === 'sk_president',403);
+        $currentTerm=$this->currentAdministrationTerm();
+        $currentYear=(int)now('Asia/Manila')->year;
+        $minimumStartYear=$currentTerm
+            ? max($currentYear,(int)$currentTerm->end_year)
+            : $currentYear;
         $validated=$request->validateWithBag('newTerm',[
-            'start_year'=>['required','integer','digits:4','min:2000','max:2100'],
-            'end_year'=>['required','integer','digits:4','min:2000','max:2100'],
+            'start_year'=>['required','integer','digits:4','min:'.$minimumStartYear,'max:2099'],
+            'end_year'=>['required','integer','digits:4','min:'.($minimumStartYear+1),'max:2100'],
             'president_mode'=>['required','in:continue,assign_new'],
             'new_president_first_name'=>['nullable','required_if:president_mode,assign_new','string','max:100'],
             'new_president_last_name'=>['nullable','required_if:president_mode,assign_new','string','max:100'],
             'new_president_email'=>['nullable','required_if:president_mode,assign_new','email','max:100','unique:users,email'],
             'new_president_phone'=>['nullable','string','max:20','unique:users,phone_number'],
+        ],[
+            'start_year.min'=>'Start year cannot be earlier than '.$minimumStartYear.'.',
+            'start_year.max'=>'Start year must not be later than 2099.',
+            'end_year.min'=>'End year must be after the allowed start year.',
+            'end_year.max'=>'End year must not be later than 2100.',
         ]);
         if((int)$validated['end_year'] <= (int)$validated['start_year']){
             return back()->withInput()->withErrors([
@@ -745,7 +755,6 @@ class UserManagementController extends Controller
                 'start_year'=>'This administration term already exists.',
             ],'newTerm');
         }
-        $currentTerm=$this->currentAdministrationTerm();
         $president=auth()->user();
         if($currentTerm){
             $pendingCount=DB::table('official_terms')
