@@ -13,15 +13,23 @@ Route::prefix('mobile')->group(function(){
         Route::post('/logout',[MobileSyncController::class,'logout'])->name('mobile.logout');
         Route::get('/me',[MobileSyncController::class,'me'])->name('mobile.me');
         Route::post('/profile',[MobileSyncController::class,'updateProfile'])->name('mobile.profile.update');
+        Route::post('/profile/contact/request',[MobileSyncController::class,'requestContactChange'])->middleware('throttle:5,10')->name('mobile.profile.contact.request');
+        Route::post('/profile/contact/verify',[MobileSyncController::class,'verifyContactChange'])->middleware('throttle:10,10')->name('mobile.profile.contact.verify');
         Route::post('/profile/password',[MobileSyncController::class,'updatePassword'])->name('mobile.profile.password');
         Route::get('/sync',[MobileSyncController::class,'sync'])->name('mobile.sync');
 
         Route::post('/wall/posts',[MobileSyncController::class,'storeWallPost'])->name('mobile.wall.posts.store');
+        Route::patch('/wall/posts/{announcementId}',[MobileSyncController::class,'updateWallPost'])->name('mobile.wall.posts.update');
         Route::post('/wall/posts/{announcementId}/like',[MobileSyncController::class,'toggleWallLike'])->name('mobile.wall.posts.like');
+        Route::get('/wall/posts/{announcementId}/comments',[MobileSyncController::class,'wallPostComments'])->name('mobile.wall.posts.comments.index');
+        Route::post('/wall/posts/{announcementId}/comments',[MobileSyncController::class,'storeWallPostComment'])->name('mobile.wall.posts.comments.store');
 
         Route::post('/events',[MobileSyncController::class,'storeEvent'])->name('mobile.events.store');
+        Route::patch('/events/{eventId}',[MobileSyncController::class,'updateEvent'])->name('mobile.events.update');
 
         Route::post('/meetings',[MobileSyncController::class,'storeMeeting'])->name('mobile.meetings.store');
+        Route::patch('/meetings/{meetingId}',[MobileSyncController::class,'updateMeeting'])->name('mobile.meetings.update');
+        Route::patch('/meetings/{meeting}/end',[MobileSyncController::class,'endMeeting'])->name('mobile.meetings.end');
         Route::get('/meetings/{meeting}/join-url',[MobileSyncController::class,'meetingJoinUrl'])->name('mobile.meetings.join-url');
         Route::post('/meetings/{meeting}/agora-token',[MobileSyncController::class,'meetingAgoraToken'])->name('mobile.meetings.agora-token');
 
@@ -29,15 +37,20 @@ Route::prefix('mobile')->group(function(){
 
         Route::post('/leadership/council',[MobileSyncController::class,'storeCouncilMember'])->name('mobile.leadership.council.store');
         Route::post('/leadership/council/{councilId}',[MobileSyncController::class,'updateCouncilMember'])->name('mobile.leadership.council.update');
-        Route::post('/leadership/secretary',[MobileSyncController::class,'storeSecretaryAccount'])->name('mobile.leadership.secretary.store');
+        Route::post('/leadership/secretary',[MobileSyncController::class,'storeSecretaryAccount'])->middleware('throttle:3,10')->name('mobile.leadership.secretary.store');
+        Route::post('/leadership/chairman',[MobileSyncController::class,'storeChairmanAccount'])->middleware('throttle:3,10')->name('mobile.leadership.chairman.store');
 
         Route::post('/official-submissions',[MobileSyncController::class,'storeOfficialSubmission'])->name('mobile.official-submissions.store');
 
         Route::get('/submission-slots',[MobileSyncController::class,'submissionSlots'])->name('mobile.submission-slots.index');
+        Route::get('/submission-slots/{slotId}/submissions',[MobileSyncController::class,'submissionSlotSubmissions'])->name('mobile.submission-slots.submissions');
+        Route::patch('/submission-slots/{slotId}/toggle',[MobileSyncController::class,'toggleSubmissionSlot'])->name('mobile.submission-slots.toggle');
         Route::post('/submission-slots',[MobileSyncController::class,'storeSubmissionSlot'])->name('mobile.submission-slots.store');
+        Route::patch('/submission-slots/{slotId}',[MobileSyncController::class,'updateSubmissionSlot'])->name('mobile.submission-slots.update');
         Route::delete('/submission-slots/{slotId}',[MobileSyncController::class,'deleteSubmissionSlot'])->name('mobile.submission-slots.destroy');
 
         Route::get('/consolidation',[MobileSyncController::class,'consolidation'])->name('mobile.consolidation');
+        Route::post('/consolidation/quality-review',[MobileSyncController::class,'mobileQualityReview'])->name('mobile.consolidation.quality-review');
 
         Route::post('/notifications/{notificationId}/read',[MobileSyncController::class,'markNotificationRead'])->name('mobile.notifications.read');
     });

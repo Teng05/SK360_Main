@@ -85,6 +85,10 @@ Route::post('/mobile/meetings/{meeting}/call-attendance/leave', [MobileApiContro
     ->middleware('signed')
     ->name('mobile.meetings.call-attendance.leave');
 
+Route::get('/mobile-documents/{sourceType}/{sourceId}', [\App\Http\Controllers\Api\MobileDocumentController::class, 'mobileView'])
+    ->middleware('signed')
+    ->name('mobile.document.view');
+
 Route::controller(AuthController::class)->group(function () {
     Route::get('/login', 'showLogin')->name('login');
     Route::post('/login', 'login')->name('login.submit');
