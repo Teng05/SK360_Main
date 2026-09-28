@@ -558,6 +558,8 @@ function applySearch(){
     if(calendar){
         calendar.removeAllEvents();
         calendar.addEventSource(filteredEvents);
+    }else{
+        renderFallbackCalendar(filteredEvents);
     }
 
     const resultCount=
@@ -580,6 +582,24 @@ function applySearch(){
     }
 
     filterUpcomingEvents();
+}
+
+function renderFallbackCalendar(events){
+    const element=document.getElementById('calendar');
+    if(!element)return;
+    element.innerHTML=events.length
+        ? `<div class="rounded-2xl border border-gray-100 divide-y divide-gray-100">${events.map(event=>`<button type="button" class="w-full p-4 text-left hover:bg-red-50 transition" data-fallback-event="${event.id}"><span class="block text-[10px] font-black uppercase tracking-widest text-red-600">${formatDate(event.start)}</span><span class="block mt-1 font-black text-gray-800">${escapeHtml(event.title||'Untitled event')}</span><span class="block mt-1 text-xs text-gray-500">${escapeHtml(event.extendedProps?.location||'Location not specified')}</span></button>`).join('')}</div>`
+        : '<div class="py-12 text-center text-sm text-gray-400">No public events for this period.</div>';
+    element.querySelectorAll('[data-fallback-event]').forEach(button=>button.addEventListener('click',()=>{
+        const event=events.find(item=>String(item.id)===button.dataset.fallbackEvent);
+        if(event)openEventModal({title:event.title,start:event.start,end:event.end,description:event.extendedProps?.description,location:event.extendedProps?.location});
+    }));
+}
+
+function escapeHtml(value){
+    const node=document.createElement('div');
+    node.textContent=String(value??'');
+    return node.innerHTML;
 }
 
 /*
@@ -676,6 +696,11 @@ document.addEventListener('DOMContentLoaded',function(){
 
     const isMobile=
         window.innerWidth<=640;
+
+    if(typeof FullCalendar==='undefined'){
+        renderFallbackCalendar(allCalendarEvents);
+        return;
+    }
 
     calendar=new FullCalendar.Calendar(
         calendarElement,
