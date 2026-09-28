@@ -303,11 +303,10 @@ body:has(> .sk-auth) {
 .sk-auth__mark img {
     width: 48px;
     height: 48px;
-    padding: 5px;
-    border-radius: 14px;
+    padding: 0;
+    border-radius: 50%;
     background: #fff;
     object-fit: contain;
-    box-shadow: 0 10px 24px -12px rgba(0, 0, 0, .35);
 }
 
 .sk-auth__mark-name {
