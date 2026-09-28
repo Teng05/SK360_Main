@@ -26,8 +26,8 @@
     ];
 @endphp
 
-<div class="sk-landing">
-    <header class="sk-lnav" id="home">
+<div class="sk-landing" id="home">
+    <header class="sk-lnav">
         <div class="sk-container sk-lnav__inner">
             <a href="#home" class="sk-lnav__brand">
                 <img src="{{ asset('images/logo.png') }}" alt="SK 360 Logo">
@@ -57,13 +57,6 @@
         <div class="sk-container sk-hero__grid">
             <div>
                 <h1>
-                    <span class="sk-hero__brand">
-                        <span class="sk-hero__brand-dot">
-                            @include('landing.icon', ['icon' => 'sparkles', 'iconSize' => 14])
-                        </span>
-                        SK 360&deg;
-                    </span>
-
                     <span class="sk-hero__title" style="display: block;">
                         Empowering the youth, <em>transforming communities.</em>
                     </span>
@@ -160,7 +153,6 @@
     <section class="sk-lsection sk-lsection--tint" id="features">
         <div class="sk-container">
             <div class="sk-lsection__head">
-                <span class="sk-eyebrow"><span class="sk-dot"></span>Features</span>
                 <h2 class="sk-lsection__title">Platform Features</h2>
                 <p class="sk-lsection__lead">
                     Comprehensive tools designed for efficient SK governance
@@ -188,7 +180,6 @@
     <section class="sk-lsection" id="benefits">
         <div class="sk-container">
             <div class="sk-lsection__head">
-                <span class="sk-eyebrow"><span class="sk-dot"></span>About SK 360&deg;</span>
                 <h3 class="sk-lsection__title">Why SK 360&deg;?</h3>
                 <p class="sk-lsection__lead">
                     Transforming youth governance through technology,
