@@ -22,12 +22,6 @@
         <span class="sk-eyebrow"><span class="sk-dot"></span>City of Lipa</span>
         <h2 class="sk-phero__title mx-auto">SK360 Public Portal</h2>
         <p class="sk-phero__lead mx-auto">Access official public information from the Sangguniang Kabataan Federation of Lipa City. Stay informed about announcements, upcoming activities, current barangay SK leadership, and Annual Budget information.</p>
-        <div class="flex flex-wrap justify-center gap-3 mt-8">
-            <a href="{{ route('public.announcements') }}" class="sk-btn sk-btn--secondary">@include('public_portal.partials.icon',['icon'=>'megaphone']) Announcements</a>
-            <a href="{{ route('public.calendar') }}" class="sk-btn sk-btn--secondary">@include('public_portal.partials.icon',['icon'=>'calendar-days']) Calendar</a>
-            <a href="{{ route('public.leadership') }}" class="sk-btn sk-btn--secondary">@include('public_portal.partials.icon',['icon'=>'id-card']) Leadership</a>
-            <a href="{{ route('public.budgets') }}" class="sk-btn sk-btn--secondary">@include('public_portal.partials.icon',['icon'=>'wallet']) Annual Budget & LYDP</a>
-        </div>
     </div>
 </section>
 
