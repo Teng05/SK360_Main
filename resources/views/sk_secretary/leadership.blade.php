@@ -9,11 +9,11 @@
 @section('content')
 <div class="flex h-screen bg-gray-100 overflow-hidden">
 
-    @include('sk_secretary.partials.sidebar')
+    @include('partials.app.sidebar')
 
-    <div class="flex-1 flex flex-col overflow-hidden">
+    <div class="flex-1 flex flex-col overflow-hidden min-w-0">
 
-        @include('sk_secretary.partials.topbar')
+        @include('partials.app.topbar', ['search' => ['id' => 'leadershipSearch', 'placeholder' => 'Search officials...']])
 
         <main class="p-8 overflow-y-auto h-full bg-gray-50">
 
@@ -21,6 +21,7 @@
             <div class="flex flex-col gap-4 md:flex-row md:items-end md:justify-between mb-6">
 
                 <div>
+                    <span class="sk-eyebrow"><span class="sk-dot"></span>Leadership</span>
                     <div class="flex items-center gap-2">
 
                         <h1 class="text-3xl font-black text-gray-800 uppercase tracking-tight">
@@ -38,20 +39,6 @@
                             : 'Current leadership directory for Barangay '.$barangayName }}
                     </p>
                 </div>
-
-                <!-- Search -->
-                <div class="relative w-full md:w-80">
-
-                    <span class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300">
-                        &#128269;
-                    </span>
-
-                    <input type="text"
-                        id="leadershipSearch"
-                        placeholder="{{ ($activeTab ?? 'current') === 'history' ? 'Search historical officials...' : 'Search officials...' }}"
-                        autocomplete="off"
-                        class="w-full rounded-xl border border-gray-200 bg-white py-3 pl-10 pr-4 text-sm text-gray-700 outline-none focus:ring-2 focus:ring-red-200">
-                </div>
             </div>
 
             <!-- Tabs -->
@@ -60,13 +47,13 @@
                 <a href="{{ route('sk_secretary.leadership',['tab'=>'current']) }}"
                     class="flex-1 text-center rounded-xl px-4 py-3 text-xs font-black uppercase transition {{ ($activeTab ?? 'current') === 'current' ? 'bg-red-600 text-white' : 'text-gray-500 hover:bg-gray-50' }}">
 
-                    &#128101; Current Leadership
+                    <span class="inline-flex align-[-3px]">@include('partials.ui.icon', ['icon' => 'users', 'iconSize' => 16])</span> Current Leadership
                 </a>
 
                 <a href="{{ route('sk_secretary.leadership',['tab'=>'history']) }}"
                     class="flex-1 text-center rounded-xl px-4 py-3 text-xs font-black uppercase transition {{ ($activeTab ?? 'current') === 'history' ? 'bg-gray-800 text-white' : 'text-gray-500 hover:bg-gray-50' }}">
 
-                    &#128220; Leadership History
+                    <span class="inline-flex align-[-3px]">@include('partials.ui.icon', ['icon' => 'archive', 'iconSize' => 16])</span> Leadership History
                 </a>
             </div>
 
@@ -78,7 +65,7 @@
                     <div class="flex items-center gap-4">
 
                         <div class="bg-white/20 p-3 rounded-xl text-2xl">
-                            &#128205;
+                            <span class="inline-flex align-[-3px]">@include('partials.ui.icon', ['icon' => 'map-pin', 'iconSize' => 16])</span>
                         </div>
 
                         <div>
@@ -138,7 +125,7 @@
                             <div class="flex items-center gap-2">
 
                                 <span class="text-red-500 font-bold">
-                                    &#128737;
+                                    <span class="inline-flex align-[-3px]">@include('partials.ui.icon', ['icon' => 'shield-check', 'iconSize' => 16])</span>
                                 </span>
 
                                 <h3 class="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em]">
@@ -254,19 +241,19 @@
                                             <div class="mt-3 space-y-1.5 text-[10px] text-gray-500">
 
                                                 <p class="truncate">
-                                                    &#128231;
+                                                    <span class="inline-flex align-[-3px]">@include('partials.ui.icon', ['icon' => 'mail', 'iconSize' => 16])</span>
                                                     {{ $member['email'] ?: 'No email provided' }}
                                                 </p>
 
                                                 <p>
-                                                    &#128222;
+                                                    <span class="inline-flex align-[-3px]">@include('partials.ui.icon', ['icon' => 'phone', 'iconSize' => 16])</span>
                                                     {{ $member['phone'] ?: 'No phone provided' }}
                                                 </p>
 
                                                 @if($currentAdministration)
 
                                                     <p>
-                                                        &#128197;
+                                                        <span class="inline-flex align-[-3px]">@include('partials.ui.icon', ['icon' => 'calendar-days', 'iconSize' => 16])</span>
                                                         Term:
                                                         {{ $currentAdministration->start_year }}
                                                         -
@@ -323,7 +310,7 @@
                             <div class="flex items-center gap-2">
 
                                 <span class="text-purple-500 font-bold">
-                                    &#127775;
+                                    <span class="inline-flex align-[-3px]">@include('partials.ui.icon', ['icon' => 'award', 'iconSize' => 16])</span>
                                 </span>
 
                                 <h3 class="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em]">
@@ -380,19 +367,19 @@
                                         <div class="mt-3 space-y-1 text-[9px] text-gray-400">
 
                                             <p class="truncate">
-                                                &#128231;
+                                                <span class="inline-flex align-[-3px]">@include('partials.ui.icon', ['icon' => 'mail', 'iconSize' => 16])</span>
                                                 {{ $member['email'] ?: 'No email provided' }}
                                             </p>
 
                                             <p>
-                                                &#128222;
+                                                <span class="inline-flex align-[-3px]">@include('partials.ui.icon', ['icon' => 'phone', 'iconSize' => 16])</span>
                                                 {{ $member['phone'] ?: 'No phone provided' }}
                                             </p>
 
                                             @if($currentAdministration)
 
                                                 <p>
-                                                    &#128197;
+                                                    <span class="inline-flex align-[-3px]">@include('partials.ui.icon', ['icon' => 'calendar-days', 'iconSize' => 16])</span>
                                                     {{ $currentAdministration->start_year }}
                                                     -
                                                     {{ $currentAdministration->end_year }}
@@ -483,7 +470,7 @@
                     <div class="rounded-3xl border border-dashed border-gray-200 bg-white p-10 text-center">
 
                         <div class="text-4xl mb-3">
-                            &#128220;
+                            <span class="inline-flex align-[-3px]">@include('partials.ui.icon', ['icon' => 'archive', 'iconSize' => 16])</span>
                         </div>
 
                         <h3 class="text-lg font-black text-gray-700">
@@ -516,7 +503,7 @@
                         <div class="flex items-center gap-4">
 
                             <div class="bg-white/10 p-3 rounded-xl text-2xl">
-                                &#128220;
+                                <span class="inline-flex align-[-3px]">@include('partials.ui.icon', ['icon' => 'archive', 'iconSize' => 16])</span>
                             </div>
 
                             <div>
@@ -561,7 +548,7 @@
                                 <div class="flex items-center gap-2">
 
                                     <span class="text-gray-500 font-bold">
-                                        &#128737;
+                                        <span class="inline-flex align-[-3px]">@include('partials.ui.icon', ['icon' => 'shield-check', 'iconSize' => 16])</span>
                                     </span>
 
                                     <h3 class="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em]">
@@ -653,17 +640,17 @@
                                             <div class="mt-3 space-y-1.5 text-[10px] text-gray-500">
 
                                                 <p class="truncate">
-                                                    &#128231;
+                                                    <span class="inline-flex align-[-3px]">@include('partials.ui.icon', ['icon' => 'mail', 'iconSize' => 16])</span>
                                                     {{ $member['email'] ?: 'No email provided' }}
                                                 </p>
 
                                                 <p>
-                                                    &#128222;
+                                                    <span class="inline-flex align-[-3px]">@include('partials.ui.icon', ['icon' => 'phone', 'iconSize' => 16])</span>
                                                     {{ $member['phone'] ?: 'No phone provided' }}
                                                 </p>
 
                                                 <p>
-                                                    &#128197;
+                                                    <span class="inline-flex align-[-3px]">@include('partials.ui.icon', ['icon' => 'calendar-days', 'iconSize' => 16])</span>
                                                     Term: {{ $member['term'] }}
                                                 </p>
 
@@ -703,7 +690,7 @@
                                 <div class="flex items-center gap-2">
 
                                     <span class="text-purple-500 font-bold">
-                                        &#127775;
+                                        <span class="inline-flex align-[-3px]">@include('partials.ui.icon', ['icon' => 'award', 'iconSize' => 16])</span>
                                     </span>
 
                                     <h3 class="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em]">
@@ -765,17 +752,17 @@
                                             <div class="mt-3 space-y-1 text-[9px] text-gray-400">
 
                                                 <p class="truncate">
-                                                    &#128231;
+                                                    <span class="inline-flex align-[-3px]">@include('partials.ui.icon', ['icon' => 'mail', 'iconSize' => 16])</span>
                                                     {{ $member['email'] ?: 'No email provided' }}
                                                 </p>
 
                                                 <p>
-                                                    &#128222;
+                                                    <span class="inline-flex align-[-3px]">@include('partials.ui.icon', ['icon' => 'phone', 'iconSize' => 16])</span>
                                                     {{ $member['phone'] ?: 'No phone provided' }}
                                                 </p>
 
                                                 <p>
-                                                    &#128197;
+                                                    <span class="inline-flex align-[-3px]">@include('partials.ui.icon', ['icon' => 'calendar-days', 'iconSize' => 16])</span>
                                                     {{ $member['term'] }}
                                                 </p>
 
@@ -814,7 +801,7 @@
                 class="hidden mt-6 rounded-2xl border border-gray-200 bg-white p-8 text-center">
 
                 <div class="text-3xl">
-                    &#128269;
+                    <span class="inline-flex align-[-3px]">@include('partials.ui.icon', ['icon' => 'search', 'iconSize' => 16])</span>
                 </div>
 
                 <p class="mt-2 text-sm font-bold text-gray-600">
@@ -831,8 +818,37 @@
 @endsection
 
 @push('scripts')
+<script>
+const notifBtn=document.getElementById('notifBtn');
+const notifDropdown=document.getElementById('notifDropdown');
+const userMenuBtn=document.getElementById('userMenuBtn');
+const userDropdown=document.getElementById('userDropdown');
 
-@include('sk_secretary.partials.dropdown-scripts')
+if(notifBtn&&notifDropdown){
+    notifBtn.addEventListener('click',(e)=>{
+        e.stopPropagation();
+        notifDropdown.classList.toggle('hidden');
+        userDropdown?.classList.add('hidden');
+    });
+}
+
+if(userMenuBtn&&userDropdown){
+    userMenuBtn.addEventListener('click',(e)=>{
+        e.stopPropagation();
+        userDropdown.classList.toggle('hidden');
+        notifDropdown?.classList.add('hidden');
+    });
+}
+
+document.addEventListener('click',(e)=>{
+    if(notifBtn&&notifDropdown&&!notifBtn.contains(e.target)&&!notifDropdown.contains(e.target)){
+        notifDropdown.classList.add('hidden');
+    }
+    if(userMenuBtn&&userDropdown&&!userMenuBtn.contains(e.target)&&!userDropdown.contains(e.target)){
+        userDropdown.classList.add('hidden');
+    }
+});
+</script>
 
 <script>
 document.addEventListener('DOMContentLoaded',()=>{

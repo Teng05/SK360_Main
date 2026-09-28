@@ -8,14 +8,15 @@
 @endsection
 
 @section('content')
-<div class="flex h-screen bg-gray-100 overflow-hidden">
-    {{-- Shared secretary sidebar/topbar layout --}}
-    @include('sk_secretary.partials.sidebar')
-    <div class="flex-1 flex flex-col overflow-hidden">
-        @include('sk_secretary.partials.topbar')
-        {{-- Chat room and messages area --}}
+<div class="flex h-screen bg-gray-100">
+    @include('partials.app.sidebar')
+
+    <div class="flex-1 flex flex-col min-w-0">
+        @include('partials.app.topbar', ['accountButtonId' => 'profileDropdownBtn', 'accountMenuId' => 'profileMenu', 'bindBell' => true, 'search' => ['placeholder' => 'Search']])
+
         <main class="flex-1 overflow-y-auto bg-gray-50 p-8">
             <div class="mb-6">
+                <span class="sk-eyebrow"><span class="sk-dot"></span>Chat</span>
                 <h1 class="text-3xl font-bold text-gray-900">Real-Time Chat</h1>
                 <p class="text-gray-500">Formal communication channel for SK federation</p>
             </div>
@@ -24,7 +25,7 @@
                 <div class="min-w-0 rounded-3xl border border-gray-100 bg-white shadow-sm lg:w-[320px]">
                     <div class="border-b border-gray-100 p-4">
                         <div class="relative">
-                            <span class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300">&#128269;</span>
+                            <span class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300"><span class="inline-flex align-[-3px]">@include('partials.ui.icon', ['icon' => 'search', 'iconSize' => 16])</span></span>
                             <input id="roomSearch" type="text" placeholder="Search users or groups..." class="w-full rounded-xl bg-gray-50 py-3 pl-10 pr-4 text-sm text-gray-700 outline-none ring-1 ring-transparent focus:ring-red-200">
                         </div>
                         <button id="createGroupBtn" type="button" class="mt-3 w-full rounded-xl bg-red-500 px-4 py-3 text-sm font-bold text-white transition hover:bg-red-600">
@@ -36,13 +37,14 @@
 
                 <div class="min-w-0 rounded-3xl border border-gray-100 bg-white shadow-sm">
                     <div class="flex items-center justify-between border-b border-gray-100 p-5">
-                        <div>
-                            <h2 id="activeRoomName" class="text-lg font-black text-gray-900">No active conversation</h2>
-                            <p id="activeRoomMeta" class="text-xs text-gray-400">Search for a user or create a group to start chatting</p>
+                        <div class="flex items-center gap-3">
+                            <span id="activeRoomAvatar" class="hidden h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-red-500 text-xs font-bold text-white"></span>
+                            <div><h2 id="activeRoomName" class="text-lg font-black text-gray-900">No active conversation</h2>
+                            <p id="activeRoomMeta" class="text-xs text-gray-400">Search for a user or create a group to start chatting</p></div>
                         </div>
                         <div class="flex items-center gap-2 text-gray-400">
-                            <button type="button" class="rounded-lg border border-gray-200 px-2 py-1 text-xs">&#128249;</button>
-                            <button type="button" class="rounded-lg border border-gray-200 px-2 py-1 text-xs">&#128222;</button>
+                            <button type="button" class="rounded-lg border border-gray-200 px-2 py-1 text-xs"><span class="inline-flex align-[-3px]">@include('partials.ui.icon', ['icon' => 'video', 'iconSize' => 16])</span></button>
+                            <button type="button" class="rounded-lg border border-gray-200 px-2 py-1 text-xs"><span class="inline-flex align-[-3px]">@include('partials.ui.icon', ['icon' => 'phone', 'iconSize' => 16])</span></button>
                         </div>
                     </div>
 
@@ -52,9 +54,9 @@
 
                     <div class="border-t border-gray-100 p-4">
                         <form id="messageForm" class="flex items-center gap-3">
-                            <button type="button" class="rounded-lg border border-gray-200 px-3 py-2 text-gray-400">&#128206;</button>
-                            <input id="messageInput" type="text" placeholder="Type your message..." class="flex-1 rounded-xl bg-gray-50 px-4 py-3 text-sm text-gray-700 outline-none ring-1 ring-transparent focus:ring-red-200" disabled>
-                            <button id="sendMessageBtn" type="submit" class="rounded-lg bg-red-500 px-4 py-3 text-white hover:bg-red-600 transition disabled:cursor-not-allowed disabled:opacity-50" disabled>&#10148;</button>
+                            <button type="button" class="rounded-lg border border-gray-200 px-3 py-2 text-gray-400"><span class="inline-flex align-[-3px]">@include('partials.ui.icon', ['icon' => 'paperclip', 'iconSize' => 16])</span></button>
+                            <input id="messageInput" type="text" placeholder="Type your message..." class="min-w-0 flex-1 rounded-xl bg-gray-50 px-4 py-3 text-sm text-gray-700 outline-none ring-1 ring-transparent focus:ring-red-200" disabled>
+                            <button id="sendMessageBtn" type="submit" class="rounded-lg bg-red-500 px-4 py-3 text-white hover:bg-red-600 transition disabled:cursor-not-allowed disabled:opacity-50" disabled><span class="inline-flex align-[-3px]">@include('partials.ui.icon', ['icon' => 'send', 'iconSize' => 17])</span></button>
                         </form>
                     </div>
                 </div>
@@ -62,10 +64,34 @@
         </main>
     </div>
 </div>
+
+<div id="groupModal" class="fixed inset-0 z-[80] hidden items-center justify-center bg-black/50 px-4 py-6">
+    <div class="w-full max-w-[500px] rounded-[20px] bg-white px-7 py-7 shadow-2xl">
+        <h2 class="text-[25px] font-black leading-none text-gray-950">Create group chat</h2>
+        <div class="mt-6">
+            <label for="groupNameInput" class="mb-2 block text-sm font-bold text-slate-700">Group name</label>
+            <input id="groupNameInput" type="text" maxlength="80" placeholder="Enter a group name" class="h-14 w-full rounded-xl border border-red-300 bg-white px-4 text-base text-slate-700 outline-none ring-4 ring-red-50 transition focus:border-red-400 focus:ring-red-100">
+            <p id="groupNameError" class="mt-1 hidden text-xs font-semibold text-red-600">Enter a group name.</p>
+        </div>
+        <div class="mt-5">
+            <label for="groupMemberSearch" class="mb-2 block text-sm font-bold text-slate-700">Add members</label>
+            <input id="groupMemberSearch" type="text" placeholder="Search registered accounts" autocomplete="off" class="h-12 w-full rounded-xl border border-slate-300 bg-white px-4 text-base text-slate-600 outline-none transition focus:border-red-300 focus:ring-4 focus:ring-red-50">
+            <p class="mt-2 text-xs text-slate-500">You are included automatically. Select at least one member.</p>
+        </div>
+        <div id="groupMemberList" class="mt-4 max-h-[330px] space-y-1 overflow-y-auto pr-1"></div>
+        <p id="groupMemberError" class="mt-1 hidden text-xs font-semibold text-red-600">Select at least one member.</p>
+        <div class="mt-6 flex items-end justify-between gap-4 border-t border-slate-100 pt-5">
+            <span id="groupSelectedCount" class="pb-2 text-sm text-slate-500">0 selected</span>
+            <div class="flex items-center gap-2">
+                <button id="cancelGroupBtn" type="button" class="rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-medium text-gray-900 transition hover:bg-slate-50">Cancel</button>
+                <button id="confirmCreateGroupBtn" type="button" class="rounded-xl bg-[#cf2033] px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-[#b91c2c] disabled:cursor-not-allowed disabled:opacity-50">Create group</button>
+            </div>
+        </div>
+    </div>
+</div>
 @endsection
 
 @push('scripts')
-@include('sk_secretary.partials.dropdown-scripts')
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/12.12.1/firebase-app.js";
     import {
@@ -100,6 +126,18 @@
     };
     const groupMembers = @json($groupMembers ?? []);
 
+    const userPhotos = new Map(groupMembers.map(user => [String(user.id), user.profile_pic_url || null]));
+    const activeRoomAvatar = document.getElementById('activeRoomAvatar');
+    function escapeChatHtml(value) {
+        return String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
+    }
+    function avatarMarkup(url, initials) {
+        const fallback = '<span>' + escapeChatHtml(initials) + '</span>';
+        if (!url) return fallback;
+        try { if (!['http:', 'https:'].includes(new URL(url, location.origin).protocol)) return fallback; } catch { return fallback; }
+        return fallback + '<img src="' + escapeChatHtml(url) + '" alt="" class="absolute inset-0 h-full w-full rounded-full object-cover" data-chat-photo>';
+    }
+    document.addEventListener('error', event => { if (event.target.matches?.('[data-chat-photo]')) event.target.remove(); }, true);
     let rooms = [];
     let activeRoomId = null;
     let unsubscribeMessages = null;
@@ -115,10 +153,22 @@
     const messageInput = document.getElementById('messageInput');
     const sendMessageBtn = document.getElementById('sendMessageBtn');
     const createGroupBtn = document.getElementById('createGroupBtn');
+    const groupModal = document.getElementById('groupModal');
+    const cancelGroupBtn = document.getElementById('cancelGroupBtn');
+    const confirmCreateGroupBtn = document.getElementById('confirmCreateGroupBtn');
+    const groupNameInput = document.getElementById('groupNameInput');
+    const groupMemberSearch = document.getElementById('groupMemberSearch');
+    const groupMemberList = document.getElementById('groupMemberList');
+    const groupSelectedCount = document.getElementById('groupSelectedCount');
+    const groupNameError = document.getElementById('groupNameError');
+    const groupMemberError = document.getElementById('groupMemberError');
+    const selectedGroupMemberIds = new Set();
     const dropdownBtn = document.getElementById('profileDropdownBtn');
     const profileMenu = document.getElementById('profileMenu');
 
+
     function resetEmptyState() {
+        activeRoomAvatar.classList.add('hidden');
         activeRoomName.textContent = 'No active conversation';
         activeRoomMeta.textContent = 'Search for a user or create a group to start chatting';
         chatStatus.textContent = 'No conversation selected yet.';
@@ -154,10 +204,6 @@
             .toUpperCase();
     }
 
-    function makeGroupRoomKey(memberIds) {
-        return `group_${memberIds.map(String).sort().join('_')}`;
-    }
-
     function renderRooms(filter = '') {
         const keyword = filter.trim().toLowerCase();
         const filteredRooms = rooms.filter((room) =>
@@ -178,16 +224,16 @@
         roomList.innerHTML = filteredRooms.map((room) => `
             <button
                 type="button"
-                data-room-id="${room.id}"
+                data-room-id="${escapeChatHtml(room.id)}"
                 class="chat-room-btn w-full rounded-2xl p-3 text-left transition ${room.id === activeRoomId ? 'bg-green-500 text-white' : 'hover:bg-gray-50'}"
             >
                 <div class="flex items-start gap-3">
-                    <div class="flex h-10 w-10 items-center justify-center rounded-full ${room.id === activeRoomId ? 'bg-white/20 text-white' : room.color + ' text-white'} text-[10px] font-black">
-                        ${room.initials}
+                    <div class="relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full ${room.id === activeRoomId ? 'bg-white/20 text-white' : room.color + ' text-white'} text-[10px] font-black">
+                        ${avatarMarkup(userPhotos.get(room.partnerId), room.initials)}
                     </div>
                     <div class="min-w-0">
-                        <div class="text-sm font-black ${room.id === activeRoomId ? 'text-white' : 'text-gray-800'}">${room.name}</div>
-                        <div class="text-[11px] ${room.id === activeRoomId ? 'text-white/80' : 'text-gray-400'}">${room.subtitle}</div>
+                        <div class="text-sm font-black ${room.id === activeRoomId ? 'text-white' : 'text-gray-800'}">${escapeChatHtml(room.name)}</div>
+                        <div class="text-[11px] ${room.id === activeRoomId ? 'text-white/80' : 'text-gray-400'}">${escapeChatHtml(room.subtitle)}</div>
                     </div>
                 </div>
             </button>
@@ -214,6 +260,7 @@
             return;
         }
 
+        users.forEach(user => userPhotos.set(String(user.id), user.profile_pic_url || null));
         roomList.innerHTML = users.map((user) => {
             const initials = user.name
                 .split(' ')
@@ -225,19 +272,19 @@
             return `
                 <button
                     type="button"
-                    data-user-id="${user.id}"
-                    data-user-name="${user.name}"
-                    data-user-role="${user.role}"
+                    data-user-id="${escapeChatHtml(user.id)}"
+                    data-user-name="${escapeChatHtml(user.name)}"
+                    data-user-role="${escapeChatHtml(user.role)}"
                     class="user-search-btn w-full rounded-2xl border border-gray-100 p-3 text-left transition hover:bg-gray-50"
                 >
                     <div class="flex items-start gap-3">
-                        <div class="flex h-10 w-10 items-center justify-center rounded-full bg-red-500 text-[10px] font-black text-white">
-                            ${initials}
+                        <div class="relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-red-500 text-[10px] font-black text-white">
+                            ${avatarMarkup(user.profile_pic_url, initials)}
                         </div>
                         <div class="min-w-0">
-                            <div class="text-sm font-black text-gray-800">${user.name}</div>
-                            <div class="text-[11px] text-gray-400">${roleLabel(user.role)}${user.barangay ? ' • ' + user.barangay : ''}</div>
-                            <div class="text-[11px] text-gray-400">${user.email}</div>
+                            <div class="text-sm font-black text-gray-800">${escapeChatHtml(user.name)}</div>
+                            <div class="text-[11px] text-gray-400">${escapeChatHtml(roleLabel(user.role))}${user.barangay ? ' • ' + escapeChatHtml(user.barangay) : ''}</div>
+                            <div class="text-[11px] text-gray-400">${escapeChatHtml(user.email)}</div>
                         </div>
                     </div>
                 </button>
@@ -261,6 +308,9 @@
             resetEmptyState();
             return;
         }
+        activeRoomAvatar.innerHTML = avatarMarkup(userPhotos.get(room.partnerId), room.initials);
+        activeRoomAvatar.classList.remove('hidden');
+        activeRoomAvatar.classList.add('relative', 'flex');
         activeRoomName.textContent = room.name;
         activeRoomMeta.textContent = room.subtitle;
         messageInput.disabled = false;
@@ -280,7 +330,14 @@
             }
 
             const users = await response.json();
-            renderUserSearchResults(users);
+            if (rooms.some(room => room.name.toLowerCase().includes(keyword.toLowerCase()) || room.subtitle.toLowerCase().includes(keyword.toLowerCase()))) {
+                renderRooms(keyword);
+                const matchingRooms = Array.from(roomList.children);
+                renderUserSearchResults(users);
+                roomList.prepend(...matchingRooms);
+            } else {
+                renderUserSearchResults(users);
+            }
         } catch (error) {
             roomList.innerHTML = `<div class="rounded-2xl border border-red-100 bg-red-50 p-4 text-sm text-red-600">${error.message}</div>`;
         }
@@ -336,6 +393,7 @@
             const roomEntry = {
                 id: room.id,
                 name: otherUser.name,
+                partnerId: String(otherUser.id),
                 subtitle: 'Direct message',
                 color: 'bg-green-500',
                 initials: otherUser.name
@@ -364,94 +422,136 @@
         }
     }
 
-    async function ensureFederationGroupRoom() {
-        const memberMap = new Map(groupMembers.map((member) => [String(member.id), member]));
-        memberMap.set(String(currentUser.id), {
-            id: String(currentUser.id),
-            name: currentUser.name,
-            role: currentUser.role
-        });
-
-        const members = Array.from(memberMap.values());
-        const memberIds = members.map((member) => String(member.id));
-        const memberNames = members.map((member) => member.name);
-        const roomKey = makeGroupRoomKey(memberIds);
-        const existingRoomQuery = query(
-            collection(db, 'chat_rooms'),
-            where('roomKey', '==', roomKey),
-            limit(1)
+    function renderGroupMemberChoices(filter='') {
+        const keyword=filter.trim().toLowerCase();
+        const availableMembers=groupMembers.filter((member)=>
+            String(member.id)!==String(currentUser.id)
+            && (
+                String(member.name || '').toLowerCase().includes(keyword)
+                || String(member.role || '').toLowerCase().includes(keyword)
+                || String(member.email || '').toLowerCase().includes(keyword)
+            )
         );
 
-        const existingRoomSnapshot = await getDocs(existingRoomQuery);
-
-        if (!existingRoomSnapshot.empty) {
-            const doc = existingRoomSnapshot.docs[0];
-            return {
-                id: doc.id,
-                ...doc.data()
-            };
+        if(!availableMembers.length){
+            groupMemberList.innerHTML='<div class="rounded-xl border border-dashed border-gray-200 bg-gray-50 px-4 py-8 text-center text-sm text-gray-400">No matching registered accounts.</div>';
+            return;
         }
 
-        await addDoc(collection(db, 'chat_rooms'), {
-            name: 'SK Federation Group',
-            type: 'group',
-            groupKind: 'federation',
-            createdBy: String(currentUser.id),
-            createdAt: serverTimestamp(),
+        groupMemberList.innerHTML=availableMembers.map((member)=>{
+            const memberId=String(member.id);
+            const checked=selectedGroupMemberIds.has(memberId) ? 'checked' : '';
+            const initials=initialsFor(member.name || 'SK Official','SK').slice(0,2);
+            return `
+                <label class="flex cursor-pointer items-center gap-3 rounded-lg px-1 py-2.5 transition hover:bg-slate-50">
+                    <input type="checkbox" class="group-member-checkbox h-4 w-4 shrink-0 rounded border-gray-300 text-red-600 focus:ring-red-200" value="${escapeChatHtml(memberId)}" ${checked}>
+                    <span class="relative flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-red-500 text-[10px] font-black text-white">${avatarMarkup(member.profile_pic_url,initials)}</span>
+                    <span class="min-w-0 truncate text-[15px] text-gray-900">${escapeChatHtml(member.name || 'SK Official')} <span class="text-gray-500">— ${escapeChatHtml(roleLabel(member.role || 'official'))}</span></span>
+                </label>
+            `;
+        }).join('');
+
+        document.querySelectorAll('.group-member-checkbox').forEach((checkbox)=>{
+            checkbox.addEventListener('change',()=>{
+                if(checkbox.checked) selectedGroupMemberIds.add(String(checkbox.value));
+                else selectedGroupMemberIds.delete(String(checkbox.value));
+                groupSelectedCount.textContent=`${selectedGroupMemberIds.size} selected`;
+                groupMemberError.classList.add('hidden');
+            });
+        });
+    }
+
+    function openGroupModal() {
+        selectedGroupMemberIds.clear();
+        groupNameInput.value='';
+        groupMemberSearch.value='';
+        groupSelectedCount.textContent='0 selected';
+        groupNameError.classList.add('hidden');
+        groupMemberError.classList.add('hidden');
+        renderGroupMemberChoices();
+        groupModal.classList.remove('hidden');
+        groupModal.classList.add('flex');
+        setTimeout(()=>groupNameInput.focus(),30);
+    }
+
+    function closeGroupModal() {
+        groupModal.classList.add('hidden');
+        groupModal.classList.remove('flex');
+    }
+
+    async function ensureGroupRoom(groupName,selectedMemberIds) {
+        const selectedIdSet=new Set(selectedMemberIds.map(String));
+        const selectedMembers=groupMembers.filter((member)=>selectedIdSet.has(String(member.id)));
+        const memberMap=new Map(selectedMembers.map((member)=>[String(member.id),member]));
+        memberMap.set(String(currentUser.id),{id:String(currentUser.id),name:currentUser.name,role:currentUser.role});
+        const members=Array.from(memberMap.values());
+        const memberIds=members.map((member)=>String(member.id)).sort();
+        const memberNames=members.map((member)=>member.name);
+        const normalizedName=groupName.trim().toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'') || 'group';
+        const roomKey=`group_${normalizedName}_${memberIds.join('_')}`;
+        const existingRoomQuery=query(collection(db,'chat_rooms'),where('roomKey','==',roomKey),limit(1));
+        const existingRoomSnapshot=await getDocs(existingRoomQuery);
+
+        if(!existingRoomSnapshot.empty){
+            const doc=existingRoomSnapshot.docs[0];
+            return {id:doc.id,...doc.data()};
+        }
+
+        await addDoc(collection(db,'chat_rooms'),{
+            name:groupName.trim(),
+            type:'group',
+            groupKind:'custom',
+            createdBy:String(currentUser.id),
+            createdAt:serverTimestamp(),
             memberIds,
             memberNames,
             roomKey
         });
 
-        const createdRoomSnapshot = await getDocs(existingRoomQuery);
-
-        if (createdRoomSnapshot.empty) {
-            throw new Error('Unable to create group room.');
-        }
-
-        const createdDoc = createdRoomSnapshot.docs[0];
-
-        return {
-            id: createdDoc.id,
-            ...createdDoc.data()
-        };
+        const createdRoomSnapshot=await getDocs(existingRoomQuery);
+        if(createdRoomSnapshot.empty) throw new Error('Unable to create group room.');
+        const createdDoc=createdRoomSnapshot.docs[0];
+        return {id:createdDoc.id,...createdDoc.data()};
     }
 
-    async function openFederationGroup() {
-        chatStatus.textContent = 'Creating group chat...';
-        createGroupBtn.disabled = true;
+    async function createSelectedGroup() {
+        const groupName=groupNameInput.value.trim();
+        groupNameError.classList.toggle('hidden',groupName!=='');
+        groupMemberError.classList.toggle('hidden',selectedGroupMemberIds.size>0);
+        if(groupName==='' || selectedGroupMemberIds.size===0) return;
 
-        try {
-            const room = await ensureFederationGroupRoom();
-            const memberCount = Array.isArray(room.memberIds) ? room.memberIds.length : groupMembers.length;
-            const roomEntry = {
-                id: room.id,
-                name: room.name || 'SK Federation Group',
-                subtitle: `${memberCount} members`,
-                color: 'bg-red-500',
-                initials: initialsFor(room.name || 'SK Federation Group', 'SKG'),
-                createdAtSeconds: room.createdAt?.seconds || Date.now()
+        chatStatus.textContent='Creating group chat...';
+        confirmCreateGroupBtn.disabled=true;
+        createGroupBtn.disabled=true;
+
+        try{
+            const room=await ensureGroupRoom(groupName,[...selectedGroupMemberIds]);
+            const memberCount=Array.isArray(room.memberIds) ? room.memberIds.length : selectedGroupMemberIds.size+1;
+            const roomEntry={
+                id:room.id,
+                name:room.name || groupName,
+                subtitle:`${memberCount} members`,
+                color:'bg-red-500',
+                initials:initialsFor(room.name || groupName,'GC'),
+                createdAtSeconds:room.createdAt?.seconds || Date.now()/1000
             };
-
-            const existingIndex = rooms.findIndex((item) => item.id === room.id);
-
-            if (existingIndex === -1) {
-                rooms.unshift(roomEntry);
-            } else {
-                rooms[existingIndex] = roomEntry;
-            }
-
-            activeRoomId = room.id;
-            roomSearch.value = '';
+            const existingIndex=rooms.findIndex((item)=>item.id===room.id);
+            if(existingIndex===-1) rooms.unshift(roomEntry);
+            else rooms[existingIndex]=roomEntry;
+            activeRoomId=room.id;
+            roomSearch.value='';
+            closeGroupModal();
             renderRooms();
             subscribeToMessages();
-        } catch (error) {
-            chatStatus.textContent = 'Unable to create group chat. Check Firestore permissions.';
+        }catch(error){
+            chatStatus.textContent='Unable to create group chat. Check Firestore permissions.';
             console.error(error);
-        } finally {
-            createGroupBtn.disabled = false;
+        }finally{
+            confirmCreateGroupBtn.disabled=false;
+            createGroupBtn.disabled=false;
         }
     }
+
 
     async function loadRooms() {
         chatStatus.textContent = 'Loading rooms...';
@@ -475,9 +575,10 @@
 
                 return {
                     id: doc.id,
+                    partnerId: isDirect && Array.isArray(data.memberIds) ? data.memberIds.map(String).find(id => id !== String(currentUser.id)) : null,
                     name: isDirect ? (directPartnerName || data.name || 'Direct Chat') : (data.name || 'Unnamed Room'),
                     subtitle: isDirect ? 'Direct message' : `${memberCount} members`,
-                    color: 'bg-green-500',
+                    color: isDirect ? 'bg-green-500' : 'bg-red-500',
                     initials: (isDirect ? (directPartnerName || data.name || 'Room') : (data.name || 'Room'))
                         .split(' ')
                         .map((part) => part[0] || '')
@@ -526,10 +627,10 @@
                 <div class="flex ${isOwn ? 'justify-end' : 'justify-start'}">
                     <div class="max-w-[75%]">
                         <div class="mb-1 text-[11px] text-gray-400 ${isOwn ? 'text-right' : ''}">
-                            ${message.senderName} ${message.senderRole ? '• ' + message.senderRole : ''}
+                            ${escapeChatHtml(message.senderName)} ${message.senderRole ? '• ' + message.senderRole : ''}
                         </div>
                         <div class="rounded-2xl px-4 py-3 text-sm shadow-sm ${isOwn ? 'bg-red-500 text-white' : 'bg-gray-100 text-gray-800'}">
-                            ${message.text}
+                            ${escapeChatHtml(message.text)}
                         </div>
                         <div class="mt-1 text-[10px] text-gray-400 ${isOwn ? 'text-right' : ''}">
                             ${formatMessageTime(message.createdAt)}
@@ -625,19 +726,15 @@
         }, 250);
     });
 
-    createGroupBtn.addEventListener('click', openFederationGroup);
+    createGroupBtn.addEventListener('click',openGroupModal);
+    cancelGroupBtn?.addEventListener('click',closeGroupModal);
+    confirmCreateGroupBtn?.addEventListener('click',createSelectedGroup);
+    groupMemberSearch?.addEventListener('input',()=>renderGroupMemberChoices(groupMemberSearch.value));
+    groupModal?.addEventListener('click',(event)=>{if(event.target===groupModal)closeGroupModal();});
 
-    if (dropdownBtn && profileMenu) {
-        dropdownBtn.addEventListener('click', (event) => {
-            event.stopPropagation();
-            profileMenu.classList.toggle('hidden');
-        });
-
-        window.addEventListener('click', (event) => {
-            if (!profileMenu.contains(event.target) && !dropdownBtn.contains(event.target)) {
-                profileMenu.classList.add('hidden');
-            }
-        });
+    if(dropdownBtn&&profileMenu){
+        dropdownBtn.addEventListener('click',(event)=>{event.stopPropagation();profileMenu.classList.toggle('hidden');});
+        window.addEventListener('click',(event)=>{if(!profileMenu.contains(event.target)&&!dropdownBtn.contains(event.target))profileMenu.classList.add('hidden');});
     }
 
     loadRooms();

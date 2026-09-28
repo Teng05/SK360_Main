@@ -8,25 +8,37 @@
 @endsection
 
 @section('content')
-<div class="flex h-screen bg-gray-100 overflow-hidden">
-    {{-- Shared secretary sidebar/topbar layout --}}
-    @include('sk_secretary.partials.sidebar')
+<div class="flex h-screen bg-[#f1f5f9] overflow-hidden">
+    @include('partials.app.sidebar')
 
-    <div class="flex-1 flex flex-col overflow-hidden">
-        @include('sk_secretary.partials.topbar')
+    <div class="flex-1 flex flex-col min-w-0">
+        @include('partials.app.topbar')
 
-        {{-- Dashboard content --}}
-        <div class="p-6 overflow-y-auto">
-            <h1 class="text-2xl font-bold mb-4">Good morning, {{ $firstName }}!</h1>
+        <div class="flex-1 p-8 overflow-y-auto">
+            <div class="sk-page-head">
+                <div class="sk-page-head__text">
+                    <span class="sk-eyebrow"><span class="sk-dot"></span>{{ now()->format('l, F j, Y') }}</span>
+                    <h1 class="sk-page-title">Good morning, {{ $firstName }}!</h1>
+                </div>
 
-            <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
-                @foreach ($summaryCards as $card)
-                    <div class="{{ $card['classes'] }} p-5 rounded-xl shadow">
-                        <h2 class="text-2xl font-bold">{{ $card['value'] }}</h2>
-                        <p class="text-sm">{{ $card['label'] }}</p>
-                    </div>
-                @endforeach
+                {{-- Quick actions --}}
+                <div class="sk-page-head__actions">
+                    <a href="{{ route('sk_secretary.meetings') }}" class="sk-btn sk-btn--secondary">
+                        @include('partials.ui.icon', ['icon' => 'video', 'iconSize' => 17])
+                        Meeting
+                    </a>
+                    <a href="{{ route('sk_secretary.budget') }}" class="sk-btn sk-btn--secondary">
+                        @include('partials.ui.icon', ['icon' => 'wallet', 'iconSize' => 17])
+                        Budget
+                    </a>
+                    <a href="{{ route('sk_secretary.reports') }}" class="sk-btn sk-btn--primary">
+                        @include('partials.ui.icon', ['icon' => 'file-text', 'iconSize' => 17])
+                        Report
+                    </a>
+                </div>
             </div>
+
+            @include('partials.app.summary-cards')
 
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <div class="lg:col-span-2">
@@ -34,43 +46,7 @@
                 </div>
 
                 <div class="space-y-6">
-                    <div class="bg-white p-4 rounded-xl shadow border">
-                        <h2 class="font-bold text-gray-700 uppercase text-[10px] mb-3 tracking-widest border-b pb-2">Quick Actions</h2>
-                        <div class="grid grid-cols-3 gap-2">
-                            <a href="{{ route('sk_secretary.reports') }}" class="flex aspect-square flex-col items-center justify-center rounded-lg bg-red-600 p-3 text-white transition hover:bg-red-700">
-                                <span class="text-xl">&#128196;</span>
-                                <span class="mt-1 text-center text-[8px] font-bold">REPORT</span>
-                            </a>
-                            <a href="{{ route('sk_secretary.budget') }}" class="flex aspect-square flex-col items-center justify-center rounded-lg bg-blue-600 p-3 text-white transition hover:bg-blue-700">
-                                <span class="text-xl">&#128229;</span>
-                                <span class="mt-1 text-center text-[8px] font-bold">BUDGET</span>
-                            </a>
-                            <a href="{{ route('sk_secretary.meetings') }}" class="flex aspect-square flex-col items-center justify-center rounded-lg bg-yellow-500 p-3 text-white transition hover:bg-yellow-600">
-                                <span class="text-xl">&#128222;</span>
-                                <span class="mt-1 text-center text-[8px] font-bold">MEETING</span>
-                            </a>
-                        </div>
-                    </div>
-
-                    <div class="bg-white p-4 rounded-xl shadow border">
-                        <h2 class="font-bold text-gray-700 uppercase text-[10px] mb-3 tracking-widest border-b pb-2">Calendar Preview</h2>
-                        <div class="space-y-4">
-                            @forelse ($upcomingEvents as $event)
-                                <div class="border-l-4 border-red-500 pl-3">
-                                    <div class="flex items-center justify-between gap-2">
-                                        <p class="text-[11px] font-black text-gray-800 uppercase leading-none">{{ $event->title }}</p>
-                                        <span class="rounded-full px-2 py-1 text-[8px] font-bold uppercase {{ $event->type_badge }}">
-                                            {{ $event->type_label }}
-                                        </span>
-                                    </div>
-                                    <p class="text-[9px] text-gray-500 mt-2">{{ \Carbon\Carbon::parse($event->start_datetime)->format('M d, Y h:i A') }}</p>
-                                    <p class="text-[9px] text-gray-400 mt-1">{{ $event->location ?: 'No location provided' }}</p>
-                                </div>
-                            @empty
-                                <p class="text-[10px] text-gray-400 italic">No scheduled events.</p>
-                            @endforelse
-                        </div>
-                    </div>
+                    @include('partials.app.calendar-preview', ['calendarUrl' => route('sk_secretary.calendar')])
                 </div>
             </div>
         </div>
@@ -79,5 +55,32 @@
 @endsection
 
 @push('scripts')
-@include('sk_secretary.partials.dropdown-scripts')
+<script>
+    const notifBtn = document.getElementById('notifBtn');
+    const notifDropdown = document.getElementById('notifDropdown');
+    const userMenuBtn = document.getElementById('userMenuBtn');
+    const userDropdown = document.getElementById('userDropdown');
+
+    notifBtn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        notifDropdown.classList.toggle('hidden');
+        userDropdown.classList.add('hidden');
+    });
+
+    userMenuBtn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        userDropdown.classList.toggle('hidden');
+        notifDropdown.classList.add('hidden');
+    });
+
+    document.addEventListener('click', function (e) {
+        if (!notifBtn.contains(e.target) && !notifDropdown.contains(e.target)) {
+            notifDropdown.classList.add('hidden');
+        }
+
+        if (!userMenuBtn.contains(e.target) && !userDropdown.contains(e.target)) {
+            userDropdown.classList.add('hidden');
+        }
+    });
+</script>
 @endpush
