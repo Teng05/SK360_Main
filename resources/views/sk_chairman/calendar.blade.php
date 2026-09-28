@@ -8,142 +8,49 @@
 <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.css" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js"></script>
 <style>
-.fc .fc-toolbar{gap:12px;margin-bottom:18px}
-.fc .fc-toolbar-title{font-size:1.05rem;font-weight:800;color:#111827}
-.fc .fc-button{background:#fff!important;border:1px solid #e5e7eb!important;color:#4b5563!important;box-shadow:none!important;border-radius:10px!important;padding:.45rem .75rem!important;font-size:.72rem!important;font-weight:800!important}
-.fc .fc-button:hover{background:#fef2f2!important;border-color:#fecaca!important;color:#dc2626!important}
-.fc .fc-col-header-cell{background:#f8fafc}
-.fc .fc-col-header-cell-cushion{padding:10px 4px!important;color:#6b7280;font-size:10px;font-weight:900;text-transform:uppercase;text-decoration:none!important}
-.fc .fc-daygrid-day-frame{min-height:112px}
-.fc .fc-daygrid-day-number{color:#6b7280;font-size:11px;font-weight:700;text-decoration:none!important;padding:8px!important}
-.fc .fc-day-today{background:#fff7f7!important}
-.fc-event{border:none!important;padding:3px 6px!important;border-radius:7px!important;font-size:10px!important;font-weight:700!important;cursor:pointer!important}
-</style>
+        .fc .fc-toolbar-title { font-size: 1.1rem; font-weight: 700; color: #1f2937; text-transform: uppercase; }
+        .fc .fc-button { background: #ef4444 !important; border: none !important; color: #fff !important; font-size: 0.8rem !important; text-transform: uppercase; font-weight: bold; }
+        .fc .fc-button:hover { background: #dc2626 !important; }
+        .fc-event { border: none !important; padding: 3px 5px !important; border-radius: 4px !important; font-size: 10px !important; cursor: pointer; }
+        .fc .fc-daygrid-day-number { color: #6b7280; font-size: 12px; text-decoration: none !important; }
+    </style>
 @endsection
 
 @section('content')
 <div class="flex h-screen bg-gray-100 overflow-hidden">
-    <div class="w-64 bg-red-600 text-white flex flex-col p-3 overflow-y-auto">
-        <div class="flex items-center gap-3 mb-4">
-            <img src="{{ asset('images/logo.png') }}" class="w-8 h-8 rounded-full object-cover" alt="logo">
-            <div class="leading-tight">
-                <h2 class="text-lg font-extrabold tracking-wide">SK 360°</h2>
-                <p class="text-[10px] opacity-80">Management System</p>
+    @include('partials.app.sidebar')
+
+    <div class="flex-1 flex flex-col min-w-0 overflow-hidden">
+        @include('partials.app.topbar')
+
+        <div class="p-8 overflow-y-auto h-full bg-gray-50">
+            <div class="mb-8">
+                <span class="sk-eyebrow"><span class="sk-dot"></span>Calendar</span>
+                <h1 class="text-3xl font-bold text-gray-800 uppercase">Event Calendar</h1>
+                <p class="text-gray-500">View scheduled activities, programs, meetings, deadlines, and submission slots.</p>
             </div>
-        </div>
 
-        <div class="bg-red-500 rounded-lg p-2 flex items-center gap-2 mb-3 shadow text-xs">
-            <div class="bg-yellow-400 text-red-600 p-1 rounded-full text-sm">&#128100;</div>
-            <div>
-                <p class="font-semibold text-xs">SK Chairman</p>
-                <p class="text-xs opacity-80">Active Role</p>
-            </div>
-        </div>
-
-        <nav class="space-y-1 text-xs">
-            @foreach($menuItems as $item)
-                @php $isActive=$item['link']===$currentUrl; @endphp
-
-                <a href="{{ $item['link'] }}" class="flex items-center gap-2 p-2 rounded-lg {{ $isActive ? 'bg-red-500' : 'hover:bg-red-500 transition' }}">
-                    <span class="{{ $isActive ? 'bg-yellow-400 text-red-600' : 'bg-red-400' }} p-1 rounded text-sm">{!! $item['icon'] !!}</span>
-                    <span class="{{ $isActive ? 'text-yellow-300 font-semibold' : '' }} text-xs">{{ $item['label'] }}</span>
-                </a>
-            @endforeach
-        </nav>
-    </div>
-
-    <div class="flex-1 flex flex-col overflow-hidden">
-        <div class="bg-red-600 text-white px-6 py-3 flex justify-between items-center shadow">
-            <input type="text" placeholder="Search..." class="px-4 py-2 rounded-full text-black w-1/3 focus:outline-none">
-
-            <div class="flex items-center gap-3 relative">
-                <div class="relative">
-                    <button id="notifBtn" type="button" class="text-xl hover:bg-red-500 p-2 rounded-lg transition">🔔</button>
-
-                    <div id="notifDropdown" class="hidden absolute right-0 mt-3 w-72 bg-white rounded-2xl shadow-xl border z-50 overflow-hidden">
-                        <div class="px-4 py-3 font-semibold border-b text-gray-800">Notifications</div>
-                        <div class="max-h-64 overflow-y-auto">
-                            <div class="px-4 py-3 hover:bg-gray-100 text-sm text-gray-700">No notifications yet</div>
-                        </div>
-                    </div>
+            <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+                <div class="lg:col-span-3 bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                    <div id="calendar"></div>
                 </div>
 
-                <div class="relative">
-                    <button id="userMenuBtn" type="button" class="flex items-center gap-2 hover:bg-red-500 px-3 py-2 rounded-lg transition">
-                        <span class="font-semibold">{{ $fullName }}</span>
-                    </button>
-
-                    <div id="userDropdown" class="hidden absolute right-0 mt-3 w-64 bg-white rounded-2xl shadow-xl border overflow-hidden z-50">
-                        <div class="px-5 py-4 font-semibold text-gray-800 border-b">My Account</div>
-
-                        <a href="{{ route('sk_chairman.profile') }}" class="flex items-center gap-3 px-5 py-3 hover:bg-gray-100 transition">
-                            <span>👤</span>
-                            <span class="text-gray-700">Profile Settings</span>
-                        </a>
-
-                        <form method="POST" action="{{ route('logout') }}">
-                            @csrf
-
-                            <button type="submit" class="w-full text-left flex items-center gap-3 px-5 py-3 text-red-500 hover:bg-gray-100 transition">
-                                <span>↩️</span>
-                                <span>Log Out</span>
-                            </button>
-                        </form>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <main class="p-8 overflow-y-auto h-full bg-[#f8fafc]">
-            <div class="mb-7">
-                <div class="inline-flex items-center gap-2 rounded-full bg-red-50 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-red-600 mb-3">📅 Official Schedule</div>
-                <h1 class="text-3xl font-black text-gray-900">Event Calendar</h1>
-                <p class="text-sm text-gray-500 mt-2">View scheduled activities, programs, meetings, deadlines, and submission slots.</p>
-            </div>
-
-            <div class="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_320px] gap-6">
-                <section class="bg-white rounded-[24px] border border-gray-100 shadow-sm overflow-hidden">
-                    <div class="px-6 py-5 border-b border-gray-100">
-                        <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-                            <div>
-                                <h2 class="text-sm font-black text-gray-900">Calendar Schedule</h2>
-                                <p class="text-xs text-gray-400 mt-1">Click any item to view its complete available details.</p>
-                            </div>
-
-                            <div class="flex flex-wrap gap-2">
-                                @foreach($legendItems as [$color,$label])
-                                    <div class="flex items-center gap-2 rounded-full border border-gray-100 bg-gray-50 px-3 py-1.5">
-                                        <span class="w-2.5 h-2.5 rounded-full {{ $color }}"></span>
-                                        <span class="text-[9px] font-bold text-gray-600">{{ $label }}</span>
-                                    </div>
-                                @endforeach
-                            </div>
+                <div class="space-y-6">
+                    <div class="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm">
+                        <h3 class="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4">Legend</h3>
+                        <div class="sk-calendar-legend space-y-3">
+                            @foreach ($legendItems as [$color, $label])
+                                <div class="flex items-center gap-3">
+                                    <span class="w-3 h-3 rounded-full {{ $color }}"></span>
+                                    <span class="text-xs font-bold text-gray-600">{{ $label }}</span>
+                                </div>
+                            @endforeach
                         </div>
                     </div>
 
-                    <div class="p-5 md:p-6">
-                        <div id="calendar"></div>
-                    </div>
-                </section>
-
-                <aside class="space-y-5">
-                    <div class="rounded-[24px] bg-gradient-to-br from-red-600 to-red-500 p-5 text-white shadow-sm">
-                        <p class="text-[9px] font-black uppercase tracking-[0.2em] text-red-100">Calendar Guide</p>
-                        <h3 class="text-lg font-black mt-2">Stay updated</h3>
-                        <p class="text-xs leading-relaxed text-red-100 mt-2">Click any calendar item to view its details. Events are shown according to your allowed audience.</p>
-                    </div>
-
-                    <div class="bg-white p-5 rounded-[24px] border border-gray-100 shadow-sm">
-                        <div class="flex items-center justify-between gap-3 mb-4">
-                            <div>
-                                <h3 class="text-xs font-black text-gray-900">Upcoming</h3>
-                                <p class="text-[10px] text-gray-400 mt-1">Nearest calendar items</p>
-                            </div>
-
-                            <span class="rounded-full bg-red-50 px-2.5 py-1 text-[9px] font-black text-red-600">{{ $upcomingEvents->count() }}</span>
-                        </div>
-
-                        <div class="space-y-3">
+                    <div class="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm">
+                        <h3 class="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4">Upcoming Agendas</h3>
+                        <div class="space-y-4">
                             @forelse($upcomingEvents as $event)
                                 @php
                                     $isSlot=($event->source_type ?? '')==='slot';
@@ -152,7 +59,7 @@
                                 @endphp
 
                                 <button type="button"
-                                    class="upcoming-event-btn w-full text-left rounded-2xl border border-gray-100 bg-gray-50/70 p-4 hover:border-red-200 hover:bg-red-50/40 transition"
+                                    class="upcoming-event-btn w-full text-left border-l-4 border-red-500 pl-3 transition hover:bg-red-50 focus-visible:outline-red-600"
                                     data-source-type="{{ $event->source_type ?? 'event' }}"
                                     data-title="{{ $event->title }}"
                                     data-type-label="{{ $event->type_label }}"
@@ -162,14 +69,14 @@
                                     data-end="{{ $endValue }}"
                                     data-visibility-label="{{ $event->visibility_label ?? ($event->role ?? 'Both') }}"
                                 >
-                                    <div class="flex items-start justify-between gap-3">
+                                    <div class="flex items-center justify-between gap-2">
                                         <div class="min-w-0">
-                                            <p class="text-[11px] font-black text-gray-800">{{ $event->title }}</p>
+                                            <p class="text-[11px] font-black text-gray-800 uppercase leading-none">{{ $event->title }}</p>
                                             <p class="text-[9px] text-gray-400 mt-2">{{ \Carbon\Carbon::parse($event->start_datetime)->format($isSlot ? 'M d, Y' : 'M d, Y • h:i A') }}</p>
                                             <p class="text-[9px] text-gray-400 mt-1 truncate">{{ $event->location ?: 'No location provided' }}</p>
                                         </div>
 
-                                        <span class="shrink-0 rounded-full px-2 py-1 text-[8px] font-bold uppercase {{ $event->type_badge ?? 'bg-gray-100 text-gray-600' }}">{{ $event->type_label }}</span>
+                                        <span data-sk-event="{{ $event->event_type ?? 'submission_slot' }}" class="shrink-0 rounded-full px-2 py-1 text-[8px] font-bold uppercase {{ $event->type_badge ?? 'bg-gray-100 text-gray-600' }}">{{ $event->type_label }}</span>
                                     </div>
                                 </button>
                             @empty
@@ -179,9 +86,9 @@
                             @endforelse
                         </div>
                     </div>
-                </aside>
+                </div>
             </div>
-        </main>
+        </div>
     </div>
 </div>
 

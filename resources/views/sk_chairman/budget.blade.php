@@ -8,7 +8,7 @@
 @endsection
 
 @section('content')
-    @include('shared.submission-slots-page')
+    @include('shared.submission-slots-page', ['chairmanReportUi' => true])
 @endsection
 
 @push('scripts')

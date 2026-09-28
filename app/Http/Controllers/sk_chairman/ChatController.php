@@ -50,10 +50,12 @@ class ChatController extends Controller
                 'u.last_name',
                 'u.email',
                 'u.role',
+                'u.profile_pic',
                 'b.barangay_name'
             )
             ->where('u.user_id', '!=', $currentUserId)
             ->where('u.status', '=', 'active')
+            ->whereNull('u.archived_at')
             ->whereIn('u.role', $chatRoles)
             ->where(function ($query) use ($keyword) {
                 $query
@@ -72,6 +74,9 @@ class ChatController extends Controller
                     'email' => $user->email,
                     'role' => $user->role,
                     'barangay' => $user->barangay_name,
+                    'profile_pic_url' => $user->profile_pic
+                        ? asset(str_starts_with($user->profile_pic, 'uploads/') ? $user->profile_pic : 'uploads/profile_pics/'.$user->profile_pic)
+                        : null,
                 ];
             })
             ->values();
@@ -98,8 +103,9 @@ class ChatController extends Controller
     protected function groupMembers(): array
     {
         return DB::table('users')
-            ->select('user_id', 'first_name', 'last_name', 'email', 'role')
+            ->select('user_id', 'first_name', 'last_name', 'email', 'role', 'profile_pic')
             ->where('status', 'active')
+            ->whereNull('archived_at')
             ->whereIn('role', ['sk_president', 'sk_chairman', 'sk_secretary'])
             ->orderBy('first_name')
             ->orderBy('last_name')
@@ -109,6 +115,10 @@ class ChatController extends Controller
                     'id' => (string) $user->user_id,
                     'name' => trim(($user->first_name ?? '') . ' ' . ($user->last_name ?? '')) ?: $user->email,
                     'role' => $user->role,
+                    'email' => $user->email,
+                    'profile_pic_url' => $user->profile_pic
+                        ? asset(str_starts_with($user->profile_pic, 'uploads/') ? $user->profile_pic : 'uploads/profile_pics/'.$user->profile_pic)
+                        : null,
                 ];
             })
             ->values()

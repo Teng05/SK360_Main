@@ -1,6 +1,13 @@
 {{-- File guide: Blade view template for resources/views/shared/submission-slots-page.blade.php. --}}
+@php
+    $chairmanReportUi = $chairmanReportUi ?? false;
+    $slotUiClass = fn ($original, $web) => $chairmanReportUi ? $web : $original;
+@endphp
 <div class="flex h-screen bg-gray-100 overflow-hidden">
     {{-- SIDEBAR --}}
+    @if($chairmanReportUi)
+        @include('partials.app.sidebar')
+    @else
     <div class="w-64 bg-red-600 text-white flex flex-col p-3 overflow-y-auto">
         <div class="flex items-center gap-3 mb-4">
             <img
@@ -49,9 +56,13 @@
             @endforeach
         </nav>
     </div>
+    @endif
     {{-- MAIN --}}
-    <div class="flex-1 flex flex-col overflow-hidden">
+    <div class="{{ $slotUiClass('flex-1 flex flex-col overflow-hidden', 'flex-1 flex flex-col overflow-hidden min-w-0') }}">
         {{-- TOPBAR --}}
+        @if($chairmanReportUi)
+            @include('partials.app.topbar', ['search' => ['id' => 'submissionSearch', 'placeholder' => 'Search...']])
+        @else
         <div class="bg-red-600 text-white px-6 py-3 flex justify-between items-center shadow">
             <input
                 id="submissionSearch"
@@ -125,8 +136,9 @@
                 </div>
             </div>
         </div>
+        @endif
         {{-- CONTENT --}}
-        <main class="flex-1 overflow-y-auto p-8 bg-gray-50">
+        <main class="{{ $slotUiClass('flex-1 overflow-y-auto p-8 bg-gray-50', 'flex-1 overflow-y-auto p-8') }}">
             <div class="max-w-6xl mx-auto">
                 {{-- SUCCESS --}}
                 @if(session('report_success'))
@@ -153,6 +165,93 @@
                         </ul>
                     </div>
                 @endif
+                @if($chairmanReportUi)
+                @php
+    // Summary counts come from the slots and submissions already on this page.
+    $submissionStatuses = collect($submissions)->map(
+        fn ($submission) => strtolower((string) ($submission->quality_status ?? 'pending'))
+    );
+    $approvedCount = $submissionStatuses->filter(fn ($status) => $status === 'approved')->count();
+    $revisionCount = $submissionStatuses->filter(fn ($status) => $status === 'needs_revision')->count();
+    $pendingCount = $submissionStatuses->count() - $approvedCount - $revisionCount;
+    $isBudgetPage = ($submissionType ?? '') === 'budget';
+                @endphp
+                {{-- PAGE TITLE --}}
+                <div class="sk-page-head">
+                    <div class="sk-page-head__text">
+                        <span class="sk-eyebrow"><span class="sk-dot"></span>Submission Slots</span>
+                        <h1 class="sk-page-title">
+                            {{ $pageTitle }}
+                        </h1>
+
+                        <p class="sk-page-subtitle">
+                            {{ $pageDescription }}
+                        </p>
+                    </div>
+                </div>
+
+                {{-- SUMMARY --}}
+                <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5 mb-8">
+                    <div class="sk-stat">
+                        <div class="sk-stat__top">
+                            <div>
+                                <p class="sk-stat__label">Active Slots</p>
+                                <p class="sk-stat__value">{{ $slots->count() }}</p>
+                            </div>
+                            <span class="sk-icon-tile">
+                                @include('partials.ui.icon', ['icon' => 'lock-open', 'iconSize' => 21])
+                            </span>
+                        </div>
+                        <p class="sk-stat__meta">Open windows from the SK President</p>
+                    </div>
+
+                    <div class="sk-stat">
+                        <div class="sk-stat__top">
+                            <div>
+                                <p class="sk-stat__label">Submitted</p>
+                                <p class="sk-stat__value">{{ $submissionStatuses->count() }}</p>
+                            </div>
+                            <span class="sk-icon-tile sk-icon-tile--blue">
+                                @include('partials.ui.icon', ['icon' => $isBudgetPage ? 'wallet' : 'file-text', 'iconSize' => 21])
+                            </span>
+                        </div>
+                        <p class="sk-stat__meta">Your recent submissions</p>
+                    </div>
+
+                    <div class="sk-stat">
+                        <div class="sk-stat__top">
+                            <div>
+                                <p class="sk-stat__label">Pending Review</p>
+                                <p class="sk-stat__value">{{ $pendingCount }}</p>
+                            </div>
+                            <span class="sk-icon-tile sk-icon-tile--orange">
+                                @include('partials.ui.icon', ['icon' => 'hourglass', 'iconSize' => 21])
+                            </span>
+                        </div>
+                        <p class="sk-stat__meta">Waiting for quality review</p>
+                    </div>
+
+                    <div class="sk-stat">
+                        <div class="sk-stat__top">
+                            <div>
+                                <p class="sk-stat__label">Approved</p>
+                                <p class="sk-stat__value">{{ $approvedCount }}</p>
+                            </div>
+                            <span class="sk-icon-tile sk-icon-tile--green">
+                                @include('partials.ui.icon', ['icon' => 'circle-check', 'iconSize' => 21])
+                            </span>
+                        </div>
+                        <p class="sk-stat__meta">
+                            @if ($revisionCount > 0)
+                                <span class="font-bold text-red-600">{{ $revisionCount }} need revision</span>
+                            @else
+                                No revisions requested
+                            @endif
+                        </p>
+                    </div>
+                </div>
+
+                @else
                 {{-- PAGE TITLE --}}
                 <div class="mb-8">
                     <h1 class="text-3xl font-black text-gray-800 uppercase tracking-tighter">
@@ -162,6 +261,7 @@
                         {{ $pageDescription }}
                     </p>
                 </div>
+                @endif
                 {{-- BUDGET FILTER --}}
                 @if(($submissionType ?? '')==='budget')
                     <form
@@ -311,17 +411,17 @@
                     $focusSlot=(int)request()->query('focus_slot',0);
                 @endphp
                 {{-- ACTIVE SLOTS --}}
-                <div class="bg-white rounded-3xl shadow-sm border border-gray-100 p-6 mb-8">
-                    <div class="flex items-center justify-between mb-5">
+                <div class="{{ $slotUiClass('bg-white rounded-3xl shadow-sm border border-gray-100 p-6 mb-8', 'sk-card p-6 mb-8') }}">
+                    <div class="{{ $slotUiClass('flex items-center justify-between mb-5', 'flex flex-wrap items-start justify-between gap-3 mb-5') }}">
                         <div>
-                            <h2 class="text-lg font-black text-gray-800 uppercase tracking-tight">
+                            <h2 class="{{ $slotUiClass('text-lg font-black text-gray-800 uppercase tracking-tight', 'sk-section-title') }}">
                                 {{ $slotSectionTitle }}
                             </h2>
                             <p class="text-xs text-gray-400">
                                 Only active slots created by the SK President can accept submissions.
                             </p>
                         </div>
-                        <span class="rounded-full bg-red-50 px-4 py-2 text-xs font-black uppercase text-red-600">
+                        <span class="{{ $slotUiClass('rounded-full bg-red-50 px-4 py-2 text-xs font-black uppercase text-red-600', 'sk-badge sk-badge--red sk-badge--dot') }}">
                             {{ $slots->count() }} Active
                         </span>
                     </div>
@@ -352,7 +452,7 @@
                             @endphp
                             <div
                                 id="submission-slot-{{ $slot->slot_id }}"
-                                class="submission-slot-card rounded-2xl border p-5 transition-all duration-500 {{ $isFocusedCard ? 'border-yellow-400 bg-yellow-50 ring-4 ring-yellow-200 shadow-lg' : 'border-red-100 bg-red-50/30' }}"
+                                class="submission-slot-card {{ $chairmanReportUi ? 'relative flex flex-col' : '' }} rounded-2xl border p-5 transition-all duration-500 {{ $isFocusedCard ? 'border-yellow-400 bg-yellow-50 ring-4 ring-yellow-200 shadow-lg' : ($chairmanReportUi ? 'border-gray-200 bg-white hover:shadow-md' : 'border-red-100 bg-red-50/30') }}"
                                 data-focus-slot-card="{{ $isFocusedCard ? '1' : '0' }}"
                                 data-search="{{ strtolower(($slot->title ?? '').' '.($slot->description ?? '').' '.($slot->role ?? '').' '.($slot->budget_category_label ?? '').' '.($slot->budget_period_label ?? '').' '.($slot->accomplishment_category_label ?? '')) }}"
                             >
@@ -367,34 +467,35 @@
                                     </div>
                                 @endif
                                 <div class="flex items-start justify-between gap-4">
-                                    <div>
-                                        <p class="text-[10px] font-black uppercase tracking-widest text-red-400">
+                                    @if($chairmanReportUi)<span class="sk-thumb {{ ($submissionType ?? '')==='budget' ? 'sk-thumb--blue' : '' }}">@include('partials.ui.icon', ['icon' => ($submissionType ?? '')==='budget' ? 'wallet' : 'clipboard-list', 'iconSize' => 24])</span>@endif
+                                    <div class="{{ $chairmanReportUi ? 'min-w-0 flex-1' : '' }}">
+                                        <p class="{{ $slotUiClass('text-[10px] font-black uppercase tracking-widest text-red-400', 'sk-overline') }}">
                                             {{ str_replace('_',' ',$slot->submission_type) }}
                                         </p>
-                                        <h3 class="text-lg font-bold text-gray-800">
+                                        <h3 class="{{ $slotUiClass('text-lg font-bold text-gray-800', 'mt-1 text-[17px] font-bold leading-snug text-gray-900') }}">
                                             {{ $slot->title }}
                                         </h3>
-                                        <p class="text-sm text-gray-500 mt-1">
+                                        <p class="{{ $slotUiClass('text-sm text-gray-500 mt-1', 'text-sm text-gray-500 mt-1 leading-relaxed') }}">
                                             {{ $slot->description ?: 'No description provided.' }}
                                         </p>
                                     </div>
-                                    <div class="flex flex-col items-end gap-2">
-                                        <span class="rounded-full bg-white px-3 py-1 text-[10px] font-black uppercase text-red-600">
-                                            {{ $slot->role }}
-                                        </span>
+                                    <div class="{{ $slotUiClass('flex flex-col items-end gap-2', 'flex flex-col items-end gap-2 shrink-0') }}">
                                         <span class="rounded-full px-3 py-1 text-[10px] font-black uppercase {{ $slot->slot_status_badge ?? 'bg-red-100 text-red-600' }}">
                                             {{ $slot->slot_status_label ?? 'Open' }}
+                                        </span>
+                                        <span class="{{ $slotUiClass('rounded-full bg-white px-3 py-1 text-[10px] font-black uppercase text-red-600', 'sk-badge sk-badge--gray') }}">
+                                            {{ $slot->role }}
                                         </span>
                                     </div>
                                 </div>
                                 {{-- ACCOMPLISHMENT METADATA --}}
-                                @if(($submissionType ?? '')==='report')
+                                @if(($submissionType ?? '')==='report' && !$chairmanReportUi)
                                     <div class="mt-4 flex flex-wrap gap-2">
-                                        <span class="rounded-full bg-blue-50 px-3 py-1 text-[10px] font-black uppercase text-blue-600">
+                                        <span class="{{ $slotUiClass('rounded-full bg-blue-50 px-3 py-1 text-[10px] font-black uppercase text-blue-600', 'sk-badge sk-badge--blue') }}">
                                             {{ $slot->accomplishment_category_label ?? 'Accomplishment Report' }}
                                         </span>
                                         @if(($slot->accomplishment_category ?? null)==='youth_development_program' && !empty($slot->ydp_program_type_label))
-                                            <span class="rounded-full bg-green-50 px-3 py-1 text-[10px] font-black uppercase text-green-600">
+                                            <span class="{{ $slotUiClass('rounded-full bg-green-50 px-3 py-1 text-[10px] font-black uppercase text-green-600', 'sk-badge sk-badge--green') }}">
                                                 {{ $slot->ydp_program_type_label }}
                                             </span>
                                         @endif
@@ -403,7 +504,7 @@
                                 {{-- BUDGET METADATA --}}
                                 @if(($submissionType ?? '')==='budget')
                                     <div class="mt-4 flex flex-wrap gap-2">
-                                        <span class="rounded-full bg-blue-50 px-3 py-1 text-[10px] font-black uppercase text-blue-600">
+                                        <span class="{{ $slotUiClass('rounded-full bg-blue-50 px-3 py-1 text-[10px] font-black uppercase text-blue-600', 'sk-badge sk-badge--blue') }}">
                                             {{ $slot->budget_category_label ?? 'Budget / Financial Report' }}
                                         </span>
                                         @if(!empty($slot->fiscal_year))
@@ -419,26 +520,28 @@
                                     </div>
                                 @endif
                                 {{-- DATES --}}
-                                <div class="mt-4 grid grid-cols-2 gap-3 text-xs text-gray-600">
-                                    <div class="rounded-xl bg-white px-3 py-3">
-                                        <p class="font-black uppercase text-gray-400">
+                                <div class="{{ $slotUiClass('mt-4 grid grid-cols-2 gap-3 text-xs text-gray-600', 'mt-4 grid grid-cols-2 gap-3') }}">
+                                    <div class="{{ $slotUiClass('rounded-xl bg-white px-3 py-3', 'rounded-xl border border-gray-100 bg-[#f8f9fb] px-3.5 py-3') }}">
+                                        <p class="{{ $slotUiClass('font-black uppercase text-gray-400', 'sk-overline') }}">
                                             Start
                                         </p>
-                                        <p class="mt-1 font-semibold">
+                                        <p class="{{ $slotUiClass('mt-1 font-semibold', 'mt-1 flex items-center gap-1.5 text-sm font-bold text-gray-800') }}">
+                                            @if($chairmanReportUi)@include('partials.ui.icon', ['icon' => 'calendar-days', 'iconSize' => 15, 'iconClass' => 'text-gray-400'])@endif
                                             {{ \Carbon\Carbon::parse($slot->start_date)->format('M d, Y') }}
                                         </p>
                                     </div>
-                                    <div class="rounded-xl bg-white px-3 py-3">
-                                        <p class="font-black uppercase text-gray-400">
+                                    <div class="{{ $slotUiClass('rounded-xl bg-white px-3 py-3', 'rounded-xl border border-red-100 bg-[#fff8f8] px-3.5 py-3') }}">
+                                        <p class="{{ $slotUiClass('font-black uppercase text-gray-400', 'sk-overline !text-red-400') }}">
                                             Deadline
                                         </p>
-                                        <p class="mt-1 font-semibold">
+                                        <p class="{{ $slotUiClass('mt-1 font-semibold', 'mt-1 flex items-center gap-1.5 text-sm font-bold text-gray-800') }}">
+                                            @if($chairmanReportUi)@include('partials.ui.icon', ['icon' => 'clock', 'iconSize' => 15, 'iconClass' => 'text-red-400'])@endif
                                             {{ \Carbon\Carbon::parse($slot->end_date)->format('M d, Y') }}
                                         </p>
                                     </div>
                                 </div>
                                 {{-- QUALITY REVIEW STATUS --}}
-                                @if($hasSubmission)
+                                @if($hasSubmission && !($chairmanReportUi && ($submissionType ?? '')==='report' && $qualityStatus==='approved'))
                                     <div class="mt-4 rounded-xl border px-4 py-3 {{ $qualityStatus==='approved' ? 'border-green-200 bg-green-50' : ($qualityStatus==='needs_revision' ? 'border-red-200 bg-red-50' : 'border-amber-200 bg-amber-50') }}">
                                         <div class="flex items-center justify-between gap-3">
                                             <p class="text-[10px] font-black uppercase {{ $qualityStatus==='approved' ? 'text-green-700' : ($qualityStatus==='needs_revision' ? 'text-red-700' : 'text-amber-700') }}">
@@ -473,12 +576,12 @@
                                     </div>
                                 @endif
                                 {{-- SLOT ACTION --}}
-                                <div class="mt-4 flex justify-end">
+                                <div class="{{ $slotUiClass('mt-4 flex justify-end', 'mt-auto flex justify-end pt-4') }}">
                                     @if(!empty($slot->is_upcoming))
                                         <button
                                             type="button"
                                             disabled
-                                            class="rounded-xl bg-gray-300 px-4 py-3 text-xs font-black uppercase text-gray-500 cursor-not-allowed"
+                                            class="{{ $slotUiClass('rounded-xl bg-gray-300 px-4 py-3 text-xs font-black uppercase text-gray-500 cursor-not-allowed', 'sk-btn sk-btn--ghost !bg-gray-100 !text-gray-500') }}"
                                         >
                                             Opens {{ \Carbon\Carbon::parse($slot->start_date)->format('M d, Y') }}
                                         </button>
@@ -486,7 +589,7 @@
                                         <button
                                             type="button"
                                             disabled
-                                            class="rounded-xl bg-green-600 px-4 py-3 text-xs font-black uppercase text-white cursor-not-allowed"
+                                            class="{{ $slotUiClass('rounded-xl bg-green-600 px-4 py-3 text-xs font-black uppercase text-white cursor-not-allowed', 'sk-btn !bg-green-50 !text-green-700 !border-green-200') }}"
                                         >
                                             Approved / Locked
                                         </button>
@@ -494,14 +597,14 @@
                                         <button
                                             type="button"
                                             disabled
-                                            class="rounded-xl bg-amber-100 px-4 py-3 text-xs font-black uppercase text-amber-700 cursor-not-allowed"
+                                            class="{{ $slotUiClass('rounded-xl bg-amber-100 px-4 py-3 text-xs font-black uppercase text-amber-700 cursor-not-allowed', 'sk-btn !bg-amber-50 !text-amber-700 !border-amber-200') }}"
                                         >
                                             Pending Review
                                         </button>
                                     @elseif($canResubmit)
                                         <button
                                             type="button"
-                                            class="rounded-xl bg-red-600 hover:bg-red-700 px-4 py-3 text-xs font-black uppercase text-white"
+                                            class="{{ $slotUiClass('rounded-xl bg-red-600 hover:bg-red-700 px-4 py-3 text-xs font-black uppercase text-white', 'sk-btn sk-btn--primary') }}"
                                             @if(($submissionType ?? '')==='report')
                                                 onclick="openAccomplishmentSlotSubmission(
                                                     {{ $slot->slot_id }},
@@ -531,14 +634,14 @@
                                         <button
                                             type="button"
                                             disabled
-                                            class="rounded-xl bg-gray-300 px-4 py-3 text-xs font-black uppercase text-gray-500 cursor-not-allowed"
+                                            class="{{ $slotUiClass('rounded-xl bg-gray-300 px-4 py-3 text-xs font-black uppercase text-gray-500 cursor-not-allowed', 'sk-btn sk-btn--ghost !bg-gray-100 !text-gray-500') }}"
                                         >
                                             Submitted
                                         </button>
                                     @else
                                         <button
                                             type="button"
-                                            class="rounded-xl bg-red-600 hover:bg-red-700 px-4 py-3 text-xs font-black uppercase text-white"
+                                            class="{{ $slotUiClass('rounded-xl bg-red-600 hover:bg-red-700 px-4 py-3 text-xs font-black uppercase text-white', 'sk-btn sk-btn--primary') }}"
                                             @if(($submissionType ?? '')==='report')
                                                 onclick="openAccomplishmentSlotSubmission(
                                                     {{ $slot->slot_id }},
@@ -573,29 +676,29 @@
                     </div>
                 </div>
                 {{-- RECENT SUBMISSIONS --}}
-                <div class="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
-                    <div class="px-8 py-5 border-b border-gray-50 bg-gray-50/50">
-                        <h3 class="font-black text-gray-800 uppercase tracking-tighter">
+                <div class="{{ $slotUiClass('bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden', 'sk-card overflow-hidden') }}">
+                    <div class="{{ $slotUiClass('px-8 py-5 border-b border-gray-50 bg-gray-50/50', 'sk-card__header !px-6 !py-5') }}">
+                        <h3 class="{{ $slotUiClass('font-black text-gray-800 uppercase tracking-tighter', 'sk-section-title') }}">
                             Recent Submissions
                         </h3>
                     </div>
                     <div class="overflow-x-auto">
                         <table class="w-full text-left">
-                            <thead class="text-[10px] text-gray-400 uppercase font-black tracking-widest border-b bg-gray-50">
+                            <thead class="{{ $slotUiClass('text-[10px] text-gray-400 uppercase font-black tracking-widest border-b bg-gray-50', '') }}">
                                 <tr>
-                                    <th class="px-8 py-4">
+                                    <th class="{{ $slotUiClass('px-8 py-4', 'px-6 py-3.5') }}">
                                         Title
                                     </th>
-                                    <th class="px-6 py-4">
+                                    <th class="{{ $slotUiClass('px-6 py-4', 'px-6 py-3.5') }}">
                                         Method
                                     </th>
-                                    <th class="px-6 py-4">
+                                    <th class="{{ $slotUiClass('px-6 py-4', 'px-6 py-3.5') }}">
                                         Date Submitted
                                     </th>
-                                    <th class="px-6 py-4">
+                                    <th class="{{ $slotUiClass('px-6 py-4', 'px-6 py-3.5') }}">
                                         Quality Review
                                     </th>
-                                    <th class="px-8 py-4 text-right">
+                                    <th class="{{ $slotUiClass('px-8 py-4 text-right', 'px-6 py-3.5 text-right') }}">
                                         Actions
                                     </th>
                                 </tr>
@@ -615,8 +718,8 @@
                                         data-focus-submission="{{ $isFocusedSubmission ? '1' : '0' }}"
                                         data-search="{{ strtolower(($submission->title ?? $submission->report_title ?? '').' '.($submission->period_label ?? '').' '.($submission->method_label ?? '').' '.($submission->quality_status_label ?? '')) }}"
                                     >
-                                        <td class="px-8 py-5">
-                                            <div class="font-bold text-gray-800 uppercase tracking-tighter">
+                                        <td class="{{ $slotUiClass('px-8 py-5', 'px-6 py-4') }}">
+                                            <div class="{{ $slotUiClass('font-bold text-gray-800 uppercase tracking-tighter', 'font-bold text-gray-900') }}">
                                                 {{ $submission->title ?? $submission->report_title }}
                                             </div>
                                             @if($isFocusedSubmission)
@@ -625,19 +728,19 @@
                                                     Opened from notification
                                                 </div>
                                             @endif
-                                            <div class="text-[10px] text-gray-400 font-bold uppercase mt-1">
+                                            <div class="{{ $slotUiClass('text-[10px] text-gray-400 font-bold uppercase mt-1', 'text-xs text-gray-500 font-semibold mt-0.5') }}">
                                                 {{ $submission->period_label ?? optional($submission->submitted_at)->format('F Y') ?? 'Submission' }}
                                             </div>
                                         </td>
-                                        <td class="px-6 py-5">
+                                        <td class="{{ $slotUiClass('px-6 py-5', 'px-6 py-4') }}">
                                             <span class="{{ $submission->method_badge }} px-3 py-1 rounded-full text-[9px] font-black uppercase">
                                                 {{ $submission->method_label }}
                                             </span>
                                         </td>
-                                        <td class="px-6 py-5 text-xs font-semibold">
+                                        <td class="{{ $slotUiClass('px-6 py-5 text-xs font-semibold', 'px-6 py-4 text-sm font-semibold text-gray-700 whitespace-nowrap') }}">
                                             {{ optional($submission->submitted_at)->format('M d, Y') ?? '--' }}
                                         </td>
-                                        <td class="px-6 py-5">
+                                        <td class="{{ $slotUiClass('px-6 py-5', 'px-6 py-4') }}">
                                             @php
                                                 $submissionQualityStatus=strtolower(
                                                     (string)($submission->quality_status ?? 'pending')
@@ -748,12 +851,41 @@
 {{-- SUBMISSION MODAL --}}
 <div
     id="slotSubmissionModal"
-    class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4"
+    class="{{ $slotUiClass('hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4', 'hidden fixed inset-0 bg-black/40 z-[100] flex items-center justify-center p-4') }}"
 >
-    <div class="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden">
+    <div class="{{ $slotUiClass('bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden', 'bg-white w-full max-w-md rounded-[20px] overflow-hidden max-h-[90vh] overflow-y-auto') }}">
+        @if($chairmanReportUi)
+        {{-- MODAL HEADER --}}
+        <div class="px-6 pt-6 pb-5 flex items-start gap-4 border-b border-gray-100">
+            <span class="sk-icon-tile">
+                @include('partials.ui.icon', ['icon' => 'upload', 'iconSize' => 21])
+            </span>
+
+            <div class="min-w-0 flex-1">
+                <h3 class="sk-modal__title !text-xl">
+                    Submit to Slot
+                </h3>
+
+                <p
+                    id="slotSubmissionTitle"
+                    class="sk-modal__subtitle"
+                ></p>
+            </div>
+
+            <button
+                type="button"
+                onclick="closeSlotSubmission()"
+                class="sk-icon-btn -mr-2 -mt-2"
+                aria-label="Close"
+            >
+                @include('partials.ui.icon', ['icon' => 'x', 'iconSize' => 20])
+            </button>
+        </div>
+
+        @else
         <div class="bg-red-600 px-6 py-5 text-white flex justify-between items-center">
             <div>
-                <h3 class="font-black uppercase tracking-tighter">
+                <h3 class="{{ $slotUiClass('font-black uppercase tracking-tighter', 'text-lg font-bold tracking-tight') }}">
                     Submit to Slot
                 </h3>
                 <p id="slotSubmissionTitle" class="text-xs text-red-100 mt-1"></p>
@@ -766,12 +898,13 @@
                 X
             </button>
         </div>
+        @endif
         <form
             id="slotSubmissionForm"
             action="{{ $storeRoute }}"
             method="POST"
             enctype="multipart/form-data"
-            class="p-8 space-y-6"
+            class="{{ $slotUiClass('p-8 space-y-6', 'p-6 space-y-5') }}"
             novalidate
         >
             @csrf
@@ -979,29 +1112,30 @@
                 id="slotFileSection"
                 class="{{ ($submissionType ?? '')==='report' ? '' : 'hidden' }}"
             >
-                <label class="block text-[10px] font-black text-red-500 uppercase mb-2 ml-1">
+                <label class="{{ $slotUiClass('block text-[10px] font-black text-red-500 uppercase mb-2 ml-1', 'sk-label') }}">
                     Select PDF File
                 </label>
-                <div class="border-2 border-dashed border-red-200 bg-red-50 p-4 rounded-xl text-center relative hover:bg-red-100 transition cursor-pointer">
+                <div class="{{ $slotUiClass('border-2 border-dashed border-red-200 bg-red-50 p-4 rounded-xl text-center relative hover:bg-red-100 transition cursor-pointer', 'border-2 border-dashed border-red-200 bg-[#fff8f8] px-4 py-6 rounded-2xl text-center relative hover:bg-red-50 hover:border-red-300 transition cursor-pointer') }}">
                     <input
                         type="file"
                         name="report_file"
                         accept=".pdf"
                         class="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                     >
-                    <p class="text-[10px] font-black text-red-600 uppercase">
+                    @if($chairmanReportUi)<span class="sk-icon-tile mx-auto mb-2">@include('partials.ui.icon', ['icon' => 'upload', 'iconSize' => 20])</span>@endif
+                    <p class="{{ $slotUiClass('text-[10px] font-black text-red-600 uppercase', 'text-sm font-bold text-gray-800') }}">
                         Click or drag PDF here
                     </p>
                     <p
                         id="slotFileName"
-                        class="mt-2 text-xs text-red-500 font-semibold"
+                        class="{{ $slotUiClass('mt-2 text-xs text-red-500 font-semibold', 'mt-1 text-xs text-red-600 font-semibold') }}"
                     ></p>
                 </div>
             </div>
             <button
                 id="slotSubmitButton"
                 type="submit"
-                class="w-full bg-red-600 text-white py-4 rounded-2xl font-black uppercase tracking-tighter shadow-lg hover:bg-red-700 active:scale-95 transition"
+                class="{{ $slotUiClass('w-full bg-red-600 text-white py-4 rounded-2xl font-black uppercase tracking-tighter shadow-lg hover:bg-red-700 active:scale-95 transition', 'sk-btn sk-btn--primary sk-btn--lg w-full') }}"
             >
                 Submit Slot
             </button>
