@@ -33,7 +33,7 @@
 @endphp
 <aside class="sk-sidebar" id="skSidebar" aria-label="Main navigation">
     <div class="sk-sidebar__brand">
-        <img src="{{ asset('images/logo.png') }}" class="sk-sidebar__logo" alt="SK 360 logo">
+        <img src="{{ asset('images/logo.png') }}?v={{ @filemtime(public_path('images/logo.png')) }}" class="sk-sidebar__logo" alt="SK 360 logo">
         <div class="min-w-0">
             <p class="sk-sidebar__name">SK 360&deg;</p>
             <p class="sk-sidebar__tag">Management System</p>

@@ -260,7 +260,7 @@
 <div class="sk-public sk-public-auth reset-page">
     <div class="reset-container">
         <div id="request-view" class="{{ $showSuccess ? 'hidden' : '' }}">
-            <div class="sk-logo"><img src="{{ asset('images/logo.png') }}" alt="SK 360 logo"></div>
+            <div class="sk-logo"><img src="{{ asset('images/logo.png') }}?v={{ @filemtime(public_path('images/logo.png')) }}" alt="SK 360 logo"></div>
             <h2 class="main-title">Reset Your Password</h2>
             <p class="sub-text">Choose your preferred reset method</p>
 

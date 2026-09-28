@@ -30,7 +30,7 @@
     <header class="sk-lnav">
         <div class="sk-container sk-lnav__inner">
             <a href="#home" class="sk-lnav__brand">
-                <img src="{{ asset('images/logo.png') }}" alt="SK 360 Logo">
+                <img src="{{ asset('images/logo.png') }}?v={{ @filemtime(public_path('images/logo.png')) }}" alt="SK 360 Logo">
                 <span>SK 360&deg;</span>
             </a>
 
@@ -241,7 +241,7 @@
             <div class="sk-footer__grid">
                 <div>
                     <a href="#home" class="sk-lnav__brand">
-                        <img src="{{ asset('images/logo.png') }}" alt="SK 360 Logo">
+                        <img src="{{ asset('images/logo.png') }}?v={{ @filemtime(public_path('images/logo.png')) }}" alt="SK 360 Logo">
                         <span>SK 360&deg;</span>
                     </a>
 

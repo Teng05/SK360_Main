@@ -3,7 +3,7 @@
         <div class="flex flex-col md:flex-row md:items-start md:justify-between gap-8">
             <div class="max-w-sm">
                 <a href="{{ route('public.home') }}" class="sk-lnav__brand">
-                    <img src="{{ asset('images/logo.png') }}" alt="SK360 Logo">
+                    <img src="{{ asset('images/logo.png') }}?v={{ @filemtime(public_path('images/logo.png')) }}" alt="SK360 Logo">
                     <span class="leading-tight">
                         <span class="block">SK 360&deg;</span>
                         <span class="block text-[10.5px] font-extrabold uppercase tracking-[0.12em] text-gray-500">Public Information Portal</span>

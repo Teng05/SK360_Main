@@ -13,7 +13,7 @@
     <section class="sk-auth__brand">
         <div class="sk-auth__top">
             <div class="sk-auth__mark">
-                <img src="{{ asset('images/logo.png') }}" alt="SK 360 logo">
+                <img src="{{ asset('images/logo.png') }}?v={{ @filemtime(public_path('images/logo.png')) }}" alt="SK 360 logo">
                 <div>
                     <p class="sk-auth__mark-name">SK 360&deg;</p>
                     <p class="sk-auth__mark-tag">Management System</p>
