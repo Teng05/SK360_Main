@@ -23,6 +23,13 @@
         <link rel="stylesheet" href="{{ asset('css/sk360-web.css') }}?v={{ @filemtime(public_path('css/sk360-web.css')) }}">
     @endif
 </head>
+<style>
+    .sk-password-toggle-wrap{position:relative!important}
+    .sk-password-toggle-wrap>input[type=password],.sk-password-toggle-wrap>input[type=text]{padding-right:48px!important}
+    .sk-password-toggle{position:absolute;right:12px;top:50%;display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;transform:translateY(-50%);border:0;border-radius:8px;background:transparent;color:#64748b;cursor:pointer}
+    .sk-password-toggle:hover{background:rgba(148,163,184,.12);color:#1e293b}
+    .sk-password-toggle:focus-visible{outline:3px solid rgba(201,35,54,.2);outline-offset:1px}
+</style>
 @php($skRoleWeb = !empty($menuItems) && request()->routeIs('sk_pres.*', 'sk_chairman.*', 'sk_secretary.*') && !request()->routeIs('*.meetings.call'))
 <body class="{{ $skRoleWeb ? 'sk-web sk-app' : '' }}">
     @yield('content')
@@ -92,5 +99,22 @@
         })();
     </script>
     @endauth
+    <script>
+        (function(){
+            function eyeSvg(open){return open
+                ? '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>'
+                : '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 3 18 18M10.6 10.6a2 2 0 0 0 2.8 2.8M9.9 4.2A10.8 10.8 0 0 1 12 4c6.5 0 10 8 10 8a18 18 0 0 1-3.1 4.4M6.6 6.6C3.7 8.5 2 12 2 12s3.5 8 10 8a10.8 10.8 0 0 0 3-.4"/></svg>';}
+            document.querySelectorAll('input[type="password"]').forEach(function(input){
+                if(input.closest('.pf-pass')||input.dataset.passwordToggle==='false'||input.parentElement.querySelector('[data-toggle-pass]'))return;
+                const wrap=input.parentElement;
+                wrap.classList.add('sk-password-toggle-wrap');
+                const button=document.createElement('button');
+                button.type='button'; button.className='sk-password-toggle'; button.setAttribute('aria-label','Show password'); button.setAttribute('title','Show password');
+                button.innerHTML=eyeSvg(false);
+                button.addEventListener('click',function(){const show=input.type==='password';input.type=show?'text':'password';button.innerHTML=eyeSvg(show);button.setAttribute('aria-label',show?'Hide password':'Show password');button.setAttribute('title',show?'Hide password':'Show password');});
+                wrap.appendChild(button);
+            });
+        })();
+    </script>
 </body>
 </html>
