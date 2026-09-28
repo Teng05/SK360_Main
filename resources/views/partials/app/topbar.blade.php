@@ -14,24 +14,12 @@
     $skAccountButtonId = $accountButtonId ?? 'userMenuBtn';
     $skAccountMenuId = $accountMenuId ?? 'userDropdown';
     $skBindBell = $bindBell ?? false;
-    $skSearch = $search ?? [];
+    $skBindAccount = $bindAccount ?? false;
 @endphp
 <header class="sk-topbar">
     <button type="button" class="sk-icon-btn sk-icon-btn--filled sk-topbar__menu" data-sk-sidebar-open aria-label="Open menu" aria-controls="skSidebar">
         @include('partials.ui.icon', ['icon' => 'menu', 'iconSize' => 21])
     </button>
-    @if ($skSearch !== false)
-        <label class="sk-search sk-topbar__search">
-            <span class="sr-only">Search</span>
-            @include('partials.ui.icon', ['icon' => 'search', 'iconSize' => 18])
-            <input type="text"
-                @isset($skSearch['id']) id="{{ $skSearch['id'] }}" @endisset
-                @isset($skSearch['name']) name="{{ $skSearch['name'] }}" @endisset
-                @isset($skSearch['value']) value="{{ $skSearch['value'] }}" @endisset
-                @isset($skSearch['class']) class="{{ $skSearch['class'] }}" @endisset
-                placeholder="{{ $skSearch['placeholder'] ?? 'Search...' }}" autocomplete="off">
-        </label>
-    @endif
     <div class="sk-topbar__actions">
         <div class="relative">
             <button id="notifBtn" type="button" class="sk-icon-btn" aria-label="Notifications" @if ($skBindBell) data-sk-dropdown="notifDropdown" @endif>
@@ -43,7 +31,7 @@
         </div>
         <span class="sk-topbar__divider" aria-hidden="true"></span>
         <div class="relative">
-            <button id="{{ $skAccountButtonId }}" type="button" class="sk-user-btn" aria-haspopup="menu">
+            <button id="{{ $skAccountButtonId }}" type="button" class="sk-user-btn" aria-haspopup="menu" @if ($skBindAccount) data-sk-dropdown="{{ $skAccountMenuId }}" @endif>
                 <span class="sk-avatar">@if ($skPhoto)<img src="{{ $skPhoto }}" alt="">@else{{ $skInitials }}@endif</span>
                 <span class="sk-user-btn__text"><span class="sk-user-btn__name">{{ $skName }}</span><span class="sk-user-btn__role">{{ $skRoleLabel }}</span></span>
                 @include('partials.ui.icon', ['icon' => 'chevron-down', 'iconSize' => 17, 'iconClass' => 'text-gray-400'])

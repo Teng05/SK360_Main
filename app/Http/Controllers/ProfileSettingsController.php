@@ -89,6 +89,9 @@ class ProfileSettingsController extends Controller
             'profileRoute'=>route($config['prefix'].'.profile'),
             'updateRoute'=>route($config['prefix'].'.profile.update'),
             'passwordRoute'=>route($config['prefix'].'.profile.password'),
+            'contactSendRoute'=>route($config['prefix'].'.profile.contact.send'),
+            'contactVerifyRoute'=>route($config['prefix'].'.profile.contact.verify'),
+            'pendingContact'=>\Illuminate\Support\Facades\Cache::get('profile-contact:'.$user->user_id),
             'menuItems'=>$this->menuItems($config),
             'currentUrl'=>url()->current(),
             'hasProfilePicColumn'=>Schema::hasColumn('users','profile_pic'),
@@ -102,8 +105,10 @@ class ProfileSettingsController extends Controller
         $hasProfilePicColumn=Schema::hasColumn('users','profile_pic');
 
         $rules=[
-            'first_name'=>['sometimes','required','string','max:50'],
-            'last_name'=>['sometimes','required','string','max:50'],
+            'first_name'=>['prohibited'],
+            'last_name'=>['prohibited'],
+            'email'=>['prohibited'],
+            'phone_number'=>['prohibited'],
         ];
 
         if($hasProfilePicColumn){
@@ -112,7 +117,7 @@ class ProfileSettingsController extends Controller
         }
 
         $validated=$request->validateWithBag('profile',$rules);
-        $changes=collect($validated)->only(['first_name','last_name'])->all();
+        $changes=[];
 
         if($hasProfilePicColumn&&$request->boolean('remove_photo')){
             $this->deleteProfilePicture($user->profile_pic??null);

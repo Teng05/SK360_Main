@@ -18,6 +18,18 @@
 .pf-tab[aria-selected="true"]{background:#c92336;color:#fff}
 .pf-panel[hidden]{display:none}
 .pf-field{min-width:0}
+.pf-contact-choice{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:20px}
+.pf-contact-choice[hidden]{display:none}
+.pf-contact-choice legend{margin-bottom:10px;font-size:13px;font-weight:700;color:#475569}
+.pf-contact-choice label{display:flex;align-items:center;gap:8px;padding:10px 14px;border:1px solid #cbd5e1;border-radius:12px;cursor:pointer;font-size:14px;font-weight:600}
+.pf-contact-choice label:has(input:checked){border-color:#c92336;background:#fff1f2;color:#a91c2c}
+.pf-contact-choice input{accent-color:#c92336}
+#contactSend:disabled{opacity:.55;cursor:not-allowed;box-shadow:none}
+.pf-personal-header{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:24px}
+.pf-personal-header>div{flex:1;min-width:0}
+.pf-personal-header #editToggle{flex-shrink:0;min-width:94px;min-height:44px}
+.pf-personal-header #editToggle:focus-visible{outline:3px solid #f3a5ae;outline-offset:3px}
+@media(max-width:480px){.pf-personal-header{gap:10px}.pf-personal-header #editToggle{min-width:80px;padding:0 12px}}
 .pf-label{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:7px;font-size:11px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:#64748b}
 .pf-lock{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:99px;background:#e9eef5;color:#64748b;font-size:9px;font-weight:800;letter-spacing:.06em}
 .pf-input{width:100%;height:50px;padding:0 14px;border:1px solid transparent;border-radius:13px;background:#f4f6fa;color:#0f172a;font-size:14px;font-weight:600;transition:.2s}
@@ -77,7 +89,8 @@ $photoUrl=($hasProfilePicColumn&&!empty($profilePic))
 
 $profileErrors=$errors->getBag('profile');
 $passwordErrors=$errors->getBag('password');
-$startEditing=$profileErrors->hasAny(['first_name','last_name']);
+$contactErrors=$errors->getBag('contact');
+$startEditing=$contactErrors->any();
 $startTab=$passwordErrors->any()?'security':(session('tab')?:'personal');
 
 $formatDate=fn($value)=>$value
@@ -213,30 +226,35 @@ $isActive=($user->status??'active')==='active';
                 </div>
 
                 <section class="pf-panel space-y-6" id="panel-personal" role="tabpanel" aria-labelledby="tab-personal" tabindex="0">
-                    <form id="personalForm" action="{{ $updateRoute }}" method="POST" class="sk-card p-5 sm:p-7">
+                    <form id="personalForm" action="{{ $contactSendRoute }}" method="POST" class="sk-card p-5 sm:p-7">
                         @csrf
 
-                        <div class="sk-card__header mb-6">
+                        <div class="pf-personal-header">
                             <div class="min-w-0">
                                 <h3 class="sk-section-title">Personal information</h3>
                                 <p class="sk-section-subtitle">Your name appears on reports, announcements and the public leadership page.</p>
                             </div>
 
-                            <button type="button" id="editToggle" class="sk-btn sk-btn--soft sk-btn--sm" aria-expanded="false">
+                            <button type="button" id="editToggle" class="sk-btn sk-btn--primary" aria-expanded="false" aria-controls="personalEditActions">
                                 @include('partials.ui.icon',['icon'=>'pencil','iconSize'=>15])
                                 <span data-edit-label>Edit</span>
                             </button>
                         </div>
 
+                        <fieldset id="contactChoice" class="pf-contact-choice" hidden>
+                            <legend>Which contact detail would you like to change?</legend>
+                            <label><input type="radio" name="contact_channel" value="email" {{ old('contact_channel','email')==='email'?'checked':'' }}> Email address</label>
+                            <label><input type="radio" name="contact_channel" value="phone_number" {{ old('contact_channel')==='phone_number'?'checked':'' }}> Phone number</label>
+                        </fieldset>
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
                             <div class="pf-field">
-                                <label class="pf-label" for="first_name">First name</label>
+                                <label class="pf-label" for="first_name">First name<span class="pf-lock">@include('partials.ui.icon',['icon'=>'lock','iconSize'=>11]) Locked</span></label>
 
-                                <input id="first_name" name="first_name" type="text" maxlength="50" autocomplete="given-name"
+                                <input id="first_name" type="text" maxlength="50" autocomplete="given-name"
                                     class="pf-input {{ $profileErrors->has('first_name')?'has-error':'' }}"
-                                    value="{{ old('first_name',$user->first_name) }}"
+                                    value="{{ $user->first_name }}"
                                     data-initial="{{ $user->first_name }}"
-                                    data-editable readonly>
+                                    readonly>
 
                                 @if($profileErrors->has('first_name'))
                                     <p class="pf-error">{{ $profileErrors->first('first_name') }}</p>
@@ -244,58 +262,53 @@ $isActive=($user->status??'active')==='active';
                             </div>
 
                             <div class="pf-field">
-                                <label class="pf-label" for="last_name">Last name</label>
+                                <label class="pf-label" for="last_name">Last name<span class="pf-lock">@include('partials.ui.icon',['icon'=>'lock','iconSize'=>11]) Locked</span></label>
 
-                                <input id="last_name" name="last_name" type="text" maxlength="50" autocomplete="family-name"
+                                <input id="last_name" type="text" maxlength="50" autocomplete="family-name"
                                     class="pf-input {{ $profileErrors->has('last_name')?'has-error':'' }}"
-                                    value="{{ old('last_name',$user->last_name) }}"
+                                    value="{{ $user->last_name }}"
                                     data-initial="{{ $user->last_name }}"
-                                    data-editable readonly>
+                                    readonly>
 
                                 @if($profileErrors->has('last_name'))
                                     <p class="pf-error">{{ $profileErrors->first('last_name') }}</p>
                                 @endif
                             </div>
 
+                            @foreach(['email'=>'Email address','phone_number'=>'Phone number'] as $field=>$label)
                             <div class="pf-field">
-                                <label class="pf-label" for="profile_email">
-                                    Email address
-                                    <span class="pf-lock">
-                                        @include('partials.ui.icon',['icon'=>'lock','iconSize'=>11])
-                                        Locked
-                                    </span>
-                                </label>
-
-                                <input id="profile_email" type="email" class="pf-input" value="{{ $user->email }}" disabled>
+                                <label class="pf-label" for="{{ $field==='email'?'profile_email':'profile_phone' }}">{{ $label }}</label>
+                                <input id="{{ $field==='email'?'profile_email':'profile_phone' }}" name="{{ $field }}" type="{{ $field==='email'?'email':'tel' }}" class="pf-input" value="{{ old($field,$user->{$field}) }}" data-initial="{{ $user->{$field} }}" data-editable readonly>
                             </div>
-
-                            <div class="pf-field">
-                                <label class="pf-label" for="profile_phone">
-                                    Phone number
-                                    <span class="pf-lock">
-                                        @include('partials.ui.icon',['icon'=>'lock','iconSize'=>11])
-                                        Locked
-                                    </span>
-                                </label>
-
-                                <input id="profile_phone" type="tel" class="pf-input" value="{{ $user->phone_number?:'Not set' }}" disabled>
-                            </div>
+                            @endforeach
                         </div>
-
                         <div class="sk-alert sk-alert--info mt-6">
                             @include('partials.ui.icon',['icon'=>'info','iconSize'=>18])
-                            <span>Your email address and phone number sign you in, so only the SK Federation office can change them. Message them if either one is wrong.</span>
+                            <span>Your name is locked. To change an email address or phone number, verify a code sent to the new contact detail. Change one contact detail at a time.</span>
                         </div>
-
-                        <div class="pf-actions" data-edit-actions hidden>
+                        @if($contactErrors->any())
+                            <div class="sk-alert sk-alert--error mt-4" role="alert">{{ $contactErrors->first() }}</div>
+                        @endif
+                        <div id="personalEditActions" class="pf-actions" data-edit-actions hidden>
+                            <div class="pf-field w-full">
+                                <label class="pf-label" for="contact_password">Current password</label>
+                                <input id="contact_password" name="current_password" type="password" autocomplete="current-password" class="pf-input" required>
+                                <p id="contactSendHint" class="pf-hint mt-2" aria-live="polite">Enter a new email address and your current password to receive a code.</p>
+                            </div>
                             <button type="button" id="editCancel" class="sk-btn sk-btn--ghost">Cancel</button>
-
-                            <button type="submit" class="sk-btn sk-btn--primary">
-                                @include('partials.ui.icon',['icon'=>'circle-check','iconSize'=>17])
-                                Save changes
-                            </button>
+                            <button type="submit" id="contactSend" class="sk-btn sk-btn--primary" aria-describedby="contactSendHint" disabled>Send verification code</button>
                         </div>
                     </form>
+                    @if($pendingContact)
+                        <form method="POST" action="{{ $contactVerifyRoute }}" class="sk-card p-5 sm:p-7">
+                            @csrf
+                            <h3 class="sk-section-title">Verify contact change</h3>
+                            <p class="pf-hint mt-2">Enter the 6-digit code sent to {{ $pendingContact['value'] }}. It expires after 10 minutes. Your current contact detail remains unchanged until verification succeeds.</p>
+                            <label class="pf-label mt-4" for="contact_code">Verification code</label>
+                            <input id="contact_code" name="contact_code" class="pf-input" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" required>
+                            <button type="submit" class="sk-btn sk-btn--primary mt-4">Verify and save</button>
+                        </form>
+                    @endif
 
                     <div class="sk-card p-5 sm:p-7">
                         <h3 class="sk-section-title mb-1">Council details</h3>
@@ -560,6 +573,33 @@ $isActive=($user->status??'active')==='active';
     const editables=Array.from(personalForm.querySelectorAll('[data-editable]'));
     const editActions=personalForm.querySelector('[data-edit-actions]');
     const editLabel=editToggle.querySelector('[data-edit-label]');
+    const contactChoice=document.getElementById('contactChoice');
+    const contactSend=document.getElementById('contactSend');
+    const contactPassword=document.getElementById('contact_password');
+    let sendingContact=false;
+
+    function syncContactChoice(){
+        const channel=personalForm.querySelector('[name="contact_channel"]:checked').value;
+        const editing=!editActions.hidden;
+        const selected=editables.find(field=>field.name===channel);
+        editables.forEach(field=>{
+            field.readOnly=!editing || field!==selected;
+            field.disabled=editing && field!==selected;
+            field.required=editing && field===selected;
+        });
+        const normalize=value=>channel==='email'?value.trim().toLowerCase():value.replace(/\D/g,'').replace(/^(63|0)/,'');
+        const changed=normalize(selected.value)!==normalize(selected.dataset.initial||'');
+        contactSend.disabled=sendingContact || !editing || !changed || !selected.value.trim() || !selected.checkValidity() || !contactPassword.value;
+        document.getElementById('contactSendHint').textContent=channel==='email'
+            ? 'We will send a code to your new email address. Your current email stays active until verified.'
+            : 'We will text a code to your new phone number. Your current number stays active until verified.';
+    }
+    contactChoice.addEventListener('change',()=>{
+        syncContactChoice();
+        editables.find(field=>!field.readOnly).focus();
+    });
+    editables.forEach(field=>field.addEventListener('input',syncContactChoice));
+    contactPassword.addEventListener('input',syncContactChoice);
 
     function setEditing(editing,focusFirst){
         editables.forEach(function(field){
@@ -567,17 +607,22 @@ $isActive=($user->status??'active')==='active';
         });
 
         editActions.hidden=!editing;
+        contactChoice.hidden=!editing;
+        syncContactChoice();
         editLabel.textContent=editing?'Cancel':'Edit';
+        editToggle.classList.toggle('sk-btn--primary',!editing);
+        editToggle.classList.toggle('sk-btn--secondary',editing);
         editToggle.setAttribute('aria-expanded',editing?'true':'false');
 
         if(editing&&focusFirst&&editables.length){
-            const first=editables[0];
+            const first=editables.find(field=>!field.readOnly);
             first.focus();
-            first.setSelectionRange(first.value.length,first.value.length);
+            if(first.type==='text'||first.type==='tel') first.setSelectionRange(first.value.length,first.value.length);
         }
     }
 
     function resetFields(){
+        document.getElementById('contact_password').value='';
         editables.forEach(function(field){
             field.value=field.dataset.initial||'';
             field.classList.remove('has-error');
@@ -599,14 +644,15 @@ $isActive=($user->status??'active')==='active';
     });
 
     personalForm.addEventListener('submit',function(event){
-        const changed=editables.some(function(field){
-            return field.value.trim()!==(field.dataset.initial||'');
-        });
-
-        if(!changed){
+        syncContactChoice();
+        if(contactSend.disabled){
             event.preventDefault();
-            setEditing(false,false);
+            return;
         }
+        sendingContact=true;
+        contactSend.disabled=true;
+        contactSend.textContent='Sending code...';
+        personalForm.setAttribute('aria-busy','true');
     });
 
     setEditing(@json($startEditing),false);

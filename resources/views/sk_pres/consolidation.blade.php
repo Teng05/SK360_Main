@@ -32,10 +32,10 @@
                     <p class="sk-page-subtitle">Automatically compile barangay reports into unified monthly, quarterly, and annual documents.</p>
                 </div>
                 <div class="sk-page-head__actions">
-                    <a href="{{ $downloadRoute }}" class="sk-btn sk-btn--primary sk-btn--lg">
+                    <button type="submit" form="consolidationFilters" formaction="{{ $downloadRoute }}" class="sk-btn sk-btn--primary sk-btn--lg">
                         @include('partials.ui.icon', ['icon'=>'download','iconSize'=>18])
                         Download Consolidated PDF
-                    </a>
+                    </button>
                 </div>
             </div>
 
@@ -69,12 +69,12 @@
                     <p class="sk-section-subtitle">Review citywide report completion and archive consolidated outputs.</p>
                 </div>
 
-                <form method="GET" action="{{ route('sk_pres.consolidation') }}" class="mx-6 mt-5 flex flex-col xl:flex-row xl:items-end gap-4 rounded-2xl border border-gray-100 bg-[#f8f9fb] p-4">
+                <form id="consolidationFilters" method="GET" action="{{ route('sk_pres.consolidation') }}" class="mx-6 mt-5 flex flex-col xl:flex-row xl:items-end gap-4 rounded-2xl border border-gray-100 bg-[#f8f9fb] p-4">
                     <div class="w-full xl:max-w-xs">
                         <label for="barangaySearch" class="sk-overline block mb-2">Search Barangay</label>
                         <div class="sk-search">
                             @include('partials.ui.icon', ['icon'=>'search','iconSize'=>18])
-                            <input id="barangaySearch" type="text" placeholder="Search barangay..." class="!bg-white !border-gray-200">
+                            <input id="barangaySearch" name="barangay" value="{{ $filters['barangay'] ?? '' }}" type="text" placeholder="Search barangay..." class="!bg-white !border-gray-200">
                         </div>
                     </div>
 

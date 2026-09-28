@@ -138,6 +138,7 @@
                                         </div>
                                     </div>
 
+                                    <div class="flex shrink-0 items-center gap-2">
                                     @if($announcement->visibility==='officials_only')
                                         <span class="shrink-0 rounded-full bg-amber-100 px-3 py-1 text-[9px] font-black uppercase text-amber-700">
                                             @include('partials.ui.icon', ['icon'=>'lock','iconSize'=>14]) Officials Only
@@ -147,6 +148,32 @@
                                             @include('partials.ui.icon', ['icon'=>'globe','iconSize'=>14]) Public
                                         </span>
                                     @endif
+                                <details class="announcement-actions relative shrink-0">
+                                    <summary class="flex h-9 w-9 cursor-pointer list-none items-center justify-center rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 [&::-webkit-details-marker]:hidden" aria-label="Announcement actions">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>
+                                    </summary>
+                                    <div class="absolute right-0 top-full z-20 mt-2 w-40 rounded-xl border border-gray-100 bg-white p-1.5 shadow-lg">
+                                    <button type="button"
+                                            class="edit-announcement-btn flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition"
+                                            data-announcement-id="{{ $announcement->announcement_id }}"
+                                            data-update-url="{{ route('sk_pres.announcements.update',$announcement->announcement_id) }}"
+                                            data-title="{{ $announcement->title }}"
+                                            data-content="{{ $announcement->content }}"
+                                            data-visibility="{{ $announcement->visibility }}">
+                                        @include('partials.ui.icon', ['icon'=>'pencil','iconSize'=>16])
+                                        <span>Edit</span>
+                                    </button>
+                                    <form method="POST" action="{{ route('sk_pres.announcements.destroy',$announcement->announcement_id) }}" onsubmit="return confirm('Delete this announcement and its comments permanently? This cannot be undone.');">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button type="submit" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold text-red-600 hover:bg-red-50 transition" aria-label="Delete announcement: {{ $announcement->title }}">
+                                            @include('partials.ui.icon', ['icon'=>'trash-2','iconSize'=>16])
+                                            <span>Delete</span>
+                                        </button>
+                                    </form>
+                                    </div>
+                                </details>
+                                    </div>
                                 </div>
 
                                 <h2 class="text-xl font-black text-gray-900 mb-3">{{ $announcement->title }}</h2>
@@ -181,16 +208,7 @@
                                         <span>Views</span>
                                     </div>
 
-                                    <button type="button"
-                                            class="edit-announcement-btn ml-auto flex items-center gap-1 text-red-600 hover:text-red-700 transition"
-                                            data-announcement-id="{{ $announcement->announcement_id }}"
-                                            data-update-url="{{ route('sk_pres.announcements.update',$announcement->announcement_id) }}"
-                                            data-title="{{ $announcement->title }}"
-                                            data-content="{{ $announcement->content }}"
-                                            data-visibility="{{ $announcement->visibility }}">
-                                        @include('partials.ui.icon', ['icon'=>'pencil','iconSize'=>16])
-                                        <span>Edit</span>
-                                    </button>
+
                                 </div>
                             </div>
                         </article>
@@ -506,7 +524,19 @@ function closeEditAnnouncementModal(){
     editAnnouncementModal.classList.remove('flex');
 }
 
+document.addEventListener('click',event=>{
+    document.querySelectorAll('.announcement-actions[open]').forEach(menu=>{
+        if(!menu.contains(event.target)) menu.removeAttribute('open');
+    });
+});
+document.addEventListener('keydown',event=>{
+    if(event.key==='Escape') document.querySelectorAll('.announcement-actions[open]').forEach(menu=>{
+        menu.removeAttribute('open');
+        menu.querySelector('summary').focus();
+    });
+});
 document.querySelectorAll('.edit-announcement-btn').forEach(button=>{
+    button.addEventListener('click',()=>button.closest('details').removeAttribute('open'));
     button.addEventListener('click',()=>{
         openEditAnnouncementModal({
             id:button.dataset.announcementId,

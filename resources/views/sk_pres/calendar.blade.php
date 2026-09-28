@@ -13,6 +13,7 @@
 .fc .fc-button{background:#f8fafc!important;border:1px solid #cbd5e1!important;color:#475569!important;box-shadow:none!important;border-radius:10px!important;padding:.45rem .75rem!important;font-size:.72rem!important;font-weight:800!important;text-transform:capitalize!important}
 .fc .fc-button:hover{background:#fff1f2!important;border-color:#fda4af!important;color:#be123c!important}
 .fc .fc-button:focus{box-shadow:0 0 0 3px rgba(225,29,72,.10)!important}
+.fc .fc-prev-button .fc-icon,.fc .fc-next-button .fc-icon{color:#fff!important}
 .fc .fc-col-header-cell{background:#f8fafc}
 .fc .fc-col-header-cell-cushion{padding:10px 4px!important;color:#64748b;font-size:10px;font-weight:900;text-transform:uppercase;text-decoration:none!important}
 .fc .fc-daygrid-day{background:#fff}

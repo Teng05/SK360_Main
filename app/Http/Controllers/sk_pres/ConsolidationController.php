@@ -626,6 +626,7 @@ class ConsolidationController extends Controller
         return [
 
             'year'=>$year>2000 && $year<2100 ? $year : $defaultYear,
+            'barangay'=>trim((string)$request->query('barangay','')),
 
             'period'=>$period,
 
@@ -724,6 +725,7 @@ class ConsolidationController extends Controller
             ->orderBy('barangay_name')
 
             ->get(['barangay_id','barangay_name'])
+            ->filter(fn($barangay)=>str_contains(mb_strtolower($barangay->barangay_name),mb_strtolower($filters['barangay'] ?? '')))
 
             ->map(function($barangay) use($reports,$budgets,$hasBudgetPeriods){
 

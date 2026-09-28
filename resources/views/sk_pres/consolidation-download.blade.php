@@ -27,6 +27,9 @@
             | Quarter: {{ $filters['quarter'] }}
         @endif
         | Generated: {{ $generatedAt->format('M d, Y h:i A') }}
+        @if (!empty($filters['barangay']))
+            | Barangay filter: {{ $filters['barangay'] }}
+        @endif
     </div>
 
     <table class="stats">

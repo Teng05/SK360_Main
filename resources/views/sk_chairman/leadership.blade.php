@@ -675,12 +675,12 @@
 
                                 <div class="mt-2 space-y-1 text-[10px] text-gray-500">
                                     <p>
-                                        &#128231;
+                                        <span class="inline-flex align-middle">@include('partials.ui.icon', ['icon' => 'mail', 'iconSize' => 16])</span>
                                         {{ $former['email'] ?: 'No email provided' }}
                                     </p>
 
                                     <p>
-                                        &#128222;
+                                        <span class="inline-flex align-middle">@include('partials.ui.icon', ['icon' => 'phone', 'iconSize' => 16])</span>
                                         {{ $former['phone'] ?: 'No phone provided' }}
                                     </p>
                                 </div>
@@ -775,7 +775,7 @@
                 class="hidden rounded-2xl bg-gray-50 p-8 text-center">
 
                 <div class="text-2xl mb-2">
-                    &#128269;
+                    <span class="inline-flex align-middle">@include('partials.ui.icon', ['icon' => 'search', 'iconSize' => 16])</span>
                 </div>
 
                 <p class="text-sm font-bold text-gray-500">
@@ -881,7 +881,7 @@
                     <div class="flex items-center gap-2">
 
                         <span class="text-red-500 font-bold">
-                            &#128737;
+                            <span class="inline-flex align-middle">@include('partials.ui.icon', ['icon' => 'shield-check', 'iconSize' => 16])</span>
                         </span>
 
                         <h3 class="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">
@@ -926,17 +926,17 @@
                                 $officerBorder='border-red-100 bg-red-50/30';
                                 $avatarStyle='bg-red-600 text-white';
                                 $positionStyle='bg-red-600 text-white';
-                                $officerIcon='&#128737;';
+                                $officerIcon='shield-check';
                             }elseif($isSecretary){
                                 $officerBorder='border-blue-100 bg-blue-50/30';
                                 $avatarStyle='bg-blue-600 text-white';
                                 $positionStyle='bg-blue-600 text-white';
-                                $officerIcon='&#128196;';
+                                $officerIcon='file-text';
                             }else{
                                 $officerBorder='border-yellow-200 bg-yellow-50/40';
                                 $avatarStyle='bg-yellow-500 text-white';
                                 $positionStyle='bg-yellow-500 text-white';
-                                $officerIcon='&#128176;';
+                                $officerIcon='wallet';
                             }
 
                             $searchStatus=$pending ? 'pending' : ($member['status'] ?? '');
@@ -966,7 +966,7 @@
                                     </h4>
 
                                     <span class="px-3 py-1 rounded-full text-[9px] font-black uppercase {{ $positionStyle }}">
-                                        {!! $officerIcon !!} {{ $member['position'] }}
+                                        @include('partials.ui.icon', ['icon' => $officerIcon, 'iconSize' => 16]) {{ $member['position'] }}
                                     </span>
 
                                     @if($isSecretary)
@@ -1010,7 +1010,7 @@
 
                                     <div class="flex items-center gap-2">
                                         <span>
-                                            &#128231;
+                                            <span class="inline-flex align-middle">@include('partials.ui.icon', ['icon' => 'mail', 'iconSize' => 16])</span>
                                         </span>
 
                                         {{ $member['email'] ?: 'No email provided' }}
@@ -1018,7 +1018,7 @@
 
                                     <div class="flex items-center gap-2">
                                         <span>
-                                            &#128222;
+                                            <span class="inline-flex align-middle">@include('partials.ui.icon', ['icon' => 'phone', 'iconSize' => 16])</span>
                                         </span>
 
                                         {{ $member['phone'] ?: 'No phone provided' }}
@@ -1026,7 +1026,7 @@
 
                                     <div class="flex items-center gap-2 uppercase tracking-tighter">
                                         <span>
-                                            &#128197;
+                                            <span class="inline-flex align-middle">@include('partials.ui.icon', ['icon' => 'calendar-days', 'iconSize' => 16])</span>
                                         </span>
 
                                         {{ $member['term'] ?: 'N/A' }}
@@ -1174,7 +1174,7 @@
                 <div class="flex items-center gap-2 mb-8 border-b border-gray-50 pb-4">
 
                     <span class="text-yellow-500 font-bold">
-                        &#127775;
+                        <span class="inline-flex align-middle">@include('partials.ui.icon', ['icon' => 'award', 'iconSize' => 16])</span>
                     </span>
 
                     <h3 class="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">
@@ -1212,15 +1212,15 @@
                                 </p>
 
                                 <p class="text-[10px] text-gray-400 mt-2 font-medium">
-                                    &#128222; {{ $member['phone'] ?: 'No phone provided' }}
+                                    <span class="inline-flex align-middle">@include('partials.ui.icon', ['icon' => 'phone', 'iconSize' => 16])</span> {{ $member['phone'] ?: 'No phone provided' }}
                                 </p>
 
                                 <p class="text-[10px] text-gray-400 mt-1 truncate">
-                                    &#128231; {{ $member['email'] ?: 'No email provided' }}
+                                    <span class="inline-flex align-middle">@include('partials.ui.icon', ['icon' => 'mail', 'iconSize' => 16])</span> {{ $member['email'] ?: 'No email provided' }}
                                 </p>
 
                                 <p class="text-[9px] text-gray-400 mt-1">
-                                    &#128197; {{ $member['term'] ?: 'N/A' }}
+                                    <span class="inline-flex align-middle">@include('partials.ui.icon', ['icon' => 'calendar-days', 'iconSize' => 16])</span> {{ $member['term'] ?: 'N/A' }}
                                 </p>
                             </div>
 
@@ -1280,7 +1280,7 @@
                 class="hidden py-10 text-center">
 
                 <div class="text-3xl mb-2">
-                    &#128269;
+                    <span class="inline-flex align-middle">@include('partials.ui.icon', ['icon' => 'search', 'iconSize' => 16])</span>
                 </div>
 
                 <p class="text-sm font-bold text-gray-500">

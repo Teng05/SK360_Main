@@ -232,6 +232,34 @@ class AnnouncementController extends Controller
             ->with('status','Announcement updated successfully.');
     }
 
+    public function destroy(int $announcementId): RedirectResponse
+    {
+        abort_unless(auth()->check() && auth()->user()->role==='sk_president',403);
+
+        $currentTermId=$this->currentTermId();
+        if(!$currentTermId){
+            return back()->with('warning','There is no active administration term.');
+        }
+
+        DB::transaction(function() use($announcementId,$currentTermId){
+            $announcement=DB::table('announcements')
+                ->where('announcement_id',$announcementId)
+                ->where('term_id',$currentTermId)
+                ->lockForUpdate()->first();
+            abort_unless($announcement,404);
+
+            DB::table('feedback_verifications')->whereIn('feedback_id',function($query) use($announcementId){
+                $query->select('feedback_id')->from('announcement_feedback')->where('announcement_id',$announcementId);
+            })->delete();
+            foreach(['announcement_feedback','announcement_views','public_wall_post_likes','wall_post_likes'] as $table){
+                DB::table($table)->where('announcement_id',$announcementId)->delete();
+            }
+            DB::table('announcements')->where('announcement_id',$announcementId)->where('term_id',$currentTermId)->delete();
+        });
+
+        return redirect()->route('sk_pres.announcements')->with('status','Announcement deleted successfully.');
+    }
+
     protected function currentTermId(): ?int
     {
         $termId=DB::table('administration_terms')

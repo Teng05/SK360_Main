@@ -139,6 +139,7 @@ Route::middleware('auth')->prefix('sk_pres')->name('sk_pres.')->group(function()
     Route::get('/announcements',[AnnouncementController::class,'index'])->name('announcements');
     Route::post('/announcements',[AnnouncementController::class,'store'])->name('announcements.store');
     Route::put('/announcements/{announcementId}',[AnnouncementController::class,'update'])->name('announcements.update');
+    Route::delete('/announcements/{announcementId}',[AnnouncementController::class,'destroy'])->name('announcements.destroy');
 
     Route::get('/calendar',[CalendarController::class,'index'])->name('calendar');
     Route::get('/calendar/live',[CalendarController::class,'live'])->name('calendar.live');
@@ -198,6 +199,8 @@ Route::middleware('auth')->prefix('sk_pres')->name('sk_pres.')->group(function()
     |--------------------------------------------------------------------------
     */
 
+    Route::post('/profile/contact/send', fn (Request $r, \App\Http\Controllers\ProfileContactController $c) => $c->send($r, 'sk_president'))->middleware('throttle:10,10')->name('profile.contact.send');
+    Route::post('/profile/contact/verify', fn (Request $r, \App\Http\Controllers\ProfileContactController $c) => $c->verify($r, 'sk_president'))->middleware('throttle:20,10')->name('profile.contact.verify');
     Route::get('/profile',fn(ProfileSettingsController $c)=>$c->show('sk_president'))
         ->name('profile');
 
@@ -262,6 +265,8 @@ Route::middleware('auth')->prefix('sk_chairman')->name('sk_chairman.')->group(fu
     Route::get('/archive/download/bulk', [App\Http\Controllers\sk_chairman\ArchiveController::class, 'bulkDownload'])->name('archive.bulk-download');
     Route::get('/archive/download/{sourceType}/{sourceId}', [App\Http\Controllers\sk_chairman\ArchiveController::class, 'download'])->name('archive.download');
 
+    Route::post('/profile/contact/send', fn (Request $r, \App\Http\Controllers\ProfileContactController $c) => $c->send($r, 'sk_chairman'))->middleware('throttle:10,10')->name('profile.contact.send');
+    Route::post('/profile/contact/verify', fn (Request $r, \App\Http\Controllers\ProfileContactController $c) => $c->verify($r, 'sk_chairman'))->middleware('throttle:20,10')->name('profile.contact.verify');
     Route::get('/profile', fn (ProfileSettingsController $c) => $c->show('sk_chairman'))->name('profile');
     Route::post('/profile', fn (Request $r, ProfileSettingsController $c) => $c->update($r, 'sk_chairman'))->name('profile.update');
     Route::post('/profile/password', fn (Request $r, ProfileSettingsController $c) => $c->updatePassword($r, 'sk_chairman'))->name('profile.password');
@@ -304,6 +309,8 @@ Route::middleware('auth')->prefix('sk_secretary')->name('sk_secretary.')->group(
 
     Route::get('/leadership', [SkSecretaryLeadershipController::class, 'index'])->name('leadership');
 
+    Route::post('/profile/contact/send', fn (Request $r, \App\Http\Controllers\ProfileContactController $c) => $c->send($r, 'sk_secretary'))->middleware('throttle:10,10')->name('profile.contact.send');
+    Route::post('/profile/contact/verify', fn (Request $r, \App\Http\Controllers\ProfileContactController $c) => $c->verify($r, 'sk_secretary'))->middleware('throttle:20,10')->name('profile.contact.verify');
     Route::get('/profile', fn (ProfileSettingsController $c) => $c->show('sk_secretary'))->name('profile');
     Route::post('/profile', fn (Request $r, ProfileSettingsController $c) => $c->update($r, 'sk_secretary'))->name('profile.update');
     Route::post('/profile/password', fn (Request $r, ProfileSettingsController $c) => $c->updatePassword($r, 'sk_secretary'))->name('profile.password');

@@ -768,7 +768,7 @@
                     @empty
                         <div class="rounded-2xl border border-gray-200 bg-white p-8 text-center">
                             <div class="text-3xl">
-                                &#128220;
+                                <span class="inline-flex align-middle">@include('partials.ui.icon', ['icon' => 'file-text', 'iconSize' => 16])</span>
                             </div>
                             <p class="mt-2 text-sm font-bold text-gray-600">
                                 No official history found.
@@ -1156,7 +1156,7 @@
         <div class="mb-4">
             <a href="{{ route('sk_pres.user-management.csv-template') }}"
                 class="inline-flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-xs font-bold text-red-600 hover:bg-red-100 transition">
-                <span>&#128229;</span>
+                <span><span class="inline-flex align-middle">@include('partials.ui.icon', ['icon' => 'download', 'iconSize' => 16])</span></span>
                 Download CSV Template
             </a>
         </div>
@@ -1196,7 +1196,7 @@
             @csrf
             <div class="rounded-2xl border-2 border-dashed border-red-200 bg-red-50/50 p-6 text-center">
                 <span class="text-3xl">
-                    &#128194;
+                    <span class="inline-flex align-middle">@include('partials.ui.icon', ['icon' => 'archive', 'iconSize' => 16])</span>
                 </span>
                 <label for="csv_file"
                     class="mt-2 block text-xs font-black uppercase text-gray-600 cursor-pointer">

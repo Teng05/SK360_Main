@@ -12,7 +12,7 @@
 
 
     <div class="flex-1 flex flex-col">
-                @include('partials.app.topbar', ['accountButtonId' => 'profileDropdownBtn', 'accountMenuId' => 'profileMenu', 'bindBell' => true, 'search' => ['placeholder' => 'Search']])
+                @include('partials.app.topbar', ['accountButtonId' => 'profileDropdownBtn', 'accountMenuId' => 'profileMenu', 'bindBell' => true, 'bindAccount' => true, 'search' => ['placeholder' => 'Search']])
 
 
         <main class="flex-1 overflow-y-auto bg-gray-50 p-8">
@@ -41,10 +41,6 @@
                         <div>
                             <h2 id="activeRoomName" class="text-lg font-black text-gray-900">No active conversation</h2>
                             <p id="activeRoomMeta" class="text-xs text-gray-400">Search for a user or create a group to start chatting</p>
-                        </div>
-                        <div class="flex items-center gap-2 text-gray-400">
-                            <button type="button" class="rounded-lg border border-gray-200 px-2 py-1 text-xs">@include('partials.ui.icon', ['icon'=>'video','iconSize'=>16])</button>
-                            <button type="button" class="rounded-lg border border-gray-200 px-2 py-1 text-xs">@include('partials.ui.icon', ['icon'=>'phone','iconSize'=>16])</button>
                         </div>
                     </div>
 
@@ -157,8 +153,6 @@
     const groupNameError = document.getElementById('groupNameError');
     const groupMemberError = document.getElementById('groupMemberError');
     const selectedGroupMemberIds = new Set();
-    const dropdownBtn = document.getElementById('profileDropdownBtn');
-    const profileMenu = document.getElementById('profileMenu');
 
     function resetEmptyState() {
         activeRoomName.textContent = 'No active conversation';
@@ -167,7 +161,7 @@
         messageList.innerHTML = `
             <div class="flex h-full min-h-[360px] items-center justify-center">
                 <div class="max-w-sm text-center">
-                    <div class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gray-100 text-2xl text-gray-400">&#128172;</div>
+                    <div class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gray-100 text-2xl text-gray-400"><span class="inline-flex align-middle">@include('partials.ui.icon', ['icon' => 'message-square', 'iconSize' => 24])</span></div>
                     <h3 class="text-lg font-black text-gray-800">No conversations yet</h3>
                     <p class="mt-2 text-sm text-gray-400">Search for a user or create a group once the chat room setup is ready.</p>
                 </div>
@@ -209,7 +203,7 @@
         if (!filteredRooms.length) {
             roomList.innerHTML = `
                 <div class="rounded-2xl border border-dashed border-gray-200 bg-gray-50 p-6 text-center">
-                    <div class="mb-2 text-xl text-gray-300">&#128269;</div>
+                    <div class="mb-2 text-xl text-gray-300"><span class="inline-flex align-middle">@include('partials.ui.icon', ['icon' => 'search', 'iconSize' => 20])</span></div>
                     <h3 class="text-sm font-bold text-gray-700">No conversations found</h3>
                     <p class="mt-1 text-xs text-gray-400">Start by creating a room or adding users once the room manager is available.</p>
                 </div>
@@ -248,7 +242,7 @@
         if (!users.length) {
             roomList.innerHTML = `
                 <div class="rounded-2xl border border-dashed border-gray-200 bg-gray-50 p-6 text-center">
-                    <div class="mb-2 text-xl text-gray-300">&#128269;</div>
+                    <div class="mb-2 text-xl text-gray-300"><span class="inline-flex align-middle">@include('partials.ui.icon', ['icon' => 'search', 'iconSize' => 20])</span></div>
                     <h3 class="text-sm font-bold text-gray-700">No registered users found</h3>
                     <p class="mt-1 text-xs text-gray-400">Try another name, email, or barangay.</p>
                 </div>
@@ -673,7 +667,7 @@
                 ...doc.data()
             }));
 
-            chatStatus.textContent = 'Connected to Firebase chat.';
+            chatStatus.textContent = '';
             renderMessages(messages);
         }, (error) => {
             chatStatus.textContent = 'Chat connection failed. Check Firestore setup and rules.';
@@ -732,19 +726,6 @@
     confirmCreateGroupBtn?.addEventListener('click',createSelectedGroup);
     groupMemberSearch?.addEventListener('input',()=>renderGroupMemberChoices(groupMemberSearch.value));
     groupModal?.addEventListener('click',(event)=>{if(event.target===groupModal) closeGroupModal();});
-
-    if (dropdownBtn && profileMenu) {
-        dropdownBtn.addEventListener('click', (event) => {
-            event.stopPropagation();
-            profileMenu.classList.toggle('hidden');
-        });
-
-        window.addEventListener('click', (event) => {
-            if (!profileMenu.contains(event.target) && !dropdownBtn.contains(event.target)) {
-                profileMenu.classList.add('hidden');
-            }
-        });
-    }
 
     loadRooms();
 </script>

@@ -450,7 +450,7 @@
             commentsContainer.innerHTML=`
                 <div class="text-center py-12">
                     <div class="text-3xl mb-3">
-                        💬
+                        <span class="inline-flex align-middle">@include('partials.ui.icon', ['icon' => 'message-circle', 'iconSize' => 24])</span>
                     </div>
 
                     <p class="font-bold text-gray-600">
