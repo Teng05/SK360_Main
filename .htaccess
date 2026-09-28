@@ -1,0 +1,7 @@
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # The hosting document root is the repository root; Laravel's public
+    # directory contains the actual front controller and asset entry points.
+    RewriteRule ^(.*)$ public/$1 [L]
+</IfModule>
