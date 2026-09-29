@@ -14,7 +14,7 @@ class MobileDocumentController extends ArchiveController
         // Signed mobile links also preview reports from the current term.
         $document = $this->downloadableDocument($sourceType, $sourceId, false);
 
-        abort_unless($document, 404);
+        abort_unless($document !== null, 404);
 
         $filePath = $this->publicFilePath($document->uploaded_file_path ?? null)
             ?: $this->publicFilePath($document->generated_pdf_path ?? null);

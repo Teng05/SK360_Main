@@ -246,6 +246,35 @@ class ModuleController extends Controller
             ->route('sk_pres.module')
             ->with('status','Submission slot closed successfully.');
     }
+    public function reopen(int $slotId): RedirectResponse
+    {
+        abort_unless(auth()->check() && auth()->user()->role==='sk_president',403);
+        $currentTermId=$this->currentTermId();
+        if(!$currentTermId){
+            return back()->with('warning','There is no active administration term.');
+        }
+        $slot=DB::table('submission_slots')
+            ->where('slot_id',$slotId)
+            ->where('term_id',$currentTermId)
+            ->first();
+        if(!$slot){
+            return back()->with('warning','Submission slot was not found in the current administration.');
+        }
+        if($slot->status!=='closed'){
+            return back()->with('warning','Submission slot is already open.');
+        }
+        DB::table('submission_slots')
+            ->where('slot_id',$slotId)
+            ->where('term_id',$currentTermId)
+            ->where('status','closed')
+            ->update(['status'=>'open']);
+
+        return redirect()->route('sk_pres.module')->with(
+            'status',
+            'Submission slot reopened successfully. You can now edit its dates if the submission window needs to change.'
+        );
+    }
+
     public function update(Request $request,int $slotId,NotificationService $notifications): RedirectResponse
     {
         abort_unless(auth()->check() && auth()->user()->role==='sk_president',403);

@@ -246,14 +246,31 @@ class CalendarController extends Controller
         DB::table('events')
             ->where('event_id',$eventId)
             ->where('term_id',$currentTermId)
-            ->update([
-                ...$eventData,
-                'updated_at'=>now(),
-            ]);
+            ->update($eventData);
 
         return redirect()
             ->route('sk_pres.calendar')
             ->with('status','Event updated successfully.');
+    }
+
+    public function destroy(int $eventId): RedirectResponse
+    {
+        abort_unless(auth()->check() && auth()->user()->role==='sk_president',403);
+
+        $currentTermId=$this->currentTermId();
+        if(!$currentTermId){
+            return back()->with('warning','There is no active administration term.');
+        }
+
+        $deleted=DB::table('events')
+            ->where('event_id',$eventId)
+            ->where('term_id',$currentTermId)
+            ->delete();
+
+        return redirect()->route('sk_pres.calendar')->with(
+            $deleted ? 'status' : 'warning',
+            $deleted ? 'Event deleted successfully.' : 'Event was not found in the current administration.'
+        );
     }
 
     protected function validateEvent(Request $request): array

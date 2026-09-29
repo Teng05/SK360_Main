@@ -266,6 +266,7 @@
             </div>
 
             <div class="flex justify-end gap-3 pt-2">
+                <button id="deleteEventButton" type="button" class="hidden mr-auto rounded-xl border border-red-200 bg-white px-5 py-3 text-sm font-bold text-red-600 hover:bg-red-50">Delete Event</button>
                 <button id="cancelEventModalBtn" type="button" class="rounded-xl border border-gray-200 bg-white px-5 py-3 text-sm font-bold text-gray-600 hover:bg-gray-50">Cancel</button>
                 <button id="eventSubmitButton" type="submit" class="rounded-xl bg-red-600 hover:bg-red-700 text-white px-6 py-3 text-sm font-black transition">Save Event</button>
             </div>
@@ -287,6 +288,7 @@ const eventModal=document.getElementById('eventModal');
 const eventForm=document.getElementById('eventForm');
 const eventFormMethod=document.getElementById('eventFormMethod');
 const editingEventId=document.getElementById('editingEventId');
+const deleteEventButton=document.getElementById('deleteEventButton');
 const eventModalTitle=document.getElementById('eventModalTitle');
 const eventModalDescription=document.getElementById('eventModalDescription');
 const eventSubmitButton=document.getElementById('eventSubmitButton');
@@ -407,6 +409,7 @@ const formatDetailDate=(value,isSlot=false)=>{
 };
 
 const openCreateEventModal=()=>{
+    deleteEventButton.classList.add('hidden');
     eventForm.reset();
     eventForm.action=createEventUrl;
     eventFormMethod.disabled=true;
@@ -422,6 +425,7 @@ const openCreateEventModal=()=>{
 };
 
 const openEditEventModal=eventData=>{
+    deleteEventButton.classList.remove('hidden');
     eventForm.reset();
     eventForm.action=eventData.updateUrl;
     eventFormMethod.disabled=false;
@@ -477,6 +481,23 @@ const calendarEventData=event=>{
         visibilityLabel:props.visibility_label || 'Not specified'
     };
 };
+
+deleteEventButton.addEventListener('click',()=>{
+    if(!editingEventId.value || !window.confirm('Delete this event permanently? This cannot be undone.'))return;
+
+    const deleteForm=document.createElement('form');
+    deleteForm.method='POST';
+    deleteForm.action=calendarBaseUrl+'/'+encodeURIComponent(editingEventId.value);
+    const token=eventForm.querySelector('input[name="_token"]').cloneNode(true);
+    const method=document.createElement('input');
+    method.type='hidden';
+    method.name='_method';
+    method.value='DELETE';
+    deleteForm.append(token,method);
+    document.body.appendChild(deleteForm);
+    deleteEventButton.disabled=true;
+    deleteForm.submit();
+});
 
 openEventModalBtn.addEventListener('click',openCreateEventModal);
 closeEventModalBtn.addEventListener('click',()=>hideModal(eventModal));

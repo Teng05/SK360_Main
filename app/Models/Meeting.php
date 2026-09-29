@@ -33,6 +33,16 @@ class Meeting extends Model
         'scheduled_at' => 'datetime',
     ];
 
+    // Scheduled meetings stop accepting participation after their calendar day.
+    public function getStatusAttribute(?string $value): ?string
+    {
+        if ($value === 'scheduled' && $this->scheduled_at?->lt(Carbon::today(config('app.timezone')))) {
+            return 'completed';
+        }
+
+        return $value;
+    }
+
     // Combines meeting_date and meeting_time into one Carbon datetime.
     public function getScheduledAtAttribute(): ?Carbon
     {
@@ -67,11 +77,9 @@ class Meeting extends Model
     // Finds completed or already elapsed meetings for past-meeting lists.
     public function scopePast(Builder $query): Builder
     {
-        return $query->where('status', '!=', 'scheduled')
-            ->orWhere(function ($q) {
-                $q->where('status', 'scheduled')->where(function ($sub) {
-                    $sub->whereRaw("CONCAT(DATE(meeting_date), ' ', TIME(meeting_time)) < NOW()");
-                });
-            });
+        return $query->where(function (Builder $past) {
+            $past->where('status', '!=', 'scheduled')
+                ->orWhereDate('meeting_date', '<', Carbon::today(config('app.timezone'))->toDateString());
+        });
     }
 }

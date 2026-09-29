@@ -138,6 +138,7 @@ Route::middleware('auth')->prefix('sk_pres')->name('sk_pres.')->group(function()
     Route::post('/module',[ModuleController::class,'store'])->name('module.store');
     Route::put('/module/{slotId}',[ModuleController::class,'update'])->name('module.update');
     Route::patch('/module/{slotId}/close',[ModuleController::class,'close'])->name('module.close');
+    Route::patch('/module/{slotId}/reopen',[ModuleController::class,'reopen'])->name('module.reopen');
     Route::post('/module/{slotId}/delete',[ModuleController::class,'destroy'])->name('module.destroy');
 
     Route::get('/announcements',[AnnouncementController::class,'index'])->name('announcements');
@@ -150,6 +151,7 @@ Route::middleware('auth')->prefix('sk_pres')->name('sk_pres.')->group(function()
     Route::post('/calendar/live',[CalendarController::class,'storeLive'])->name('calendar.live.store');
     Route::post('/calendar',[CalendarController::class,'store'])->name('calendar.store');
     Route::put('/calendar/{eventId}',[CalendarController::class,'update'])->name('calendar.update');
+    Route::delete('/calendar/{eventId}',[CalendarController::class,'destroy'])->name('calendar.destroy');
 
     Route::get('/chat',[SkPresidentChatController::class,'index'])->name('chat');
     Route::get('/chat/users',[SkPresidentChatController::class,'searchUsers'])->name('chat.users');

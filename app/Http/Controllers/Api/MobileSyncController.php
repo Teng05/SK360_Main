@@ -600,6 +600,17 @@ class MobileSyncController extends Controller
         ]);
     }
 
+    public function deleteWallPost(Request $request, int $announcementId): JsonResponse
+    {
+        $announcement = DB::table('announcements')->where('announcement_id', $announcementId)->first();
+        if (! $announcement) return response()->json(['message' => 'Post not found.'], 404);
+        if ((int) $announcement->user_id !== (int) $request->user()->user_id && ! $this->isPresident($request->user())) {
+            return response()->json(['message' => 'You are not allowed to delete this post.'], 403);
+        }
+        DB::table('announcements')->where('announcement_id', $announcementId)->delete();
+        return response()->json(['message' => 'Post deleted.']);
+    }
+
     public function toggleWallLike(Request $request, int $announcementId): JsonResponse
     {
         $postExists = DB::table('announcements')
@@ -632,6 +643,15 @@ class MobileSyncController extends Controller
         return response()->json([
             'message' => $existing ? 'Post unliked.' : 'Post liked.',
             'liked' => ! $existing,
+            'likes_count' => Schema::hasTable('wall_post_likes')
+                ? DB::table('wall_post_likes')->where('announcement_id', $announcementId)->count()
+                : 0,
+            'feedback_count' => Schema::hasTable('announcement_feedback')
+                ? DB::table('announcement_feedback')
+                    ->where('announcement_id', $announcementId)
+                    ->where('status', 'posted')
+                    ->count()
+                : 0,
         ]);
     }
 
@@ -820,6 +840,16 @@ class MobileSyncController extends Controller
         ]);
 
         return response()->json(['message' => 'Event updated.', 'event_id' => $eventId]);
+    }
+
+    public function deleteEvent(Request $request, int $eventId): JsonResponse
+    {
+        if (! $this->isPresident($request->user())) {
+            return response()->json(['message' => 'Only SK President can delete calendar events.'], 403);
+        }
+        $deleted = DB::table('events')->where('event_id', $eventId)->delete();
+        if (! $deleted) return response()->json(['message' => 'Event not found.'], 404);
+        return response()->json(['message' => 'Event deleted.']);
     }
 
     // -----------------------------------------------------------------
@@ -1171,7 +1201,7 @@ class MobileSyncController extends Controller
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['nullable', 'email', 'max:255'],
-            'phone' => ['nullable', 'string', 'max:20'],
+            'phone' => ['nullable', 'regex:/^09\d{9}$/'],
             'term' => ['nullable', 'string', 'max:50'],
             'profile_img' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
         ]);
@@ -1241,7 +1271,7 @@ class MobileSyncController extends Controller
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['nullable', 'email', 'max:255'],
-            'phone' => ['nullable', 'string', 'max:20'],
+            'phone' => ['nullable', 'regex:/^09\d{9}$/'],
             'term' => ['nullable', 'string', 'max:50'],
             'profile_img' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
         ]);
@@ -1309,7 +1339,7 @@ class MobileSyncController extends Controller
             'first_name' => ['required', 'string', 'max:100'],
             'last_name' => ['required', 'string', 'max:100'],
             'email' => ['required', 'email', 'max:100', Rule::unique('users', 'email')->where(fn ($query) => $query->where('status', 'active')->whereNull('archived_at'))],
-            'phone' => ['nullable', 'string', 'max:20', 'unique:users,phone_number'],
+            'phone' => ['nullable', 'regex:/^09\d{9}$/', 'unique:users,phone_number'],
             'term' => ['nullable', 'string', 'max:50'],
         ]);
 
@@ -1406,7 +1436,7 @@ class MobileSyncController extends Controller
             'first_name' => ['required', 'string', 'max:100'],
             'last_name' => ['required', 'string', 'max:100'],
             'email' => ['required', 'email', 'max:100', Rule::unique('users', 'email')->where(fn ($query) => $query->where('status', 'active')->whereNull('archived_at'))],
-            'phone' => ['nullable', 'string', 'max:20', 'unique:users,phone_number'],
+            'phone' => ['nullable', 'regex:/^09\d{9}$/', 'unique:users,phone_number'],
             'barangay_id' => ['required', 'integer', 'exists:barangays,barangay_id'],
         ]);
 
@@ -1711,15 +1741,18 @@ class MobileSyncController extends Controller
             'status' => ['required', 'in:open,closed'],
             'role' => ['required', 'in:SK Chairman,SK Secretary,Both'],
         ]);
-        $updated = DB::table('submission_slots')->where('slot_id', $slotId)->update([
+        $changes = [
             'title' => $validated['title'],
             'description' => $validated['description'] ?? null,
             'start_date' => $validated['start_date'],
             'end_date' => $validated['end_date'],
             'status' => $validated['status'],
             'role' => $validated['role'],
-            'updated_at' => now(),
-        ]);
+        ];
+        if (Schema::hasColumn('submission_slots', 'updated_at')) {
+            $changes['updated_at'] = now();
+        }
+        $updated = DB::table('submission_slots')->where('slot_id', $slotId)->update($changes);
         if (! $updated) return response()->json(['message' => 'Submission slot not found.'], 404);
         return response()->json(['message' => 'Submission slot updated.']);
     }
@@ -1809,10 +1842,53 @@ class MobileSyncController extends Controller
         $key = $v['source_type'] === 'budget_report' ? 'budget_report_id' : 'report_id';
         $submission = DB::table($table)->where($key, $v['source_id'])->first();
         if (!$submission) return response()->json(['message' => 'Submission not found.'], 404);
+        $existingReview = DB::table('submission_quality_reviews')
+            ->where('source_type', $v['source_type'])
+            ->where('source_id', $v['source_id'])
+            ->first();
+        if ($existingReview && $existingReview->status === 'approved' && $v['status'] === 'needs_revision') {
+            return response()->json(['message' => 'This document has already been approved and cannot be changed to Needs Revision.'], 422);
+        }
         DB::table('submission_quality_reviews')->updateOrInsert(
             ['source_type' => $v['source_type'], 'source_id' => $v['source_id']],
             ['barangay_id' => $submission->barangay_id, 'reviewer_id' => $request->user()->user_id, 'status' => $v['status'], 'complete_contents' => (bool)($v['complete_contents'] ?? false), 'correct_document' => (bool)($v['correct_document'] ?? false), 'correct_period' => (bool)($v['correct_period'] ?? false), 'remarks' => $v['remarks'] ?? null, 'reviewed_at' => now(), 'updated_at' => now()]
         );
+        if ($v['status'] === 'approved' && (!$existingReview || $existingReview->status !== 'approved')) {
+            $slot = !empty($submission->slot_id)
+                ? DB::table('submission_slots')->where('term_id', $submission->term_id)->where('slot_id', $submission->slot_id)->first()
+                : null;
+            $action = null;
+            if ($v['source_type'] === 'accomplishment_report') {
+                $action = match ($slot?->accomplishment_category) {
+                    'youth_development_program' => RankingPointsService::YOUTH_DEVELOPMENT_PROGRAM_APPROVED,
+                    'kk_assembly' => RankingPointsService::KK_ASSEMBLY_APPROVED,
+                    default => null,
+                };
+            } else {
+                $category = $submission->budget_category ?? $slot?->budget_category;
+                $periodType = $submission->budget_period_type ?? $slot?->budget_period_type;
+                $action = $category === 'annual_budget'
+                    ? RankingPointsService::ANNUAL_BUDGET_APPROVED
+                    : ($category === 'coa_report' ? match ($periodType) {
+                        'monthly' => RankingPointsService::COA_MONTHLY_APPROVED,
+                        'quarterly' => RankingPointsService::COA_QUARTERLY_APPROVED,
+                        'semi_annual' => RankingPointsService::COA_SEMI_ANNUAL_APPROVED,
+                        'annual' => RankingPointsService::COA_ANNUAL_APPROVED,
+                        default => null,
+                    } : null);
+            }
+            $period = $submission->submitted_at ?? $submission->created_at ?? null;
+            if ($action && $period) {
+                app(RankingPointsService::class)->award(
+                    (int) $submission->barangay_id,
+                    $action,
+                    $v['source_type'],
+                    (int) $v['source_id'],
+                    (int) $request->user()->user_id,
+                    Carbon::parse($period)->format('F Y')
+                );
+            }
+        }
         return response()->json(['message' => 'Quality review saved.', 'status' => $v['status']]);
     }
 
@@ -2166,6 +2242,9 @@ class MobileSyncController extends Controller
         );
 
         return array_map(function ($meeting) {
+            $model = new Meeting();
+            $model->setRawAttributes((array) $meeting, true);
+            $meeting->status = $model->status;
             $meeting->call_url = url("/sk_pres/meetings/{$meeting->meeting_id}/call");
 
             return $meeting;
@@ -2180,13 +2259,13 @@ class MobileSyncController extends Controller
 
         $query = DB::table('notifications')
             ->where('user_id', $user->user_id);
-
-        return $this->finish(
-            $query,
-            'notifications',
-            $since,
-            'notification_id'
-        );
+        $this->applySince($query, 'notifications', $since);
+        return $query
+            ->orderByDesc('created_at')
+            ->orderByDesc('notification_id')
+            ->limit(20)
+            ->get()
+            ->all();
     }
 
     protected function reportSubmissions(User $user, ?Carbon $since): array
@@ -2893,9 +2972,7 @@ class MobileSyncController extends Controller
 
     protected function meetingUnavailable(Meeting $meeting): bool
     {
-        // A scheduled meeting remains joinable after its start time until the
-        // President explicitly ends it. Checking scheduled_at here prevented
-        // participants from joining once the meeting actually began.
+        // The model also treats scheduled meetings from previous days as completed.
         return $meeting->status === 'completed';
     }
 
@@ -2934,7 +3011,13 @@ class MobileSyncController extends Controller
     // -----------------------------------------------------------------
     protected function consolidationFilters(Request $request): array
     {
-        $year = (int) $request->query('year', now()->year);
+        $term = $this->mobileCurrentTerm();
+        $defaultYear = $term
+            ? (int) (DB::table('accomplishment_reports')->where('term_id', $term->term_id)->max('reporting_year')
+                ?: DB::table('budget_reports')->where('term_id', $term->term_id)->max('fiscal_year')
+                ?: now()->year)
+            : now()->year;
+        $year = (int) $request->query('year', $defaultYear);
         $period = (string) $request->query('period', 'all');
         $month = (int) $request->query('month', now()->month);
         $quarter = (string) $request->query(
