@@ -1200,7 +1200,7 @@ class MobileSyncController extends Controller
 
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
-            'email' => ['nullable', 'email', 'max:255'],
+            'email' => ['nullable', 'email', 'max:255', Rule::unique('users', 'email')->where(fn ($query) => $query->where('status', 'active')->whereNull('archived_at'))],
             'phone' => ['nullable', 'regex:/^09\d{9}$/'],
             'term' => ['nullable', 'string', 'max:50'],
             'profile_img' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
@@ -1752,8 +1752,13 @@ class MobileSyncController extends Controller
         if (Schema::hasColumn('submission_slots', 'updated_at')) {
             $changes['updated_at'] = now();
         }
-        $updated = DB::table('submission_slots')->where('slot_id', $slotId)->update($changes);
-        if (! $updated) return response()->json(['message' => 'Submission slot not found.'], 404);
+        $slotQuery = DB::table('submission_slots')->where('slot_id', $slotId);
+        if (! $slotQuery->exists()) {
+            return response()->json(['message' => 'Submission slot not found.'], 404);
+        }
+        // update() returns 0 when the submitted values are identical. That
+        // still means the slot exists and the request was handled correctly.
+        $slotQuery->update($changes);
         return response()->json(['message' => 'Submission slot updated.']);
     }
 

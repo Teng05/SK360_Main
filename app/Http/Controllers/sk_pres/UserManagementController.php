@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
+use Illuminate\Validation\Rule;
 class UserManagementController extends Controller
 {
     public function index(): View
@@ -68,7 +69,7 @@ class UserManagementController extends Controller
         $validated=$request->validateWithBag('singleAdd',[
             'first_name'=>['required','string','max:100'],
             'last_name'=>['required','string','max:100'],
-            'email'=>['required','email','max:100','unique:users,email'],
+            'email'=>['required','email','max:100',Rule::unique('users','email')->where(fn ($query) => $query->where('status','active')->whereNull('archived_at'))],
             'phone_number'=>['nullable','string','max:20','unique:users,phone_number'],
             'barangay_id'=>['required','integer','exists:barangays,barangay_id'],
         ],[
