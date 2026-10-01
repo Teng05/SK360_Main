@@ -493,6 +493,8 @@ class LeadershipController extends Controller
             'secretary_last_name'=>['required','string','max:100'],
             'secretary_email'=>['required','email','max:100','unique:users,email'],
             'secretary_phone'=>['nullable','string','max:20','unique:users,phone_number'],
+        ],[
+            'secretary_email.unique'=>'This email is already registered. If this official was previously archived, use Leadership History to reappoint the official instead.',
         ]);
 
         $existing=DB::table('official_terms')
