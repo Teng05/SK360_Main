@@ -3,6 +3,8 @@
 namespace Tests\Feature;
 
 use App\Http\Controllers\sk_pres\AnnouncementController;
+use App\Http\Controllers\sk_pres\CalendarController;
+use App\Http\Controllers\sk_pres\ModuleController;
 use App\Http\Controllers\sk_pres\ConsolidationController;
 use App\Models\User;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -48,6 +50,86 @@ class PresidentModuleActionsTest extends TestCase
         DB::table('announcements')->insert([
             ['announcement_id'=>10,'term_id'=>2],['announcement_id'=>20,'term_id'=>1],
         ]);
+    }
+
+    public function test_reopen_slot_preserves_dates_and_only_changes_current_term(): void
+    {
+        Schema::create('submission_slots',function(Blueprint $table){
+            $table->integer('slot_id');
+            $table->integer('term_id');
+            $table->string('status');
+            $table->date('end_date');
+        });
+        DB::table('submission_slots')->insert([
+            ['slot_id'=>10,'term_id'=>2,'status'=>'closed','end_date'=>'2026-01-01'],
+            ['slot_id'=>20,'term_id'=>1,'status'=>'closed','end_date'=>'2026-01-01'],
+        ]);
+        $controller=new ModuleController();
+        $response=$controller->reopen(10);
+        $this->assertSame(route('sk_pres.module'),$response->getTargetUrl());
+        $this->assertDatabaseHas('submission_slots',['slot_id'=>10,'status'=>'open','end_date'=>'2026-01-01']);
+        $controller->reopen(10);
+        $this->assertDatabaseHas('submission_slots',['slot_id'=>10,'status'=>'open']);
+        $controller->reopen(20);
+        $this->assertDatabaseHas('submission_slots',['slot_id'=>20,'status'=>'closed']);
+        DB::table('submission_slots')->where('slot_id',10)->update(['status'=>'closed']);
+        DB::table('administration_terms')->update(['status'=>'completed']);
+        $controller->reopen(10);
+        $this->assertDatabaseHas('submission_slots',['slot_id'=>10,'status'=>'closed']);
+        $route=app('router')->getRoutes()->getByName('sk_pres.module.reopen');
+        $this->assertSame(['PATCH'],$route->methods());
+    }
+
+    public function test_reopen_slot_rejects_non_president(): void
+    {
+        $user=new User();
+        $user->forceFill(['user_id'=>2,'role'=>'sk_chairman']);
+        $this->actingAs($user);
+        try {
+            (new ModuleController())->reopen(10);
+            $this->fail('Reopening slots should be forbidden.');
+        } catch(HttpException $exception) {
+            $this->assertSame(403,$exception->getStatusCode());
+        }
+    }
+
+    public function test_calendar_delete_only_removes_selected_current_term_event(): void
+    {
+        Schema::create('events',function(Blueprint $table){
+            $table->integer('event_id');
+            $table->integer('term_id');
+        });
+        DB::table('events')->insert([
+            ['event_id'=>10,'term_id'=>2],
+            ['event_id'=>11,'term_id'=>2],
+            ['event_id'=>20,'term_id'=>1],
+        ]);
+
+        $controller=new CalendarController();
+        $response=$controller->destroy(10);
+        $this->assertSame(route('sk_pres.calendar'),$response->getTargetUrl());
+        $this->assertDatabaseMissing('events',['event_id'=>10]);
+        $this->assertDatabaseHas('events',['event_id'=>11]);
+        $controller->destroy(20);
+        $this->assertDatabaseHas('events',['event_id'=>20]);
+        DB::table('administration_terms')->update(['status'=>'completed']);
+        $controller->destroy(11);
+        $this->assertDatabaseHas('events',['event_id'=>11]);
+        $route=app('router')->getRoutes()->getByName('sk_pres.calendar.destroy');
+        $this->assertSame(['DELETE'],$route->methods());
+    }
+
+    public function test_calendar_delete_rejects_non_president(): void
+    {
+        $user=new User();
+        $user->forceFill(['user_id'=>2,'role'=>'sk_chairman']);
+        $this->actingAs($user);
+        try {
+            (new CalendarController())->destroy(10);
+            $this->fail('Calendar deletion should be forbidden.');
+        } catch(HttpException $exception) {
+            $this->assertSame(403,$exception->getStatusCode());
+        }
     }
 
     public function test_delete_removes_only_selected_current_term_announcement_and_its_interactions(): void

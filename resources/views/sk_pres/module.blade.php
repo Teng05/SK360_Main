@@ -427,6 +427,11 @@
                                                     data-start-date="{{ $slot->start_date }}"
                                                     data-end-date="{{ $slot->end_date }}">@include('partials.ui.icon', ['icon'=>'pencil','iconSize'=>14]) Edit</button>
                                                 <button type="button" onclick="closeSlot({{ $slot->slot_id }},@js($slot->title))" class="sk-btn sk-btn--dark sk-btn--sm">@include('partials.ui.icon', ['icon'=>'lock','iconSize'=>14]) Close Slot</button>
+                                            @elseif($slot->status==='closed')
+                                                <form method="POST" action="{{ route('sk_pres.module.reopen',$slot->slot_id) }}" onsubmit="return confirm('Reopen this submission slot? Its existing dates will still apply. You can edit them after reopening.');">
+                                                    @csrf
+                                                    @method('PATCH')
+                                                    <button type="submit" class="sk-btn sk-btn--secondary sk-btn--sm">@include('partials.ui.icon', ['icon'=>'lock-open','iconSize'=>14]) Reopen Slot</button>
                                             @endif
                                         </div>
                                         @if($slot->status==='open')
