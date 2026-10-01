@@ -11,7 +11,6 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
-use Illuminate\Validation\Rule;
 
 class LeadershipController extends Controller
 {
@@ -492,7 +491,7 @@ class LeadershipController extends Controller
         $validated=$request->validateWithBag('secretaryAdd',[
             'secretary_first_name'=>['required','string','max:100'],
             'secretary_last_name'=>['required','string','max:100'],
-            'secretary_email'=>['required','email','max:100',Rule::unique('users','email')->where(fn ($query) => $query->where('status','active')->whereNull('archived_at'))],
+            'secretary_email'=>['required','email','max:100','unique:users,email'],
             'secretary_phone'=>['nullable','string','max:20','unique:users,phone_number'],
         ],[
             'secretary_email.unique'=>'This email is already registered. If this official was previously archived, use Leadership History to reappoint the official instead.',
