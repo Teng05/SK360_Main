@@ -146,9 +146,10 @@ class ModuleController extends Controller
             ->where('slot_id',$slotId)
             ->where('term_id',$currentTermId)
             ->where('status','open')
-            ->update([
+            ->update(array_filter([
                 'status'=>'closed',
-            ]);
+                'updated_at'=>Schema::hasColumn('submission_slots','updated_at') ? now() : null,
+            ], fn($value) => $value !== null));
         $payload=$this->modulePayload();
         $payload['message']='Submission slot closed successfully.';
         return response()->json($payload);
@@ -268,7 +269,10 @@ class ModuleController extends Controller
             ->where('slot_id',$slotId)
             ->where('term_id',$currentTermId)
             ->where('status','closed')
-            ->update(['status'=>'open', 'end_date'=>now('Asia/Manila')->toDateString()]);
+            ->update(array_filter([
+                'status'=>'open', 'end_date'=>now('Asia/Manila')->toDateString(),
+                'updated_at'=>Schema::hasColumn('submission_slots','updated_at') ? now() : null,
+            ], fn($value) => $value !== null));
 
         return redirect()->route('sk_pres.module')->with(
             'status',
@@ -314,6 +318,9 @@ class ModuleController extends Controller
             $changes['status'],
             $changes['created_at']
         );
+        if(Schema::hasColumn('submission_slots','updated_at')){
+            $changes['updated_at']=now();
+        }
         DB::table('submission_slots')
             ->where('slot_id',$slotId)
             ->where('term_id',$currentTermId)
@@ -324,7 +331,6 @@ class ModuleController extends Controller
             'submission_type'=>$validated['submission_type'],
             'title'=>$validated['submission_title'],
             'role'=>$validated['submission_role'],
-            'start_date'=>$validated['start_date'],
             'end_date'=>$validated['end_date'],
         ],auth()->user());
         return redirect()
@@ -469,7 +475,7 @@ class ModuleController extends Controller
                 Rule::in(['H1','H2']),
             ],
             'submission_title'=>['required','string','max:255'],
-            'description'=>['required','string','max:2000'],
+            'description'=>['nullable','string','max:2000'],
             'submission_role'=>['required','in:SK Chairman,SK Secretary,Both'],
             'start_date'=>['required','date'],
             'end_date'=>['required','date','after_or_equal:start_date'],
@@ -484,7 +490,6 @@ class ModuleController extends Controller
             'fiscal_quarter.required'=>'Quarter is required.',
             'fiscal_half.required'=>'Semi-annual period is required.',
             'submission_title.required'=>'Submission title is required.',
-            'description.required'=>'Description is required.',
             'submission_role.required'=>'Authorized submission role is required.',
             'start_date.required'=>'Start date is required.',
             'end_date.required'=>'Submission deadline is required.',

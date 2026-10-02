@@ -45,14 +45,8 @@ function openWallComments(id, title, comments) {
 function closeWallComments(){ const m=document.getElementById('wallCommentModal'); m.classList.add('hidden'); m.classList.remove('flex'); }
 function escapeWallComment(value){ const d=document.createElement('div'); d.textContent=value || ''; return d.innerHTML; }
 function editWallPost(id, currentContent) {
-    const content = window.prompt('Edit post:', currentContent);
-    if (content === null || !content.trim()) return;
-    const form = document.createElement('form');
-    form.method = 'POST';
-    form.action = `{{ url('/wall/posts') }}/${id}`;
-    form.innerHTML = `@csrf<input type="hidden" name="_method" value="PUT"><input type="hidden" name="post_content">`;
-    form.querySelector('[name="post_content"]').value = content;
-    document.body.appendChild(form);
-    form.submit();
+    const overlay=document.createElement('div'); overlay.className='fixed inset-0 z-[120] flex items-center justify-center bg-black/50 p-4';
+    overlay.innerHTML=`<div class="w-full max-w-2xl overflow-hidden rounded-3xl bg-white shadow-2xl"><div class="flex items-center justify-between border-b px-6 py-5"><div><p class="text-[10px] font-black uppercase tracking-widest text-red-600">Edit Announcement</p><h2 class="mt-1 text-2xl font-black text-gray-900">Edit Post</h2></div><button type="button" class="edit-close h-9 w-9 rounded-full bg-gray-100 text-xl">&times;</button></div><div class="px-6 py-5"><div class="mb-5 flex items-center gap-3"><span class="flex h-12 w-12 items-center justify-center rounded-full bg-red-50 font-black text-red-600">{{ $wallInitials($fullName ?? '') }}</span><div><p class="font-black text-gray-900">{{ $fullName ?? 'SK Official' }}</p><p class="text-sm text-gray-500">🌐 Public · SK community</p></div></div><textarea maxlength="5000" class="edit-content min-h-[260px] w-full resize-none rounded-2xl border border-gray-200 px-5 py-4 text-lg leading-relaxed focus:border-red-400 focus:outline-none">${escapeWallComment(currentContent)}</textarea><div class="mt-2 text-right text-xs text-gray-400"><span class="edit-count">0</span>/5000</div><p class="mt-3 text-sm text-gray-500">This post will be visible to everyone in the SK community.</p></div><div class="flex justify-end gap-3 border-t bg-gray-50 px-6 py-4"><button type="button" class="edit-cancel rounded-xl border px-5 py-3 font-bold text-gray-600">Cancel</button><button type="button" class="edit-save rounded-xl bg-red-600 px-6 py-3 font-bold text-white">Save</button></div></div>`;
+    document.body.appendChild(overlay); const area=overlay.querySelector('.edit-content'); const count=overlay.querySelector('.edit-count'); const close=()=>overlay.remove(); const update=()=>count.textContent=area.value.length; update(); area.addEventListener('input',update); overlay.querySelector('.edit-close').onclick=close; overlay.querySelector('.edit-cancel').onclick=close; overlay.querySelector('.edit-save').onclick=()=>{if(!area.value.trim())return; const form=document.createElement('form'); form.method='POST'; form.action=`{{ url('/wall/posts') }}/${id}`; form.innerHTML=`@csrf<input type="hidden" name="_method" value="PUT"><input type="hidden" name="post_content">`; form.querySelector('[name="post_content"]').value=area.value; document.body.appendChild(form); form.submit();}; area.focus(); area.selectionStart=area.selectionEnd=area.value.length;
 }
 </script>

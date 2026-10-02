@@ -929,11 +929,7 @@
         }
     }
 function editWallPost(id, currentContent){
-    const content=window.prompt('Edit post:', currentContent);
-    if(content===null || !content.trim()) return;
-    const form=document.createElement('form'); form.method='POST'; form.action=`{{ url('/wall/posts') }}/${id}`;
-    form.innerHTML=`@csrf<input type="hidden" name="_method" value="PUT"><input type="hidden" name="post_content">`;
-    form.querySelector('[name="post_content"]').value=content; document.body.appendChild(form); form.submit();
+    const overlay=document.createElement('div'); overlay.className='fixed inset-0 z-[120] flex items-center justify-center bg-black/50 p-4'; overlay.innerHTML=`<div class="w-full max-w-2xl overflow-hidden rounded-3xl bg-white shadow-2xl"><div class="flex items-center justify-between border-b px-6 py-5"><h2 class="text-2xl font-black">Edit Announcement</h2><button type="button" class="edit-close text-2xl">&times;</button></div><div class="px-6 py-5"><p class="mb-4 font-black">{{ auth()->user()->first_name }} {{ auth()->user()->last_name }}</p><p class="mb-3 text-sm text-gray-500">🌐 Public · SK community</p><textarea maxlength="5000" class="edit-content min-h-[280px] w-full resize-none rounded-2xl border px-5 py-4 text-lg">${escapeHtml(currentContent)}</textarea><div class="text-right text-xs text-gray-400"><span class="edit-count">0</span>/5000</div></div><div class="flex justify-end gap-3 border-t bg-gray-50 px-6 py-4"><button type="button" class="edit-cancel rounded-xl border px-5 py-3">Cancel</button><button type="button" class="edit-save rounded-xl bg-red-600 px-6 py-3 font-bold text-white">Save</button></div></div>`; document.body.appendChild(overlay); const a=overlay.querySelector('.edit-content'), n=overlay.querySelector('.edit-count'), close=()=>overlay.remove(); const update=()=>n.textContent=a.value.length; update(); a.addEventListener('input',update); overlay.querySelector('.edit-close').onclick=close; overlay.querySelector('.edit-cancel').onclick=close; overlay.querySelector('.edit-save').onclick=()=>{if(!a.value.trim())return; const f=document.createElement('form'); f.method='POST'; f.action=`{{ url('/wall/posts') }}/${id}`; f.innerHTML=`@csrf<input type="hidden" name="_method" value="PUT"><input type="hidden" name="post_content">`; f.querySelector('[name="post_content"]').value=a.value; document.body.appendChild(f); f.submit();}; a.focus(); a.selectionStart=a.selectionEnd=a.value.length;
 }
 </script>
 @endpush

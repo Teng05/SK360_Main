@@ -27,8 +27,12 @@ class SubmissionSlotService
 
     public function expireOldSlots(): void
     {
+        $changes = ['status' => 'closed'];
+        if (\Illuminate\Support\Facades\Schema::hasColumn('submission_slots', 'updated_at')) {
+            $changes['updated_at'] = now();
+        }
         DB::table('submission_slots')->where('status', 'open')
-            ->whereDate('end_date', '<', $this->today())->update(['status' => 'closed']);
+            ->whereDate('end_date', '<', $this->today())->update($changes);
     }
 
     public function chairmanReportSlots(int $barangayId): Collection

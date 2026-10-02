@@ -37,6 +37,17 @@ class NotificationService
             ]
         );
     }
+    public function notifySubmissionSlotUpdated(array $slot, User $actor): void
+    {
+        $roles = $this->submissionRoles((string)($slot['role'] ?? 'Both'));
+        $targetType = ($slot['submission_type'] ?? '') === 'budget_report' ? 'budget_slot' : 'report_slot';
+        $this->createForRoles($roles, $actor, [
+            'type' => $targetType,
+            'title' => 'Submission slot updated',
+            'message' => ($slot['title'] ?? 'Submission') . ' was updated. New deadline: ' . ($slot['end_date'] ?? ''),
+            'slot_id' => (int)($slot['slot_id'] ?? 0),
+        ]);
+    }
     public function notifySubmissionReceived(object $submission,string $sourceType,User $actor): void
     {
         $this->notifyPresidentOfSubmission(
