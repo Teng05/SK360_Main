@@ -3,7 +3,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Budget Template</title>
+    <title>SK 360° | Budget Template</title>
     <style>
         body { font-family: Arial, sans-serif; margin: 24px; color: #111; }
         table { width: 100%; border-collapse: collapse; }

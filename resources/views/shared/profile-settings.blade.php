@@ -1,7 +1,7 @@
 {{-- File guide: Shared profile settings page for SK President, Chairman, and Secretary. --}}
 @extends('layouts.app')
 
-@section('title','Profile Settings | SK 360°')
+@section('title','SK 360° | Profile Settings')
 
 @section('page_css')
 <script src="https://cdn.tailwindcss.com"></script>

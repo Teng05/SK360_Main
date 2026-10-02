@@ -1,6 +1,6 @@
 {{-- File guide: Blade view template for resources/views/sk_pres/module.blade.php. --}}
 @extends('layouts.app')
-@section('title','SK 360 Dashboard')
+@section('title','SK 360° | Module Management')
 @section('page_css')
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>

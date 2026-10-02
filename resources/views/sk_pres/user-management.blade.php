@@ -1,6 +1,6 @@
 {{-- File guide: Blade view template for resources/views/sk_pres/user-management.blade.php. --}}
 @extends('layouts.app')
-@section('title','SK 360 User Management')
+@section('title','SK 360° | User Management')
 @section('page_css')
 <script src="https://cdn.tailwindcss.com"></script>
 @endsection

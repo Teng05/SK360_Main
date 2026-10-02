@@ -1,7 +1,7 @@
 {{-- File guide: View-only leadership directory for resources/views/sk_pres/leadership.blade.php. --}}
 @extends('layouts.app')
 
-@section('title','SK 360 Leadership')
+@section('title','SK 360° | Leadership')
 
 @section('page_css')
 <script src="https://cdn.tailwindcss.com"></script>

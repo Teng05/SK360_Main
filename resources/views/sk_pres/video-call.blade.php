@@ -1,6 +1,6 @@
 {{-- File guide: Blade view template for resources/views/sk_pres/video-call.blade.php. --}}
 @extends('layouts.app')
-@section('title','Meeting Call')
+@section('title','SK 360° | Meeting Call')
 @section('page_css')
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://download.agora.io/sdk/release/AgoraRTC_N.js"></script>

@@ -3,7 +3,7 @@
 <html>
 <head>
     <meta charset="utf-8">
-    <title>Consolidated Reports</title>
+    <title>SK 360° | Consolidated Reports</title>
     <style>
         body { font-family: DejaVu Sans, sans-serif; color: #111827; font-size: 11px; }
         h1 { font-size: 22px; margin: 0 0 4px; }

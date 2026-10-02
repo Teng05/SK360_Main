@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'SK 360 Chat')
+@section('title', 'SK 360° | Chat')
 
 @section('page_css')
     <script src="https://cdn.tailwindcss.com"></script>

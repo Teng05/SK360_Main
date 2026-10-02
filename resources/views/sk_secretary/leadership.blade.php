@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title','SK Secretary Leadership')
+@section('title','SK 360° | Leadership')
 
 @section('page_css')
 <script src="https://cdn.tailwindcss.com"></script>

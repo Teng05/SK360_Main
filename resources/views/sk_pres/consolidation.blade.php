@@ -1,7 +1,7 @@
 {{-- File guide: Blade view template for resources/views/sk_pres/consolidation.blade.php. --}}
 @extends('layouts.app')
 
-@section('title', 'Report Consolidation')
+@section('title', 'SK 360° | Report Consolidation')
 
 @section('page_css')
 <script src="https://cdn.tailwindcss.com"></script>

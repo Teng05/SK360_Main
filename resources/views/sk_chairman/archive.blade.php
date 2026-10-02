@@ -1,7 +1,7 @@
 {{-- File guide: Blade view template for resources/views/sk_chairman/archive.blade.php. --}}
 @extends('layouts.app')
 
-@section('title','SK 360 Archive')
+@section('title','SK 360° | Archive')
 
 @section('page_css')
 <script src="https://cdn.tailwindcss.com"></script>

@@ -2,7 +2,7 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>Event Record</title>
+    <title>SK 360° | Event Record</title>
     <style>
         *{box-sizing:border-box}
         body{font-family:DejaVu Sans,sans-serif;color:#1f2937;font-size:12px;margin:32px}

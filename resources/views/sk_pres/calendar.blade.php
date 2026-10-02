@@ -1,7 +1,7 @@
 {{-- File guide: Blade view template for resources/views/sk_pres/calendar.blade.php. --}}
 @extends('layouts.app')
 
-@section('title', 'Event Calendar')
+@section('title', 'SK 360° | Event Calendar')
 
 @section('page_css')
 <script src="https://cdn.tailwindcss.com"></script>
