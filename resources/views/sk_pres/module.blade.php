@@ -210,7 +210,7 @@
                         </div>
                         <div>
                             <label class="block text-lg font-semibold text-gray-900 mb-2">Description</label>
-                            <input type="text" id="submissionDescription" name="description" maxlength="2000" required class="w-full h-14 px-4 rounded-xl border border-red-300 bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-400" value="{{ old('description') }}">
+                            <input type="text" id="submissionDescription" name="description" maxlength="2000" class="w-full h-14 px-4 rounded-xl border border-red-300 bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-400" value="{{ old('description') }}">
                         </div>
                         <div>
                             <label class="block text-lg font-semibold text-gray-900 mb-2">Who Can Submit</label>
