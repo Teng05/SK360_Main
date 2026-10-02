@@ -566,7 +566,7 @@ class MobileSyncController extends Controller
             return response()->json(['message' => 'Announcement not found.'], 404);
         }
 
-        if ((int) $announcement->user_id !== (int) $request->user()->user_id && ! $this->isPresident($request->user())) {
+        if ((int) $announcement->user_id !== (int) $request->user()->user_id) {
             return response()->json(['message' => 'You are not allowed to edit this announcement.'], 403);
         }
 
@@ -604,7 +604,7 @@ class MobileSyncController extends Controller
     {
         $announcement = DB::table('announcements')->where('announcement_id', $announcementId)->first();
         if (! $announcement) return response()->json(['message' => 'Post not found.'], 404);
-        if ((int) $announcement->user_id !== (int) $request->user()->user_id && ! $this->isPresident($request->user())) {
+        if ((int) $announcement->user_id !== (int) $request->user()->user_id) {
             return response()->json(['message' => 'You are not allowed to delete this post.'], 403);
         }
         DB::table('announcements')->where('announcement_id', $announcementId)->delete();
@@ -1512,6 +1512,11 @@ class MobileSyncController extends Controller
     {
         $user = $request->user();
 
+        DB::table('submission_slots')
+            ->where('status', 'open')
+            ->whereDate('end_date', '<', now()->toDateString())
+            ->update(['status' => 'closed']);
+
         if (! in_array($user->role, ['sk_chairman', 'sk_secretary'], true)) {
             return response()->json(['message' => 'Only SK Chairman or SK Secretary can submit reports.'], 403);
         }
@@ -1653,6 +1658,11 @@ class MobileSyncController extends Controller
             return response()->json(['message' => 'Only SK President can manage submission slots.'], 403);
         }
 
+        DB::table('submission_slots')
+            ->where('status', 'open')
+            ->whereDate('end_date', '<', now()->toDateString())
+            ->update(['status' => 'closed']);
+
         $slots = DB::table('submission_slots')
             ->orderByDesc('created_at')
             ->get();
@@ -1680,9 +1690,12 @@ class MobileSyncController extends Controller
             'submission_role' => ['required', 'in:SK Chairman,SK Secretary,Both'],
             'start_date' => ['required', 'date'],
             'end_date' => ['required', 'date', 'after_or_equal:start_date'],
+            'budget_category' => ['nullable', 'string', 'max:100'],
+            'fiscal_year' => ['nullable', 'integer', 'min:2000', 'max:2100'],
+            'budget_period_type' => ['nullable', 'in:monthly,quarterly,semi_annual,annual'],
         ]);
 
-        $slotId = DB::table('submission_slots')->insertGetId([
+        $slotData = [
             ...$this->mobileTermData('submission_slots'),
             'submission_type' => $validated['submission_type'],
             'title' => $validated['submission_title'],
@@ -1692,7 +1705,13 @@ class MobileSyncController extends Controller
             'end_date' => $validated['end_date'],
             'status' => 'open',
             'created_at' => now(),
-        ], 'slot_id');
+        ];
+        foreach (['budget_category', 'fiscal_year', 'budget_period_type'] as $field) {
+            if (Schema::hasColumn('submission_slots', $field) && array_key_exists($field, $validated)) {
+                $slotData[$field] = $validated[$field];
+            }
+        }
+        $slotId = DB::table('submission_slots')->insertGetId($slotData, 'slot_id');
 
         $notifications->notifySubmissionSlotCreated([
             'submission_type' => $validated['submission_type'],

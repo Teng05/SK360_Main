@@ -19,6 +19,7 @@ class ModuleController extends Controller
     public function index(): View
     {
         abort_unless(auth()->check() && auth()->user()->role==='sk_president',403);
+        app(\App\Services\SubmissionSlotService::class)->expireOldSlots();
         $user=auth()->user();
         $fullName=trim(($user->first_name ?? '').' '.($user->last_name ?? '')) ?: 'User';
         $currentTermId=$this->currentTermId();
@@ -267,7 +268,7 @@ class ModuleController extends Controller
             ->where('slot_id',$slotId)
             ->where('term_id',$currentTermId)
             ->where('status','closed')
-            ->update(['status'=>'open']);
+            ->update(['status'=>'open', 'end_date'=>now('Asia/Manila')->toDateString()]);
 
         return redirect()->route('sk_pres.module')->with(
             'status',

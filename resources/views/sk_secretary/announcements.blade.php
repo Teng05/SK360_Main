@@ -169,6 +169,15 @@
                                             <span class="inline-flex align-[-3px]">@include('partials.ui.icon', ['icon' => 'globe', 'iconSize' => 16])</span> Public
                                         </span>
                                     @endif
+                                    @if((int) $announcement->user_id === (int) auth()->id())
+                                        <details class="relative shrink-0">
+                                            <summary class="flex h-9 w-9 cursor-pointer list-none items-center justify-center rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50">⋮</summary>
+                                            <div class="absolute right-0 top-full z-20 mt-2 w-36 rounded-xl border border-gray-100 bg-white p-1.5 shadow-lg">
+                                                <button type="button" class="w-full rounded-lg px-3 py-2 text-left text-sm font-semibold hover:bg-gray-50" onclick="editWallPost({{ $announcement->announcement_id }}, @js($announcement->content))">Edit</button>
+                                                <form method="POST" action="{{ route('wall.posts.destroy',$announcement->announcement_id) }}" onsubmit="return confirm('Delete this post?');">@csrf @method('DELETE')<button class="w-full rounded-lg px-3 py-2 text-left text-sm font-semibold text-red-600 hover:bg-red-50">Delete</button></form>
+                                            </div>
+                                        </details>
+                                    @endif
                                 </div>
 
                                 <h2 class="text-xl font-black text-gray-900 mb-3">
@@ -919,5 +928,12 @@
             },250);
         }
     }
+function editWallPost(id, currentContent){
+    const content=window.prompt('Edit post:', currentContent);
+    if(content===null || !content.trim()) return;
+    const form=document.createElement('form'); form.method='POST'; form.action=`{{ url('/wall/posts') }}/${id}`;
+    form.innerHTML=`@csrf<input type="hidden" name="_method" value="PUT"><input type="hidden" name="post_content">`;
+    form.querySelector('[name="post_content"]').value=content; document.body.appendChild(form); form.submit();
+}
 </script>
 @endpush

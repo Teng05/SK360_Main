@@ -24,6 +24,7 @@ trait BuildsWallFeed
             ->where('a.visibility','public')
             ->select(
                 'a.announcement_id',
+                'a.user_id',
                 'a.title',
                 'a.content',
                 'a.created_at',
@@ -50,6 +51,10 @@ trait BuildsWallFeed
                         ->where('announcement_id',$post->announcement_id)
                         ->where('user_id',auth()->user()->user_id)
                         ->exists();
+                $post->comments_count = DB::table('announcement_feedback')->where('announcement_id', $post->announcement_id)->where('status', 'posted')->count();
+                $post->comments = DB::table('announcement_feedback as f')->leftJoin('users as cu', 'cu.user_id', '=', 'f.user_id')
+                    ->where('f.announcement_id', $post->announcement_id)->where('f.status', 'posted')
+                    ->orderBy('f.created_at')->limit(10)->get(['f.comment', 'f.created_at', DB::raw("CONCAT(COALESCE(cu.first_name,''),' ',COALESCE(cu.last_name,'')) as author_name")]);
 
                 $post->author_name=trim((string)$post->author_name) ?: 'SK 360 Official';
 

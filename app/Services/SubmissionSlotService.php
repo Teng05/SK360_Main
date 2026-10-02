@@ -27,15 +27,8 @@ class SubmissionSlotService
 
     public function expireOldSlots(): void
     {
-        /*
-         * Slots are no longer automatically closed after end_date.
-         *
-         * end_date = submission deadline
-         * status = open/closed controls whether submissions are accepted.
-         *
-         * An open slot may still accept a late submission after the deadline,
-         * allowing the ranking system to apply the late submission penalty.
-         */
+        DB::table('submission_slots')->where('status', 'open')
+            ->whereDate('end_date', '<', $this->today())->update(['status' => 'closed']);
     }
 
     public function chairmanReportSlots(int $barangayId): Collection
@@ -95,6 +88,7 @@ class SubmissionSlotService
         string $submissionType,
         array $roles
     ): ?object {
+        $this->expireOldSlots();
         $currentTermId=$this->currentTermId();
 
         if(!$currentTermId){
@@ -108,6 +102,7 @@ class SubmissionSlotService
             ->where('term_id',$currentTermId)
             ->where('status','open')
             ->whereDate('start_date','<=',$today)
+            ->whereDate('end_date','>=',$today)
             ->where('submission_type',$submissionType)
             ->whereIn('role',$roles)
             ->first();
@@ -137,6 +132,7 @@ class SubmissionSlotService
         array $roles,
         string $submissionTable
     ): Collection {
+        $this->expireOldSlots();
         $currentTermId=$this->currentTermId();
 
         if(!$currentTermId){
@@ -157,7 +153,7 @@ class SubmissionSlotService
 
         return DB::table('submission_slots')
             ->where('term_id',$currentTermId)
-            ->where('status','open')
+            ->whereIn('status',['open','closed'])
             ->where('submission_type',$submissionType)
             ->whereIn('role',$roles)
             ->orderBy('start_date')
@@ -176,7 +172,10 @@ class SubmissionSlotService
                     &&
                     $slot->end_date<$today;
 
-                if($slot->has_submitted){
+                if($slot->status==='closed' && !$slot->has_submitted){
+                    $slot->slot_status_label='Closed';
+                    $slot->slot_status_badge='bg-gray-100 text-gray-600';
+                }elseif($slot->has_submitted){
                     $slot->slot_status_label='Submitted';
                     $slot->slot_status_badge='bg-green-100 text-green-600';
                 }elseif($slot->is_upcoming){
@@ -215,7 +214,9 @@ class SubmissionSlotService
                 }
 
                 return $slot;
-            });
+            })
+            ->filter(fn($slot) => $slot->status === 'open' || !$slot->has_submitted)
+            ->values();
     }
 
     protected function accomplishmentCategoryLabel(?string $category): string

@@ -50,7 +50,6 @@
 
                     <div class="border-t border-gray-100 p-4">
                         <form id="messageForm" class="flex items-center gap-3">
-                            <button type="button" class="rounded-lg border border-gray-200 px-3 py-2 text-gray-400">@include('partials.ui.icon', ['icon'=>'paperclip','iconSize'=>16])</button>
                             <input id="messageInput" type="text" placeholder="Type your message..." class="flex-1 rounded-xl bg-gray-50 px-4 py-3 text-sm text-gray-700 outline-none ring-1 ring-transparent focus:ring-red-200" disabled>
                             <button id="sendMessageBtn" type="submit" class="rounded-lg bg-red-500 px-4 py-3 text-white hover:bg-red-600 transition disabled:cursor-not-allowed disabled:opacity-50" disabled>@include('partials.ui.icon', ['icon'=>'send','iconSize'=>17])</button>
                         </form>
@@ -730,4 +729,3 @@
     loadRooms();
 </script>
 @endpush
-

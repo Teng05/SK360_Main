@@ -109,6 +109,9 @@ Route::middleware('auth')->group(function(){
     Route::get('/notifications/feed',[NotificationController::class,'feed'])->name('notifications.feed');
     Route::post('/notifications/{notification}/read',[NotificationController::class,'markRead'])->name('notifications.read');
     Route::post('/wall/posts',[WallPostController::class,'store'])->name('wall.posts.store');
+    Route::put('/wall/posts/{announcement}',[WallPostController::class,'update'])->name('wall.posts.update');
+    Route::delete('/wall/posts/{announcement}',[WallPostController::class,'destroy'])->name('wall.posts.destroy');
+    Route::post('/wall/posts/{announcement}/comments',[WallPostController::class,'comment'])->name('wall.posts.comment');
     Route::post('/wall/posts/{announcement}/like',[WallPostController::class,'toggleLike'])->name('wall.posts.like');
     Route::post('/meetings/{meeting}/call-attendance/join',[MeetingsController::class,'joinCallAttendance'])->name('meetings.call-attendance.join');
     Route::post('/meetings/{meeting}/call-attendance/leave',[MeetingsController::class,'leaveCallAttendance'])->name('meetings.call-attendance.leave');

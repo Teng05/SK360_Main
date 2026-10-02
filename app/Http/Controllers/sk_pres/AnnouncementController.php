@@ -205,6 +205,7 @@ class AnnouncementController extends Controller
             ->first();
 
         abort_unless($announcement,404);
+        abort_unless((int) $announcement->user_id === (int) auth()->user()->user_id, 403);
 
         $validated=$request->validate([
             'title'=>['required','string','max:255'],
@@ -247,6 +248,7 @@ class AnnouncementController extends Controller
                 ->where('term_id',$currentTermId)
                 ->lockForUpdate()->first();
             abort_unless($announcement,404);
+            abort_unless((int) $announcement->user_id === (int) auth()->user()->user_id, 403);
 
             DB::table('feedback_verifications')->whereIn('feedback_id',function($query) use($announcementId){
                 $query->select('feedback_id')->from('announcement_feedback')->where('announcement_id',$announcementId);

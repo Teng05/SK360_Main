@@ -511,6 +511,14 @@
                                         >
                                             Submitted
                                         </button>
+                                    @elseif($slot->status==='closed' || (!empty($slot->is_late)))
+                                        <button
+                                            type="button"
+                                            disabled
+                                            class="{{ $slotUiClass('rounded-xl bg-gray-300 px-4 py-3 text-xs font-black uppercase text-gray-500 cursor-not-allowed', 'sk-btn sk-btn--ghost !bg-gray-100 !text-gray-500') }}"
+                                        >
+                                            Submission Closed
+                                        </button>
                                     @else
                                         <button
                                             type="button"

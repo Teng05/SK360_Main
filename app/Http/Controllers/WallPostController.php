@@ -99,6 +99,50 @@ class WallPostController extends Controller
         return back();
     }
 
+    public function update(Request $request, int $announcementId): RedirectResponse
+    {
+        abort_unless(auth()->check(), 403);
+        $termId = $this->currentTermId();
+        $post = DB::table('announcements')->where('announcement_id', $announcementId)->where('term_id', $termId)->first();
+        abort_unless($post, 404);
+        abort_unless((int) $post->user_id === (int) auth()->id(), 403);
+        $validated = $request->validate(['post_content' => ['required', 'string', 'max:5000']]);
+        DB::table('announcements')->where('announcement_id', $announcementId)->update([
+            'content' => $validated['post_content'], 'updated_at' => now(),
+        ]);
+        return back()->with('wall_status', 'Post updated successfully.');
+    }
+
+    public function destroy(int $announcementId): RedirectResponse
+    {
+        abort_unless(auth()->check(), 403);
+        $termId = $this->currentTermId();
+        DB::transaction(function () use ($announcementId, $termId) {
+            $post = DB::table('announcements')->where('announcement_id', $announcementId)->where('term_id', $termId)->lockForUpdate()->first();
+            abort_unless($post, 404);
+            abort_unless((int) $post->user_id === (int) auth()->id(), 403);
+            foreach (['announcement_feedback', 'announcement_views', 'public_wall_post_likes', 'wall_post_likes'] as $table) {
+                DB::table($table)->where('announcement_id', $announcementId)->delete();
+            }
+            DB::table('announcements')->where('announcement_id', $announcementId)->delete();
+        });
+        return back()->with('wall_status', 'Post deleted successfully.');
+    }
+
+    public function comment(Request $request, int $announcementId): RedirectResponse
+    {
+        abort_unless(auth()->check(), 403);
+        abort_unless(DB::table('announcements')->where('announcement_id', $announcementId)->where('term_id', $this->currentTermId())->exists(), 404);
+        $validated = $request->validate(['comment' => ['required', 'string', 'max:2000']]);
+        DB::table('announcement_feedback')->insert([
+            'announcement_id' => $announcementId, 'user_id' => auth()->id(),
+            'name' => trim((auth()->user()->first_name ?? '').' '.(auth()->user()->last_name ?? '')) ?: 'SK Official',
+            'email' => strtolower((string) auth()->user()->email), 'comment' => $validated['comment'],
+            'status' => 'posted', 'verified_at' => now(), 'created_at' => now(),
+        ]);
+        return back()->with('wall_status', 'Comment added.');
+    }
+
     protected function currentTermId(): ?int
     {
         $termId=DB::table('administration_terms')

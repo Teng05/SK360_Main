@@ -148,6 +148,7 @@
                                             @include('partials.ui.icon', ['icon'=>'globe','iconSize'=>14]) Public
                                         </span>
                                     @endif
+                                @if((int) $announcement->user_id === (int) auth()->id())
                                 <details class="announcement-actions relative shrink-0">
                                     <summary class="flex h-9 w-9 cursor-pointer list-none items-center justify-center rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 [&::-webkit-details-marker]:hidden" aria-label="Announcement actions">
                                         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>
@@ -173,6 +174,7 @@
                                     </form>
                                     </div>
                                 </details>
+                                @endif
                                     </div>
                                 </div>
 
