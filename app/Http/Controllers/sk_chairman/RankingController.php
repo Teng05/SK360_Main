@@ -20,6 +20,8 @@ class RankingController extends Controller
         $user = auth()->user();
         $fullName = trim(($user->first_name ?? '') . ' ' . ($user->last_name ?? '')) ?: 'User';
         $leaderboard = $this->rankingsLeaderboard();
+        $pointBreakdowns = $this->rankingPointBreakdowns($leaderboard);
+        $rankingComparison = $this->rankingComparisonData($leaderboard);
 
         $rankingsLiveRoute = request()->filled('period')
             ? route('sk_chairman.rankings.live', ['period' => request('period')])
@@ -32,6 +34,8 @@ class RankingController extends Controller
             'currentUrl' => url()->current(),
             'topRankings' => $this->topRankings($leaderboard),
             'leaderboard' => $leaderboard,
+            'pointBreakdowns' => $pointBreakdowns,
+            'rankingComparison' => $rankingComparison,
             'latestPeriod' => $this->latestRankingPeriod(),
             'rankingPeriods' => $this->rankingPeriodOptions(),
             'selectedPeriod' => $this->selectedRankingPeriodValue(),

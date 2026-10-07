@@ -25,6 +25,7 @@
 
             @php
                 $podium=collect($topRankings??[]);
+                $maxPositiveTotal=$leaderboard->filter(fn($row)=>(int)$row->points>0)->max('points')??0;
             @endphp
 
             @if($podium->isNotEmpty())
@@ -60,6 +61,22 @@
             @endif
 
             <section class="mb-10 overflow-hidden rounded-3xl border border-gray-100 bg-white shadow-sm">
+                <div class="flex flex-col gap-3 border-b border-gray-100 px-6 py-5 sm:flex-row sm:items-end sm:justify-between">
+                    <div><h2 class="text-xl font-black text-gray-900">Performance Comparison</h2><p class="mt-1 text-sm text-gray-500">Showing: Top {{ count($rankingComparison['series']['overall']??[]) }} overall barangays</p></div>
+                    @if(!empty($rankingComparison['labels'])&&!empty($rankingComparison['series']['overall']))
+                        <label class="flex items-center gap-2 text-xs font-bold text-gray-600">Metric
+                            <select id="rankingComparisonMetric" class="rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-700"><option value="overall">Overall Points</option><option value="submission">Submission Score</option><option value="document">Document Score</option><option value="meeting">Meeting Score</option></select>
+                        </label>
+                    @endif
+                </div>
+                @if(!empty($rankingComparison['labels'])&&!empty($rankingComparison['series']['overall']))
+                    <div class="p-4 md:p-6"><div class="relative h-80"><canvas id="rankingComparisonChart" aria-label="Top barangay ranking comparison across periods"></canvas></div></div>
+                @else
+                    <div class="px-6 py-12 text-center text-sm text-gray-400">No ranking history is available for the selected period.</div>
+                @endif
+            </section>
+
+            <section class="mb-10 overflow-hidden rounded-3xl border border-gray-100 bg-white shadow-sm">
                 <div class="flex flex-col gap-4 border-b border-gray-100 px-6 py-6 md:flex-row md:items-end md:justify-between">
                     <div>
                         <h2 class="text-xl font-black text-gray-900">Complete Leaderboard</h2>
@@ -86,11 +103,13 @@
                 <div id="leaderboardList" class="divide-y divide-gray-100">
                     @forelse($leaderboard as $row)
                         @php
+                            $rowBreakdowns=$pointBreakdowns[$row->barangay_id]??[];
                             $metricData=[
-                                ['label'=>'Submission Score','value'=>(int)$row->submission_score],
-                                ['label'=>'Document Score','value'=>(int)$row->document_score],
-                                ['label'=>'Meeting Score','value'=>(int)$row->meeting_score],
+                                ['label'=>'Submission Score','value'=>(int)$row->submission_score,'breakdown'=>$rowBreakdowns['submission_score']??[]],
+                                ['label'=>'Document Score','value'=>(int)$row->document_score,'breakdown'=>$rowBreakdowns['document_score']??[]],
+                                ['label'=>'Meeting Score','value'=>(int)$row->meeting_score,'breakdown'=>$rowBreakdowns['meeting_score']??[]],
                             ];
+                            $totalBarWidth=$maxPositiveTotal>0&&$row->points>0?min(100,((int)$row->points/$maxPositiveTotal)*100):0;
                         @endphp
                         <div class="leaderboard-row grid gap-4 px-6 py-5 transition hover:bg-slate-50 xl:grid-cols-[minmax(220px,1.2fr)_repeat(3,minmax(150px,1fr))_110px] xl:items-center" data-barangay="{{ $row->name }}">
                             <div class="flex min-w-0 items-center gap-3">
@@ -98,20 +117,21 @@
                                 <span class="sk-icon-tile sk-icon-tile--sm sk-icon-tile--gray">@include('partials.ui.icon',['icon'=>'building-2','iconSize'=>17])</span>
                                 <div class="min-w-0">
                                     <h3 class="truncate text-sm font-black text-gray-900">{{ $row->name }}</h3>
-                                    <p class="mt-1 text-xs text-gray-500">{{ (int)$row->points }} total points</p>
+                                    <p class="mt-1 text-xs font-bold {{ (int)$row->points<=0?'text-red-600':'text-gray-500' }}">{{ (int)$row->points }} total points</p>
+                                    <div class="mt-2 h-1.5 overflow-hidden rounded-full bg-gray-100" aria-label="Total points relative to the highest positive score"><div class="h-full rounded-full bg-red-500" style="width:{{ $totalBarWidth }}%"></div></div>
                                 </div>
                             </div>
 
                             @foreach($metricData as $metric)
                                 @php
                                     $value=$metric['value'];
-                                    $valueClass=$value<0?'text-red-600':($value>0?'text-green-700':'text-gray-500');
+                                    $valueClass=$value<=0?'text-red-600':'text-green-700';
                                     $prefix=$value>0?'+':'';
                                 @endphp
                                 <div class="rounded-2xl border border-gray-100 bg-white px-4 py-3 xl:border-0 xl:bg-transparent xl:px-0 xl:py-0">
                                     <div class="flex items-center justify-between gap-3">
                                         <span class="text-[10px] font-bold text-gray-500 xl:hidden">{{ $metric['label'] }}</span>
-                                        <span class="text-sm font-black {{ $valueClass }}">{{ $prefix }}{{ $value }} pts</span>
+                                        <span class="flex items-center gap-2"><span class="text-sm font-black {{ $valueClass }}">{{ $prefix }}{{ $value }} pts</span><button type="button" data-breakdown-trigger data-breakdown="{{ json_encode(['title'=>$metric['label'],'value'=>$value,'entries'=>$metric['breakdown']]) }}" class="inline-flex h-6 w-6 items-center justify-center rounded-full border border-gray-200 text-gray-400 transition hover:border-red-300 hover:bg-red-50 hover:text-red-600 focus:outline-none focus:ring-2 focus:ring-red-100" title="View score breakdown" aria-label="View score breakdown for {{ $metric['label'] }}" aria-controls="scoreBreakdownPopover" aria-expanded="false">@include('partials.ui.icon',['icon'=>'info','iconSize'=>14])</button></span>
                                     </div>
                                 </div>
                             @endforeach
@@ -158,6 +178,12 @@
                     </div>
                 @endif
             </section>
+
+            <div id="scoreBreakdownPopover" class="fixed z-[100] hidden max-h-[calc(100vh-24px)] w-80 max-w-[calc(100vw-24px)] overflow-y-auto rounded-xl border border-gray-200 bg-white p-4 text-xs shadow-xl" role="dialog" aria-label="Score breakdown" aria-hidden="true">
+                <p id="scoreBreakdownTitle" class="mb-2 font-black text-gray-800"></p>
+                <div id="scoreBreakdownEntries" class="max-h-56 space-y-1 overflow-y-auto"></div>
+                <div class="mt-2 flex justify-between border-t border-gray-200 pt-2 font-black text-gray-800"><span>Total</span><span id="scoreBreakdownTotal"></span></div>
+            </div>
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6 pb-10">
                 <div class="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
@@ -222,6 +248,25 @@ document.addEventListener('DOMContentLoaded',function(){
         if(userMenuBtn&&userDropdown&&!userMenuBtn.contains(e.target)&&!userDropdown.contains(e.target))userDropdown.classList.add('hidden');
     });
 
+    const scorePopover=document.getElementById('scoreBreakdownPopover'),scoreTitle=document.getElementById('scoreBreakdownTitle'),scoreEntries=document.getElementById('scoreBreakdownEntries'),scoreTotal=document.getElementById('scoreBreakdownTotal');
+    let activeBreakdownButton=null;
+    function closeScorePopover(){if(!activeBreakdownButton)return;activeBreakdownButton.setAttribute('aria-expanded','false');activeBreakdownButton=null;scorePopover.classList.add('hidden');scorePopover.setAttribute('aria-hidden','true');}
+    function positionScorePopover(){if(!activeBreakdownButton)return;const rect=activeBreakdownButton.getBoundingClientRect(),width=scorePopover.offsetWidth,height=scorePopover.offsetHeight;let left=Math.min(window.innerWidth-width-12,Math.max(12,rect.left));let top=rect.bottom+8;if(top+height>window.innerHeight-12)top=rect.top-height-8;scorePopover.style.left=`${Math.max(12,left)}px`;scorePopover.style.top=`${Math.max(12,top)}px`;}
+    function openScorePopover(button){
+        if(activeBreakdownButton===button){closeScorePopover();return;}
+        closeScorePopover();
+        let data;try{data=JSON.parse(button.dataset.breakdown||'{}');}catch(error){return;}
+        const escape=value=>String(value??'').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[char]));
+        scoreTitle.textContent=`${data.title||'Score'} Breakdown`;
+        const entries=data.entries||[];
+        scoreEntries.innerHTML=entries.length?entries.map(entry=>`<div class="flex justify-between gap-4 py-1 text-gray-600"><span>${escape(entry.label)}</span><span class="shrink-0 font-bold ${Number(entry.points)<0?'text-red-600':'text-gray-700'}">${Number(entry.points)>0?'+':''}${Number(entry.points)||0}</span></div>`).join(''):'<p class="py-1 text-gray-400">No point logs recorded.</p>';
+        const value=Number(data.value)||0;scoreTotal.textContent=`${value>0?'+':''}${value}`;scoreTotal.className=value<=0?'text-red-600':'text-green-700';
+        activeBreakdownButton=button;button.setAttribute('aria-expanded','true');scorePopover.classList.remove('hidden');scorePopover.setAttribute('aria-hidden','false');positionScorePopover();
+    }
+    document.addEventListener('click',function(event){const button=event.target.closest('[data-breakdown-trigger]');if(button){openScorePopover(button);return;}if(!scorePopover.contains(event.target))closeScorePopover();});
+    document.addEventListener('keydown',event=>{if(event.key==='Escape')closeScorePopover();});
+    window.addEventListener('resize',positionScorePopover);window.addEventListener('scroll',positionScorePopover,true);
+
     const search=document.getElementById('leaderboardSearch'),clear=document.getElementById('clearLeaderboardSearch'),rows=[...document.querySelectorAll('.leaderboard-row')],empty=document.getElementById('leaderboardEmpty'),pagination=document.getElementById('leaderboardPaginationWrapper'),info=document.getElementById('leaderboardInfo'),previous=document.getElementById('leaderboardPrevious'),next=document.getElementById('leaderboardNext'),pages=document.getElementById('leaderboardPages');
     const perPage=10;
     let currentPage=1,filteredRows=rows;
@@ -282,4 +327,16 @@ document.addEventListener('DOMContentLoaded',function(){
     render();
 });
 </script>
+@if(!empty($rankingComparison['labels'])&&!empty($rankingComparison['series']['overall']))
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded',function(){
+    const canvas=document.getElementById('rankingComparisonChart'),selector=document.getElementById('rankingComparisonMetric');
+    if(!canvas||!selector||typeof Chart==='undefined')return;
+    const comparison=@json($rankingComparison);
+    const chart=new Chart(canvas,{type:'line',data:{labels:comparison.labels,datasets:comparison.series.overall.map(dataset=>({...dataset,borderWidth:2,pointRadius:2,pointHoverRadius:5,fill:false}))},options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:{legend:{position:'bottom',labels:{usePointStyle:true,boxWidth:8}},tooltip:{callbacks:{label:context=>`${context.dataset.label}: ${context.parsed.y} pts`}}},scales:{y:{beginAtZero:true,title:{display:true,text:'Points'}},x:{title:{display:true,text:'Ranking Period'}}}}});
+    selector.addEventListener('change',function(){chart.data.datasets=comparison.series[selector.value].map(dataset=>({...dataset,borderWidth:2,pointRadius:2,pointHoverRadius:5,fill:false}));chart.update();});
+});
+</script>
+@endif
 @endpush

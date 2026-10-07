@@ -134,6 +134,89 @@ trait BuildsRankingsData
         })->sortByDesc(fn($rule)=>(int)$rule['points'])->values()->all();
     }
 
+    protected function rankingPointBreakdowns(Collection $leaderboard): array
+    {
+        $ids=$leaderboard->pluck('barangay_id')->map(fn($id)=>(int)$id)->all();
+        $empty=['submission_score'=>[],'document_score'=>[],'meeting_score'=>[]];
+        $result=array_fill_keys($ids,$empty);
+        $termId=$this->currentTermId();
+        $period=$this->latestRankingPeriod();
+        if(!$ids||!$termId||!$period||!Schema::hasTable('ranking_point_logs'))return$result;
+
+        $columns=[
+            'timely_submission_points'=>'submission_score',
+            'completeness_points'=>'document_score',
+            'participation_points'=>'meeting_score',
+        ];
+        $rules=app(RankingPointsService::class)->rules();
+        $logs=DB::table('ranking_point_logs')
+            ->where('term_id',$termId)
+            ->where('reporting_period',$period)
+            ->whereIn('barangay_id',$ids)
+            ->get(['barangay_id','action','points']);
+
+        foreach($logs as $log){
+            $rule=$rules[$log->action]??null;
+            $metric=$rule?($columns[$rule['column']??'']??null):null;
+            if(!$metric)continue;
+            $result[(int)$log->barangay_id][$metric][]=[
+                'label'=>$rule['label'],
+                'points'=>(int)$log->points,
+            ];
+        }
+        return$result;
+    }
+
+    protected function rankingComparisonData(Collection $leaderboard): array
+    {
+        $ranked=$leaderboard->filter(fn($row)=>$row->rank!==null&&(int)$row->points!==0)->take(10)->values();
+        $empty=['labels'=>[],'series'=>['overall'=>[],'submission'=>[],'document'=>[],'meeting'=>[]]];
+        $termId=$this->currentTermId();
+        if($ranked->isEmpty()||!$termId||!Schema::hasTable('rankings'))return$empty;
+        try{$selected=Carbon::createFromFormat('F Y',$this->latestRankingPeriod())->startOfMonth();}
+        catch(\Throwable){return$empty;}
+
+        $historyRows=DB::table('rankings')
+            ->where('term_id',$termId)
+            ->whereNotNull('reporting_period')
+            ->get(['barangay_id','reporting_period','total_points','timely_submission_points','completeness_points','participation_points']);
+        $periods=$historyRows->pluck('reporting_period')->unique()
+            ->map(function($period){
+                try{$date=Carbon::createFromFormat('F Y',trim((string)$period))->startOfMonth();return['value'=>(string)$period,'date'=>$date];}
+                catch(\Throwable){return null;}
+            })
+            ->filter(fn($period)=>$period&&$period['date']->lte($selected))
+            ->sortBy(fn($period)=>$period['date']->timestamp)
+            ->values();
+        if($periods->isEmpty())return$empty;
+
+        $ids=$ranked->pluck('barangay_id')->map(fn($id)=>(int)$id)->all();
+        $periodValues=$periods->pluck('value')->all();
+        $history=$historyRows
+            ->whereIn('barangay_id',$ids)
+            ->whereIn('reporting_period',$periodValues)
+            ->keyBy(fn($row)=>(int)$row->barangay_id.'|'.$row->reporting_period);
+        $metrics=[
+            'overall'=>'total_points',
+            'submission'=>'timely_submission_points',
+            'document'=>'completeness_points',
+            'meeting'=>'participation_points',
+        ];
+        $colors=['#c92336','#2563eb','#16a34a','#d97706','#7c3aed','#0891b2','#db2777','#4f46e5','#65a30d','#ea580c'];
+        $series=[];
+        foreach($metrics as $metric=>$column){
+            $series[$metric]=$ranked->map(function($barangay,$index)use($periodValues,$history,$column,$colors){
+                $id=(int)$barangay->barangay_id;
+                $values=array_map(function($period)use($history,$id,$column){
+                    $row=$history[$id.'|'.$period]??null;
+                    return$row?(int)$row->{$column}:0;
+                },$periodValues);
+                return['label'=>$barangay->name,'data'=>$values,'borderColor'=>$colors[$index],'backgroundColor'=>$colors[$index],'tension'=>0.25];
+            })->all();
+        }
+        return['labels'=>$periods->pluck('value')->all(),'series'=>$series];
+    }
+
     protected function rankingPeriods(): Collection
     {
         $periods=collect([$this->currentRankingPeriod()]);
