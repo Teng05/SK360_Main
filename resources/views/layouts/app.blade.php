@@ -35,6 +35,11 @@
 @php($skRoleWeb = !empty($menuItems) && request()->routeIs('sk_pres.*', 'sk_chairman.*', 'sk_secretary.*') && !request()->routeIs('*.meetings.call'))
 <body class="{{ $skRoleWeb ? 'sk-web sk-app' : '' }}">
     @yield('content')
+    @auth
+        @if(in_array(auth()->user()->role, ['sk_president', 'sk_chairman', 'sk_secretary'], true) && request()->routeIs('sk_pres.*', 'sk_chairman.*', 'sk_secretary.*'))
+            @include('partials.app.help')
+        @endif
+    @endauth
     @stack('scripts')
     @if($skRoleWeb)
     <script>

@@ -7,6 +7,7 @@ $skIconPaths=[
 'chart-column'=>'<path d="M3 3v16a2 2 0 0 0 2 2h16M18 17V9M13 17V5M8 17v-3"/>',
 'chevron-down'=>'<path d="m6 9 6 6 6-6"/>','chevron-left'=>'<path d="m15 18-6-6 6-6"/>','chevron-right'=>'<path d="m9 18 6-6-6-6"/>',
 'circle-check'=>'<circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/>','circle-alert'=>'<circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/>',
+'circle-help'=>'<circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3M12 17h.01"/>',
 'clock'=>'<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',
 'file-plus'=>'<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4M9 15h6M12 18v-6"/>',
 'file-text'=>'<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4M10 9H8M16 13H8M16 17H8"/>',
