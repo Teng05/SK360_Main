@@ -135,6 +135,7 @@ Route::middleware('auth')->prefix('sk_pres')->name('sk_pres.')->group(function()
 
     Route::get('/module',[ModuleController::class,'index'])->name('module');
     Route::get('/module/{slotId}/submissions',[ModuleController::class,'submissions'])->name('module.submissions');
+    Route::get('/module/submission/{sourceType}/{sourceId}/view',[ModuleController::class,'viewSubmission'])->where(['sourceType'=>'accomplishment_report|budget_report','sourceId'=>'[0-9]+'])->name('module.submission.view');
     Route::get('/module/live',[ModuleController::class,'live'])->name('module.live');
     Route::post('/module/live',[ModuleController::class,'storeLive'])->name('module.live.store');
     Route::patch('/module/live/{slotId}/close',[ModuleController::class,'closeLive'])->name('module.live.close');

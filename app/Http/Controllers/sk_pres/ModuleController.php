@@ -2,6 +2,7 @@
 namespace App\Http\Controllers\sk_pres;
 use App\Http\Controllers\Controller;
 use App\Services\NotificationService;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -123,13 +124,14 @@ class ModuleController extends Controller
         }
         $records=$query->select([
             'b.barangay_id','b.barangay_name','r.'.$idColumn.' as source_id',
-            'r.user_id','r.submitted_at','u.first_name','u.last_name','u.role',
-        ])->when($hasReviews,fn($q)=>$q->addSelect('qr.status as quality_status'))
+            'r.user_id','r.submitted_at','r.uploaded_file_path','u.first_name','u.last_name','u.role',
+        ])->when($isBudget,fn($q)=>$q->addSelect('r.generated_pdf_path','r.template_data'))
+            ->when($hasReviews,fn($q)=>$q->addSelect('qr.status as quality_status'))
             ->get()
             ->groupBy('barangay_id')
             ->map(fn($items)=>$items->first());
         $deadline=Carbon::parse($slot->end_date,'Asia/Manila')->endOfDay();
-        $rows=$records->map(function($record)use($deadline,$hasReviews){
+        $rows=$records->map(function($record)use($deadline,$hasReviews,$sourceType){
             $submitted=$record->source_id!==null;
             $submittedAt=$submitted&&$record->submitted_at
                 ? Carbon::parse($record->submitted_at,'Asia/Manila')
@@ -139,6 +141,9 @@ class ModuleController extends Controller
                 ? strtolower((string)($record->quality_status??'pending_review'))
                 : 'pending_review';
             if(!in_array($quality,['approved','needs_revision'],true))$quality='pending_review';
+            $hasDocument=$submitted&&(!empty($record->uploaded_file_path)||(
+                $sourceType==='budget_report'&&($record->generated_pdf_path??null)==='TEMPLATE_GEN'&&!empty($record->template_data)
+            ));
             return [
                 'barangay_id'=>(int)$record->barangay_id,
                 'barangay_name'=>$record->barangay_name,
@@ -148,6 +153,7 @@ class ModuleController extends Controller
                 'submitted_by'=>$submitted?trim(($record->first_name??'').' '.($record->last_name??'')):null,
                 'submitted_role'=>$submitted?match($record->role){'sk_chairman'=>'SK Chairman','sk_secretary'=>'SK Secretary',default=>null}:null,
                 'submitted_at'=>$submittedAt?->format('M d, Y h:i A'),
+                'view_url'=>$hasDocument?route('sk_pres.module.submission.view',['sourceType'=>$sourceType,'sourceId'=>$record->source_id]):null,
             ];
         })->values();
         $submitted=$rows->where('submission_status','submitted');
@@ -170,6 +176,46 @@ class ModuleController extends Controller
             ],
             'rows'=>$rows,
         ]);
+    }
+    public function viewSubmission(string $sourceType,int $sourceId)
+    {
+        abort_unless(auth()->check()&&auth()->user()->role==='sk_president',403);
+        abort_unless(in_array($sourceType,['accomplishment_report','budget_report'],true),404);
+        $termId=$this->currentTermId();
+        abort_unless($termId,404);
+        if($sourceType==='accomplishment_report'){
+            abort_unless(Schema::hasTable('accomplishment_reports'),404);
+            $submission=DB::table('accomplishment_reports')->where('report_id',$sourceId)->where('term_id',$termId)->first();
+            abort_unless($submission,404);
+            $path=$this->monitoringPdfPath($submission->uploaded_file_path??null,'uploads/reports');
+            return response()->file($path,['Content-Type'=>'application/pdf','X-Content-Type-Options'=>'nosniff']);
+        }
+        abort_unless(Schema::hasTable('budget_reports'),404);
+        $submission=DB::table('budget_reports')->where('budget_report_id',$sourceId)->where('term_id',$termId)->first();
+        abort_unless($submission,404);
+        if(!empty($submission->uploaded_file_path)){
+            $path=$this->monitoringPdfPath($submission->uploaded_file_path,'uploads/budget_reports');
+            return response()->file($path,['Content-Type'=>'application/pdf','X-Content-Type-Options'=>'nosniff']);
+        }
+        abort_unless(($submission->generated_pdf_path??null)==='TEMPLATE_GEN'&&!empty($submission->template_data),404);
+        $data=json_decode($submission->template_data,true);
+        abort_unless(is_array($data)&&$data,404);
+        $barangayName=DB::table('barangays')->where('barangay_id',$submission->barangay_id)->value('barangay_name')?:'Barangay';
+        $paper=($data['report_type']??'quarterly')==='monthly'?'portrait':'landscape';
+        return Pdf::loadView('shared.budget-template-download',['data'=>$data,'barangayName'=>$barangayName])
+            ->setPaper('a4',$paper)
+            ->stream('budget-template-'.$sourceId.'.pdf');
+    }
+    protected function monitoringPdfPath(?string $relativePath,string $directory): string
+    {
+        abort_unless($relativePath,404,'The submitted PDF is unavailable.');
+        $relativePath=str_replace('\\','/',ltrim($relativePath,'/\\'));
+        abort_unless(str_starts_with($relativePath,$directory.'/')&&strtolower(pathinfo($relativePath,PATHINFO_EXTENSION))==='pdf',404,'The submitted PDF is unavailable.');
+        $publicRoot=realpath(public_path());
+        $base=realpath(public_path($directory));
+        $path=realpath(public_path($relativePath));
+        abort_unless($publicRoot&&$base&&$path&&str_starts_with(strtolower($base),strtolower(rtrim($publicRoot,DIRECTORY_SEPARATOR).DIRECTORY_SEPARATOR))&&str_starts_with(strtolower($path),strtolower(rtrim($base,DIRECTORY_SEPARATOR).DIRECTORY_SEPARATOR))&&File::isFile($path),404,'The submitted PDF is unavailable.');
+        return $path;
     }
     public function live(): JsonResponse
     {

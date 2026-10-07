@@ -476,7 +476,7 @@
                             <input id="monitorSearch" type="search" placeholder="Search barangay..." class="h-10 rounded-lg border border-gray-200 px-3 text-sm">
                         </div>
                         <div class="overflow-x-auto rounded-xl border border-gray-100">
-                            <table class="w-full min-w-[760px] text-left text-sm"><thead class="bg-gray-50 text-xs uppercase tracking-wide text-gray-500"><tr><th class="px-4 py-3">Barangay</th><th class="px-4 py-3">Submission Status</th><th class="px-4 py-3">Quality Review</th><th class="px-4 py-3">Submitted By</th><th class="px-4 py-3">Submitted At</th></tr></thead><tbody id="monitorRows" class="divide-y divide-gray-100"></tbody></table>
+                            <table class="w-full min-w-[850px] text-left text-sm"><thead class="bg-gray-50 text-xs uppercase tracking-wide text-gray-500"><tr><th class="px-3 py-3">Barangay</th><th class="px-3 py-3">Submission Status</th><th class="px-3 py-3">Quality Review</th><th class="px-3 py-3">Submitted By</th><th class="px-3 py-3">Submitted At</th><th class="px-3 py-3">Document</th></tr></thead><tbody id="monitorRows" class="divide-y divide-gray-100"></tbody></table>
                             <p id="monitorNoResults" class="hidden px-4 py-8 text-center text-sm text-gray-500">No barangays matched the current filters.</p>
                         </div>
                         <div class="mt-4 flex items-center justify-between gap-3"><p id="monitorPageInfo" class="text-xs text-gray-500"></p><div class="flex gap-2"><button id="monitorPrev" type="button" class="sk-btn sk-btn--secondary sk-btn--sm">Previous</button><button id="monitorNext" type="button" class="sk-btn sk-btn--secondary sk-btn--sm">Next</button></div></div>
@@ -743,6 +743,7 @@ const monitorLoading=document.getElementById('monitorLoading');
 const monitorError=document.getElementById('monitorError');
 const monitorContent=document.getElementById('monitorContent');
 const monitorRows=document.getElementById('monitorRows');
+const monitorEyeIcon=@json(view('partials.ui.icon',['icon'=>'eye','iconSize'=>14])->render());
 let monitorData=[];
 let monitorPage=1;
 const monitorPageSize=10;
@@ -765,7 +766,8 @@ function monitorRender(){
         const quality=row.submission_status==='not_submitted'?'—':({pending_review:'Pending Review',needs_revision:'Needs Revision',approved:'Approved'}[row.quality_status]||'Pending Review');
         const qualityClass=row.quality_status==='approved'?'bg-green-50 text-green-700':row.quality_status==='needs_revision'?'bg-red-50 text-red-700':'bg-gray-100 text-gray-600';
         const by=row.submission_status==='not_submitted'?'—':[row.submitted_by,row.submitted_role].filter(Boolean).join(' · ')||'—';
-        return `<tr><td class="px-4 py-3 font-semibold text-gray-800">${monitorEscape(row.barangay_name)}</td><td class="px-4 py-3"><span class="rounded-full px-2.5 py-1 text-xs font-semibold ${statusClass}">${status}</span></td><td class="px-4 py-3">${row.submission_status==='not_submitted'?'—':`<span class="rounded-full px-2.5 py-1 text-xs font-semibold ${qualityClass}">${quality}</span>`}</td><td class="px-4 py-3 text-gray-600">${monitorEscape(by)}</td><td class="px-4 py-3 whitespace-nowrap text-gray-600">${monitorEscape(row.submitted_at||'—')}</td></tr>`;
+        const documentAction=row.submission_status==='not_submitted'||!row.view_url?'—':`<a href="${monitorEscape(row.view_url)}" target="_blank" rel="noopener" class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-gray-700 transition hover:border-red-200 hover:bg-red-50 hover:text-red-700">${monitorEyeIcon}<span>View PDF</span></a>`;
+        return `<tr><td class="px-3 py-3 font-semibold text-gray-800">${monitorEscape(row.barangay_name)}</td><td class="px-3 py-3"><span class="rounded-full px-2.5 py-1 text-xs font-semibold ${statusClass}">${status}</span></td><td class="px-3 py-3">${row.submission_status==='not_submitted'?'—':`<span class="rounded-full px-2.5 py-1 text-xs font-semibold ${qualityClass}">${quality}</span>`}</td><td class="px-3 py-3 text-gray-600">${monitorEscape(by)}</td><td class="whitespace-nowrap px-3 py-3 text-gray-600">${monitorEscape(row.submitted_at||'—')}</td><td class="px-3 py-3">${documentAction}</td></tr>`;
     }).join('');
     document.getElementById('monitorNoResults').classList.toggle('hidden',filtered.length>0);
     document.getElementById('monitorPageInfo').textContent=filtered.length?`Showing ${(monitorPage-1)*monitorPageSize+1}–${Math.min(monitorPage*monitorPageSize,filtered.length)} of ${filtered.length}`:'0 results';
