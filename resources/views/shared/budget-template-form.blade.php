@@ -74,7 +74,6 @@
 @endsection
 
 @section('content')
-// Quarterly Template
 @php
     $reportType = $reportType ?? 'quarterly';
     $reportingYear = $reportingYear ?? now()->year;
@@ -108,7 +107,6 @@
             <input type="hidden" name="reporting_quarter" value="{{ $reportingQuarter }}">
             <input type="hidden" name="actual_expenditure" value="{{ old('actual_expenditure', $actualExpenditure ?? '') }}">
 
-            //Monthly Template
 
             @if ($reportType === 'monthly')
                 @php
@@ -184,7 +182,6 @@
                     </tr>
                 </table>
 
-                //Anual Template
             @elseif ($reportType === 'annual')
                 @php
                     $inventoryRows = old('inventory_rows', array_fill(0, 12, [
