@@ -134,6 +134,7 @@ Route::middleware('auth')->prefix('sk_pres')->name('sk_pres.')->group(function()
     Route::post('/consolidation/quality-review',[ConsolidationController::class,'reviewQuality'])->name('consolidation.quality-review');
 
     Route::get('/module',[ModuleController::class,'index'])->name('module');
+    Route::get('/module/{slotId}/submissions',[ModuleController::class,'submissions'])->name('module.submissions');
     Route::get('/module/live',[ModuleController::class,'live'])->name('module.live');
     Route::post('/module/live',[ModuleController::class,'storeLive'])->name('module.live.store');
     Route::patch('/module/live/{slotId}/close',[ModuleController::class,'closeLive'])->name('module.live.close');

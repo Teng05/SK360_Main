@@ -91,6 +91,86 @@ class ModuleController extends Controller
             ],
         ]);
     }
+    public function submissions(int $slotId): JsonResponse
+    {
+        abort_unless(auth()->check() && auth()->user()->role==='sk_president',403);
+        $termId=$this->currentTermId();
+        abort_unless($termId,404);
+        $slot=DB::table('submission_slots')
+            ->where('slot_id',$slotId)
+            ->where('term_id',$termId)
+            ->first();
+        abort_unless($slot && in_array($slot->submission_type,['accomplishment_report','budget_report'],true),404);
+        $isBudget=$slot->submission_type==='budget_report';
+        $table=$isBudget?'budget_reports':'accomplishment_reports';
+        $idColumn=$isBudget?'budget_report_id':'report_id';
+        $sourceType=$slot->submission_type;
+        $hasReviews=Schema::hasTable('submission_quality_reviews');
+        $query=DB::table('barangays as b')
+            ->leftJoin($table.' as r',function($join)use($slotId,$termId){
+                $join->on('r.barangay_id','=','b.barangay_id')
+                    ->where('r.slot_id','=',$slotId)
+                    ->where('r.term_id','=',$termId);
+            })
+            ->leftJoin('users as u','u.user_id','=','r.user_id')
+            ->orderBy('b.barangay_name')
+            ->orderByDesc('r.submitted_at');
+        if($hasReviews){
+            $query->leftJoin('submission_quality_reviews as qr',function($join)use($idColumn,$sourceType){
+                $join->on('qr.source_id','=','r.'.$idColumn)
+                    ->where('qr.source_type','=',$sourceType);
+            });
+        }
+        $records=$query->select([
+            'b.barangay_id','b.barangay_name','r.'.$idColumn.' as source_id',
+            'r.user_id','r.submitted_at','u.first_name','u.last_name','u.role',
+        ])->when($hasReviews,fn($q)=>$q->addSelect('qr.status as quality_status'))
+            ->get()
+            ->groupBy('barangay_id')
+            ->map(fn($items)=>$items->first());
+        $deadline=Carbon::parse($slot->end_date,'Asia/Manila')->endOfDay();
+        $rows=$records->map(function($record)use($deadline,$hasReviews){
+            $submitted=$record->source_id!==null;
+            $submittedAt=$submitted&&$record->submitted_at
+                ? Carbon::parse($record->submitted_at,'Asia/Manila')
+                : null;
+            $late=$submittedAt&&$submittedAt->gt($deadline);
+            $quality=$submitted&&$hasReviews
+                ? strtolower((string)($record->quality_status??'pending_review'))
+                : 'pending_review';
+            if(!in_array($quality,['approved','needs_revision'],true))$quality='pending_review';
+            return [
+                'barangay_id'=>(int)$record->barangay_id,
+                'barangay_name'=>$record->barangay_name,
+                'submission_status'=>$submitted?'submitted':'not_submitted',
+                'timeliness_status'=>$submitted&&$submittedAt?($late?'late':'on_time'):null,
+                'quality_status'=>$submitted?$quality:null,
+                'submitted_by'=>$submitted?trim(($record->first_name??'').' '.($record->last_name??'')):null,
+                'submitted_role'=>$submitted?match($record->role){'sk_chairman'=>'SK Chairman','sk_secretary'=>'SK Secretary',default=>null}:null,
+                'submitted_at'=>$submittedAt?->format('M d, Y h:i A'),
+            ];
+        })->values();
+        $submitted=$rows->where('submission_status','submitted');
+        return response()->json([
+            'slot'=>[
+                'slot_id'=>(int)$slot->slot_id,
+                'title'=>$slot->title,
+                'submission_type'=>$sourceType,
+                'role'=>$slot->role,
+                'end_date'=>Carbon::parse($slot->end_date,'Asia/Manila')->format('M d, Y'),
+                'category'=>$isBudget?($slot->budget_category??null):($slot->accomplishment_category??null),
+                'period'=>$isBudget?($slot->budget_period_type??null):null,
+            ],
+            'summary'=>[
+                'total'=>$rows->count(),
+                'submitted'=>$submitted->count(),
+                'not_submitted'=>$rows->where('submission_status','not_submitted')->count(),
+                'on_time'=>$submitted->where('timeliness_status','on_time')->count(),
+                'late'=>$submitted->where('timeliness_status','late')->count(),
+            ],
+            'rows'=>$rows,
+        ]);
+    }
     public function live(): JsonResponse
     {
         abort_unless(auth()->check() && auth()->user()->role==='sk_president',403);

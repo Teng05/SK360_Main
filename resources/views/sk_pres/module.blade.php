@@ -408,6 +408,7 @@
                                             <span class="sk-badge sk-badge--dot {{ $isOpen ? 'sk-badge--green' : 'sk-badge--gray' }}">{{ $slot->management_state_label ?? ucfirst($slot->status) }}</span>
                                         </div>
                                         <div class="flex flex-wrap justify-end gap-2 border-t border-gray-100 pt-4">
+                                            <button type="button" class="view-submissions-btn sk-btn sk-btn--secondary sk-btn--sm" data-monitor-url="{{ route('sk_pres.module.submissions',$slot->slot_id) }}">@include('partials.ui.icon', ['icon'=>'users','iconSize'=>14]) View Submissions</button>
                                             @if($slot->status==='open')
                                                 <button type="button" class="edit-slot-btn sk-btn sk-btn--secondary sk-btn--sm"
                                                     data-slot-id="{{ $slot->slot_id }}"
@@ -452,6 +453,35 @@
                         </div>
                     </section>
                 @endforeach
+            </div>
+            <div id="submissionMonitorModal" class="fixed inset-0 z-[85] hidden items-center justify-center bg-slate-900/45 p-3 md:p-6" role="dialog" aria-modal="true" aria-labelledby="monitorTitle">
+                <section class="flex max-h-[94vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+                    <header class="flex items-start justify-between gap-4 border-b border-gray-100 px-5 py-4 md:px-7">
+                        <div class="min-w-0"><p class="text-xs font-bold uppercase tracking-wider text-red-600">Submission Monitoring</p><h2 id="monitorTitle" class="mt-1 truncate text-xl font-bold text-gray-900">Loading submissions...</h2><p id="monitorMeta" class="mt-1 text-xs text-gray-500"></p></div>
+                        <button type="button" data-monitor-close class="sk-icon-btn shrink-0" aria-label="Close monitoring">@include('partials.ui.icon',['icon'=>'x','iconSize'=>18])</button>
+                    </header>
+                    <div id="monitorLoading" class="p-10 text-center text-sm text-gray-500">Loading barangay submissions...</div>
+                    <div id="monitorError" class="hidden m-5 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700"></div>
+                    <div id="monitorContent" class="hidden min-h-0 flex-1 overflow-y-auto p-4 md:p-6">
+                        <div class="mb-5 grid grid-cols-2 gap-3 md:grid-cols-5">
+                            <div class="rounded-xl border border-gray-100 bg-gray-50 p-3"><p class="text-[11px] text-gray-500">Total Barangays</p><p data-summary="total" class="mt-1 text-xl font-bold text-gray-900">0</p></div>
+                            <div class="rounded-xl border border-green-100 bg-green-50 p-3"><p class="text-[11px] text-gray-500">Submitted</p><p data-summary="submitted" class="mt-1 text-xl font-bold text-green-700">0</p></div>
+                            <div class="rounded-xl border border-red-100 bg-red-50 p-3"><p class="text-[11px] text-gray-500">Not Submitted</p><p data-summary="not_submitted" class="mt-1 text-xl font-bold text-red-700">0</p></div>
+                            <div class="rounded-xl border border-blue-100 bg-blue-50 p-3"><p class="text-[11px] text-gray-500">On Time</p><p data-summary="on_time" class="mt-1 text-xl font-bold text-blue-700">0</p></div>
+                            <div class="rounded-xl border border-orange-100 bg-orange-50 p-3"><p class="text-[11px] text-gray-500">Late</p><p data-summary="late" class="mt-1 text-xl font-bold text-orange-700">0</p></div>
+                        </div>
+                        <div class="mb-4 grid grid-cols-1 gap-3 md:grid-cols-3">
+                            <select id="monitorSubmissionFilter" class="h-10 rounded-lg border border-gray-200 px-3 text-sm"><option value="all">All Submission Status</option><option value="submitted">Submitted</option><option value="not_submitted">Not Submitted</option><option value="on_time">On Time</option><option value="late">Late</option></select>
+                            <select id="monitorQualityFilter" class="h-10 rounded-lg border border-gray-200 px-3 text-sm"><option value="all">All Quality Status</option><option value="pending_review">Pending Review</option><option value="needs_revision">Needs Revision</option><option value="approved">Approved</option></select>
+                            <input id="monitorSearch" type="search" placeholder="Search barangay..." class="h-10 rounded-lg border border-gray-200 px-3 text-sm">
+                        </div>
+                        <div class="overflow-x-auto rounded-xl border border-gray-100">
+                            <table class="w-full min-w-[760px] text-left text-sm"><thead class="bg-gray-50 text-xs uppercase tracking-wide text-gray-500"><tr><th class="px-4 py-3">Barangay</th><th class="px-4 py-3">Submission Status</th><th class="px-4 py-3">Quality Review</th><th class="px-4 py-3">Submitted By</th><th class="px-4 py-3">Submitted At</th></tr></thead><tbody id="monitorRows" class="divide-y divide-gray-100"></tbody></table>
+                            <p id="monitorNoResults" class="hidden px-4 py-8 text-center text-sm text-gray-500">No barangays matched the current filters.</p>
+                        </div>
+                        <div class="mt-4 flex items-center justify-between gap-3"><p id="monitorPageInfo" class="text-xs text-gray-500"></p><div class="flex gap-2"><button id="monitorPrev" type="button" class="sk-btn sk-btn--secondary sk-btn--sm">Previous</button><button id="monitorNext" type="button" class="sk-btn sk-btn--secondary sk-btn--sm">Next</button></div></div>
+                    </div>
+                </section>
             </div>
         </main>
     </div>
@@ -708,6 +738,66 @@ function deleteSlot(id,title){
     });
 }
 document.addEventListener('DOMContentLoaded',syncSlotFields);
+const monitorModal=document.getElementById('submissionMonitorModal');
+const monitorLoading=document.getElementById('monitorLoading');
+const monitorError=document.getElementById('monitorError');
+const monitorContent=document.getElementById('monitorContent');
+const monitorRows=document.getElementById('monitorRows');
+let monitorData=[];
+let monitorPage=1;
+const monitorPageSize=10;
+function monitorEscape(value){return String(value??'').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[char]));}
+function monitorRender(){
+    const submissionFilter=document.getElementById('monitorSubmissionFilter').value;
+    const qualityFilter=document.getElementById('monitorQualityFilter').value;
+    const search=document.getElementById('monitorSearch').value.trim().toLocaleLowerCase();
+    const filtered=monitorData.filter(row=>{
+        const submissionMatch=submissionFilter==='all'||(submissionFilter==='submitted'&&row.submission_status==='submitted')||(submissionFilter==='not_submitted'&&row.submission_status==='not_submitted')||(submissionFilter==='on_time'&&row.timeliness_status==='on_time')||(submissionFilter==='late'&&row.timeliness_status==='late');
+        const qualityMatch=qualityFilter==='all'||row.quality_status===qualityFilter;
+        return submissionMatch&&qualityMatch&&row.barangay_name.toLocaleLowerCase().includes(search);
+    });
+    const pages=Math.max(1,Math.ceil(filtered.length/monitorPageSize));
+    monitorPage=Math.min(monitorPage,pages);
+    const pageRows=filtered.slice((monitorPage-1)*monitorPageSize,monitorPage*monitorPageSize);
+    monitorRows.innerHTML=pageRows.map(row=>{
+        const status=row.submission_status==='not_submitted'?'Not Submitted':row.timeliness_status==='late'?'Late':row.timeliness_status==='on_time'?'Submitted · On Time':'Submitted';
+        const statusClass=row.submission_status==='not_submitted'?'bg-red-50 text-red-700':row.timeliness_status==='late'?'bg-orange-50 text-orange-700':'bg-green-50 text-green-700';
+        const quality=row.submission_status==='not_submitted'?'—':({pending_review:'Pending Review',needs_revision:'Needs Revision',approved:'Approved'}[row.quality_status]||'Pending Review');
+        const qualityClass=row.quality_status==='approved'?'bg-green-50 text-green-700':row.quality_status==='needs_revision'?'bg-red-50 text-red-700':'bg-gray-100 text-gray-600';
+        const by=row.submission_status==='not_submitted'?'—':[row.submitted_by,row.submitted_role].filter(Boolean).join(' · ')||'—';
+        return `<tr><td class="px-4 py-3 font-semibold text-gray-800">${monitorEscape(row.barangay_name)}</td><td class="px-4 py-3"><span class="rounded-full px-2.5 py-1 text-xs font-semibold ${statusClass}">${status}</span></td><td class="px-4 py-3">${row.submission_status==='not_submitted'?'—':`<span class="rounded-full px-2.5 py-1 text-xs font-semibold ${qualityClass}">${quality}</span>`}</td><td class="px-4 py-3 text-gray-600">${monitorEscape(by)}</td><td class="px-4 py-3 whitespace-nowrap text-gray-600">${monitorEscape(row.submitted_at||'—')}</td></tr>`;
+    }).join('');
+    document.getElementById('monitorNoResults').classList.toggle('hidden',filtered.length>0);
+    document.getElementById('monitorPageInfo').textContent=filtered.length?`Showing ${(monitorPage-1)*monitorPageSize+1}–${Math.min(monitorPage*monitorPageSize,filtered.length)} of ${filtered.length}`:'0 results';
+    document.getElementById('monitorPrev').disabled=monitorPage<=1;
+    document.getElementById('monitorNext').disabled=monitorPage>=pages;
+}
+async function openSubmissionMonitor(button){
+    monitorModal.classList.remove('hidden');monitorModal.classList.add('flex');
+    document.body.classList.add('overflow-hidden');
+    document.getElementById('monitorTitle').textContent='Loading submissions...';
+    document.getElementById('monitorMeta').textContent='';
+    monitorLoading.classList.remove('hidden');monitorError.classList.add('hidden');monitorContent.classList.add('hidden');
+    try{
+        const response=await fetch(button.dataset.monitorUrl,{headers:{'Accept':'application/json','X-Requested-With':'XMLHttpRequest'},credentials:'same-origin'});
+        if(!response.ok)throw new Error(response.status===404?'This slot is not part of the current administration term.':'Unable to load submission monitoring. Please try again.');
+        const data=await response.json();
+        monitorData=data.rows||[];monitorPage=1;
+        document.getElementById('monitorTitle').textContent=data.slot.title;
+        const type=data.slot.submission_type==='budget_report'?'Budget / Financial Report':'Accomplishment Report';
+        const detail=[type,data.slot.category,data.slot.period,`Deadline: ${data.slot.end_date}`,`Who Can Submit: ${data.slot.role}`].filter(Boolean).join(' · ');
+        document.getElementById('monitorMeta').textContent=detail;
+        Object.entries(data.summary||{}).forEach(([key,value])=>{const target=document.querySelector(`[data-summary="${key}"]`);if(target)target.textContent=value;});
+        monitorLoading.classList.add('hidden');monitorContent.classList.remove('hidden');monitorRender();
+    }catch(error){monitorLoading.classList.add('hidden');monitorError.textContent=error.message||'Unable to load submission monitoring. Please try again.';monitorError.classList.remove('hidden');}
+}
+document.querySelectorAll('.view-submissions-btn').forEach(button=>button.addEventListener('click',()=>openSubmissionMonitor(button)));
+document.querySelectorAll('[data-monitor-close]').forEach(button=>button.addEventListener('click',()=>{monitorModal.classList.add('hidden');monitorModal.classList.remove('flex');document.body.classList.remove('overflow-hidden');}));
+monitorModal.addEventListener('click',event=>{if(event.target===monitorModal){monitorModal.classList.add('hidden');monitorModal.classList.remove('flex');document.body.classList.remove('overflow-hidden');}});
+document.addEventListener('keydown',event=>{if(event.key==='Escape'&&!monitorModal.classList.contains('hidden')){monitorModal.classList.add('hidden');monitorModal.classList.remove('flex');document.body.classList.remove('overflow-hidden');}});
+['monitorSubmissionFilter','monitorQualityFilter','monitorSearch'].forEach(id=>document.getElementById(id).addEventListener(id==='monitorSearch'?'input':'change',()=>{monitorPage=1;monitorRender();}));
+document.getElementById('monitorPrev').addEventListener('click',()=>{if(monitorPage>1){monitorPage--;monitorRender();}});
+document.getElementById('monitorNext').addEventListener('click',()=>{monitorPage++;monitorRender();});
 @if($errors->lydpUpload->any())
 Swal.fire({
     icon:'error',
