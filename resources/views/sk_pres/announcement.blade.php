@@ -71,7 +71,7 @@
                         <div class="md:w-44">
                             <label class="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">Sort</label>
 
-                            <select name="sort" class="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-red-200">
+                            <select name="sort" onchange="this.form.submit()" class="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-red-200">
                                 <option value="latest" {{ $sort==='latest' ? 'selected' : '' }}>Latest First</option>
                                 <option value="oldest" {{ $sort==='oldest' ? 'selected' : '' }}>Oldest First</option>
                             </select>

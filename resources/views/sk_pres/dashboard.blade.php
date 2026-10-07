@@ -73,7 +73,7 @@
                                 Barangay
                             </label>
 
-                            <select id="barangay_id" name="barangay_id" class="w-full sm:w-56 border border-gray-300 rounded-xl px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-red-500">
+                            <select id="barangay_id" name="barangay_id" onchange="this.form.submit()" class="w-full sm:w-56 border border-gray-300 rounded-xl px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-red-500">
                                 <option value="">All Barangays</option>
 
                                 @foreach ($barangays as $barangay)
@@ -89,7 +89,7 @@
                                 Fiscal Year
                             </label>
 
-                            <select id="fiscal_year" name="fiscal_year" class="w-full sm:w-48 border border-gray-300 rounded-xl px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-red-500">
+                            <select id="fiscal_year" name="fiscal_year" onchange="this.form.submit()" class="w-full sm:w-48 border border-gray-300 rounded-xl px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-red-500">
                                 <option value="" {{ !$selectedYear ? 'selected' : '' }}>
                                     Automatic
                                 </option>
@@ -101,10 +101,6 @@
                                 @endforeach
                             </select>
                         </div>
-
-                        <button type="submit" class="bg-red-600 hover:bg-red-700 text-white px-5 py-2 rounded-xl text-sm font-semibold transition">
-                            Apply
-                        </button>
 
                         @if ($selectedBarangay || $selectedYear)
                             <a href="{{ route('sk_pres.dashboard') }}" class="border border-gray-300 hover:bg-gray-50 text-gray-600 px-5 py-2 rounded-xl text-sm font-semibold text-center transition">

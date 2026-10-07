@@ -65,7 +65,7 @@
                                 Sort
                             </label>
 
-                            <select name="sort"
+                            <select name="sort" onchange="this.form.submit()"
                                     class="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-red-200">
 
                                 <option value="latest" {{ $sort==='latest' ? 'selected' : '' }}>
