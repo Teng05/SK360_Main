@@ -18,7 +18,7 @@ class ProfileSettingsController extends Controller
     protected array $roles=[
         'sk_president'=>[
             'prefix'=>'sk_pres',
-            'label'=>'SK President',
+            'label'=>'SK Federation President',
             'description'=>'Manage your profile and security settings for SK Federation.',
             'menu'=>[
                 ['route'=>'sk_pres.home','icon'=>'&#127968;','label'=>'Home'],
