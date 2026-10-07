@@ -1039,7 +1039,7 @@ class MobileSyncController extends Controller
         abort_unless($this->isCurrentMobileMeeting($meeting), 404);
 
         $user = $this->mobileSignedMeetingUser($request, $meeting);
-        abort_unless($user, 403);
+        abort_unless($user !== null, 403);
 
         $meeting = $this->decorateMobileMeeting($meeting);
         abort_if($meeting->status === 'cancelled', 410);
@@ -1693,6 +1693,8 @@ class MobileSyncController extends Controller
             'budget_category' => ['nullable', 'string', 'max:100'],
             'fiscal_year' => ['nullable', 'integer', 'min:2000', 'max:2100'],
             'budget_period_type' => ['nullable', 'in:monthly,quarterly,semi_annual,annual'],
+            'accomplishment_category' => ['nullable', 'string', 'max:100'],
+            'ydp_program_type' => ['nullable', 'string', 'max:150'],
         ]);
 
         $slotData = [
@@ -1706,7 +1708,7 @@ class MobileSyncController extends Controller
             'status' => 'open',
             'created_at' => now(),
         ];
-        foreach (['budget_category', 'fiscal_year', 'budget_period_type'] as $field) {
+        foreach (['budget_category', 'fiscal_year', 'budget_period_type', 'accomplishment_category', 'ydp_program_type'] as $field) {
             if (Schema::hasColumn('submission_slots', $field) && array_key_exists($field, $validated)) {
                 $slotData[$field] = $validated[$field];
             }
