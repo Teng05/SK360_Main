@@ -25,6 +25,8 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\File;
+use setasign\Fpdi\Fpdi;
 
 use Illuminate\Http\Response;
 
@@ -55,6 +57,9 @@ class ConsolidationController extends Controller
         $qualitySubmissions=$this->qualitySubmissions($filters);
 
         $stats=$this->stats($submissions);
+        $documentFilters=$this->documentFilters($request);
+        $documentSubmissions=$this->consolidationDocuments($documentFilters);
+        $term=DB::table('administration_terms')->where('term_id',$this->currentTermId())->first();
 
 
 
@@ -113,6 +118,10 @@ class ConsolidationController extends Controller
             'downloadRoute'=>route('sk_pres.consolidation.download',$filters),
 
             'currentUrl'=>url()->current(),
+            'documentFilters'=>$documentFilters,
+            'documentSubmissions'=>$documentSubmissions,
+            'documentYears'=>$this->availableYears(),
+            'documentTerm'=>$term,
 
         ]);
 
@@ -120,13 +129,24 @@ class ConsolidationController extends Controller
 
 
 
-    public function download(Request $request): Response
+    public function download(Request $request): Response|RedirectResponse
 
     {
 
         abort_unless(auth()->check() && auth()->user()->role==='sk_president',403);
 
 
+
+        $mode=(string)$request->query('mode','legacy');
+        if($mode==='annual_budget'){
+            return $this->downloadAnnualBudget((int)$request->query('year',0));
+        }
+        if($mode==='annual_coa'){
+            return $this->downloadAnnualFinancial((int)$request->query('year',0));
+        }
+        if($mode==='pdf'){
+            return $this->downloadSelectedPdfs($request);
+        }
 
         $filters=$this->filters($request);
 
@@ -150,6 +170,258 @@ class ConsolidationController extends Controller
 
         return $pdf->download('consolidated-reports-'.$filters['year'].'-'.$filters['period'].'.pdf');
 
+    }
+
+    protected function documentFilters(Request $request): array
+    {
+        $year=(int)$request->query('year',$this->defaultFilterYear());
+        $tab=(string)$request->query('tab','accomplishment');
+        $category=(string)$request->query('category','all');
+        $budgetCategory=(string)$request->query('budget_category','all');
+        $period=(string)$request->query('report_period','all');
+        return [
+            'tab'=>in_array($tab,['accomplishment','budget'],true)?$tab:'accomplishment',
+            'year'=>$year>=2000&&$year<=2100?$year:$this->defaultFilterYear(),
+            'category'=>in_array($category,['all','general','youth_development_program','kk_assembly'],true)?$category:'all',
+            'budget_category'=>in_array($budgetCategory,['all','annual_budget','supplemental_budget','coa_report'],true)?$budgetCategory:'all',
+            'period'=>in_array($period,['all','monthly','quarterly','semi_annual','annual'],true)?$period:'all',
+            'month'=>max(1,min(12,(int)$request->query('month',now()->month))),
+            'quarter'=>in_array($request->query('quarter'),['Q1','Q2','Q3','Q4'],true)?$request->query('quarter'):'Q'.ceil(now()->month/3),
+            'half'=>in_array($request->query('half'),['H1','H2'],true)?$request->query('half'):'H1',
+            'barangay'=>trim((string)$request->query('document_barangay','')),
+        ];
+    }
+
+    protected function consolidationDocuments(array $filters): Collection
+    {
+        $termId=$this->currentTermId();
+        if(!$termId){
+            return collect();
+        }
+
+        $items=collect();
+        if($filters['tab']==='accomplishment'){
+            $items=DB::table('accomplishment_reports as ar')
+                ->leftJoin('barangays as b','b.barangay_id','=','ar.barangay_id')
+                ->leftJoin('submission_slots as ss',function($join){
+                    $join->on('ss.slot_id','=','ar.slot_id')->on('ss.term_id','=','ar.term_id');
+                })
+                ->leftJoin('submission_quality_reviews as qr',function($join){
+                    $join->on('qr.source_id','=','ar.report_id')->where('qr.source_type','=','accomplishment_report');
+                })
+                ->where('ar.term_id',$termId)->where('ar.reporting_year',$filters['year'])->where('ar.status','!=','draft')
+                ->when($filters['category']!=='all',fn($q)=>$q->whereRaw("COALESCE(ss.accomplishment_category,'general') = ?",[$filters['category']]))
+                ->when($filters['period']==='monthly',fn($q)=>$q->where('ar.report_type','monthly')->where('ar.reporting_month',$filters['month']))
+                ->when($filters['period']==='quarterly',fn($q)=>$q->where('ar.report_type','quarterly')->where('ar.reporting_quarter',$filters['quarter']))
+                ->when($filters['period']==='annual',fn($q)=>$q->where('ar.report_type','annual'))
+                ->when($filters['period']==='semi_annual',fn($q)=>$q->whereRaw('1 = 0'))
+                ->when($filters['barangay']!=='',fn($q)=>$q->where('b.barangay_name','like','%'.$filters['barangay'].'%'))
+                ->select(DB::raw("'accomplishment_report' as source_type"),'ar.report_id as source_id','ar.barangay_id','b.barangay_name','ar.title',DB::raw("COALESCE(ss.accomplishment_category,'general') as category"),'ar.report_type as period_type','ar.reporting_year as year','ar.reporting_month as month','ar.reporting_quarter as quarter',DB::raw('NULL as half'),'ar.uploaded_file_path','ar.generated_pdf_path','ar.submitted_at','ar.created_at','qr.status as quality_status')
+                ->get();
+        }else{
+            $items=DB::table('budget_reports as br')
+                ->leftJoin('barangays as b','b.barangay_id','=','br.barangay_id')
+                ->leftJoin('submission_slots as ss',function($join){
+                    $join->on('ss.slot_id','=','br.slot_id')->on('ss.term_id','=','br.term_id');
+                })
+                ->leftJoin('submission_quality_reviews as qr',function($join){
+                    $join->on('qr.source_id','=','br.budget_report_id')->where('qr.source_type','=','budget_report');
+                })
+                ->where('br.term_id',$termId)->where('br.fiscal_year',$filters['year'])->where('br.status','!=','draft')
+                ->when($filters['budget_category']!=='all',fn($q)=>$q->whereRaw('COALESCE(br.budget_category,ss.budget_category) = ?',[$filters['budget_category']]))
+                ->when($filters['budget_category']==='all'||($filters['budget_category']==='coa_report'&&$filters['period']==='all'),fn($q)=>$q->whereRaw("NOT (COALESCE(br.budget_category,ss.budget_category,'') = 'annual_budget' OR (COALESCE(br.budget_category,ss.budget_category,'') = 'coa_report' AND COALESCE(br.budget_period_type,ss.budget_period_type,'') = 'annual'))"))
+                ->when($filters['budget_category']!=='annual_budget'&&$filters['period']!=='all',fn($q)=>$q->whereRaw('COALESCE(br.budget_period_type,ss.budget_period_type) = ?',[$filters['period']]))
+                ->when($filters['budget_category']!=='annual_budget'&&$filters['period']==='monthly',fn($q)=>$q->whereRaw('COALESCE(br.fiscal_month,ss.fiscal_month) = ?',[$filters['month']]))
+                ->when($filters['budget_category']!=='annual_budget'&&$filters['period']==='quarterly',fn($q)=>$q->whereRaw('COALESCE(br.fiscal_quarter,ss.fiscal_quarter) = ?',[$filters['quarter']]))
+                ->when($filters['budget_category']!=='annual_budget'&&$filters['period']==='semi_annual',fn($q)=>$q->whereRaw('COALESCE(br.fiscal_half,ss.fiscal_half) = ?',[$filters['half']]))
+                ->when($filters['barangay']!=='',fn($q)=>$q->where('b.barangay_name','like','%'.$filters['barangay'].'%'))
+                ->select(DB::raw("'budget_report' as source_type"),'br.budget_report_id as source_id','br.barangay_id','b.barangay_name','br.title',DB::raw('COALESCE(br.budget_category,ss.budget_category) as category'),DB::raw('COALESCE(br.budget_period_type,ss.budget_period_type) as period_type'),'br.fiscal_year as year',DB::raw('COALESCE(br.fiscal_month,ss.fiscal_month) as month'),DB::raw('COALESCE(br.fiscal_quarter,ss.fiscal_quarter) as quarter'),DB::raw('COALESCE(br.fiscal_half,ss.fiscal_half) as half'),'br.uploaded_file_path','br.generated_pdf_path','br.submitted_at','br.created_at','qr.status as quality_status')
+                ->get();
+        }
+
+        return $items->sortByDesc(fn($item)=>$item->submitted_at??$item->created_at)->values()->map(function($item){
+            $item->quality_status=$item->quality_status?:'pending';
+            $item->period_label=$item->source_type==='budget_report'&&$item->category!=='coa_report'
+                ? 'FY '.$item->year
+                : match($item->period_type){
+                    'monthly'=>isset($item->month)?Carbon::create((int)$item->year,(int)$item->month,1)->format('F Y'):'Monthly '.$item->year,
+                    'quarterly'=>($item->quarter?:'Quarterly').' '.$item->year,
+                    'semi_annual'=>(($item->half==='H2')?'Second Half':'First Half').' '.$item->year,
+                    'annual'=>'Annual '.$item->year,
+                    default=>'FY '.$item->year,
+                };
+            $item->category_label=$item->source_type==='accomplishment_report'
+                ? ['general'=>'General Accomplishment','youth_development_program'=>'Youth Development Program','kk_assembly'=>'KK Assembly'][$item->category]??'Accomplishment Report'
+                : ['annual_budget'=>'Annual Budget','supplemental_budget'=>'Supplemental Budget','coa_report'=>'COA Report'][$item->category]??'Budget Report';
+            $item->submitted_label=($item->submitted_at??$item->created_at)?Carbon::parse($item->submitted_at??$item->created_at)->format('M d, Y h:i A'):'Unknown';
+            $item->view_url=route('sk_pres.module.submission.view',[$item->source_type,$item->source_id]);
+            $item->is_data_consolidation=$item->source_type==='budget_report'&&($item->category==='annual_budget'||($item->category==='coa_report'&&$item->period_type==='annual'));
+            $item->has_pdf=!empty($item->uploaded_file_path)||($item->source_type==='budget_report'&&$item->generated_pdf_path==='TEMPLATE_GEN');
+            return $item;
+        });
+    }
+
+    protected function downloadAnnualBudget(int $year): Response
+    {
+        abort_unless($year>=2000&&$year<=2100,404);
+        $termId=$this->currentTermId();
+        abort_unless($termId,404);
+        $rows=$this->annualBudgetRows($year,$termId);
+        $total=(float)$rows->sum(fn($row)=>(float)$row->total_amount);
+        $expected=(int)DB::table('barangays')->count();
+        $term=DB::table('administration_terms')->where('term_id',$termId)->first();
+        return Pdf::loadView('sk_pres.consolidation-output',[
+            'mode'=>'annual_budget','year'=>$year,'rows'=>$rows,'term'=>$term,'generatedAt'=>now(),
+            'summary'=>['included'=>$rows->whereNotNull('total_amount')->count(),'expected'=>$expected,'total_budget'=>$total],
+        ])->setPaper('a4','portrait')->download('consolidated-annual-budget-'.$year.'.pdf');
+    }
+
+    protected function downloadAnnualFinancial(int $year): Response
+    {
+        abort_unless($year>=2000&&$year<=2100,404);
+        $termId=$this->currentTermId();
+        abort_unless($termId,404);
+        $budgets=$this->annualBudgetRows($year,$termId)->keyBy('barangay_id');
+        $coa=$this->annualCoaRows($year,$termId)->keyBy('barangay_id');
+        $ids=$budgets->keys()->merge($coa->keys())->unique();
+        $rows=$ids->map(function($id)use($budgets,$coa){
+            $budget=$budgets->get($id);$expenditure=$coa->get($id);
+            $hasBudget=$budget&&$budget->total_amount!==null;
+            $hasExpenditure=$expenditure&&$expenditure->actual_expenditure!==null;
+            $budgetValue=$hasBudget?(float)$budget->total_amount:null;
+            $expenditureValue=$hasExpenditure?(float)$expenditure->actual_expenditure:null;
+            $complete=$hasBudget&&$hasExpenditure;
+            return (object)[
+                'barangay_id'=>(int)$id,'barangay_name'=>$budget->barangay_name??$expenditure->barangay_name??'Unknown Barangay',
+                'budget'=>$budgetValue,'expenditure'=>$expenditureValue,'complete'=>$complete,
+                'balance'=>$complete?$budgetValue-$expenditureValue:null,
+                'utilization'=>$complete&&$budgetValue>0?($expenditureValue/$budgetValue)*100:($complete?0:null),
+                'missing'=>$complete?null:(!$hasBudget?'Annual Budget missing':'Annual COA missing'),
+            ];
+        })->sortBy('barangay_name',SORT_NATURAL|SORT_FLAG_CASE)->values();
+        $completeRows=$rows->where('complete',true);
+        $pairedBudget=(float)$completeRows->sum('budget');
+        $pairedExpenditure=(float)$completeRows->sum('expenditure');
+        $term=DB::table('administration_terms')->where('term_id',$termId)->first();
+        return Pdf::loadView('sk_pres.consolidation-output',[
+            'mode'=>'annual_coa','year'=>$year,'rows'=>$rows,'term'=>$term,'generatedAt'=>now(),
+            'summary'=>[
+                'included'=>$rows->count(),'budget_total'=>(float)$rows->whereNotNull('budget')->sum('budget'),
+                'expenditure_total'=>(float)$rows->whereNotNull('expenditure')->sum('expenditure'),
+                'paired_budget'=>$pairedBudget,'paired_expenditure'=>$pairedExpenditure,
+                'balance'=>$pairedBudget-$pairedExpenditure,'utilization'=>$pairedBudget>0?($pairedExpenditure/$pairedBudget)*100:0,
+                'complete_pairs'=>$completeRows->count(),
+            ],
+        ])->setPaper('a4','landscape')->download('annual-financial-consolidation-'.$year.'.pdf');
+    }
+
+    protected function annualBudgetRows(int $year,int $termId): Collection
+    {
+        return DB::table('budget_reports as br')
+            ->join('barangays as b','b.barangay_id','=','br.barangay_id')
+            ->leftJoin('submission_slots as ss',function($join){$join->on('ss.slot_id','=','br.slot_id')->on('ss.term_id','=','br.term_id');})
+            ->where('br.term_id',$termId)->where('br.fiscal_year',$year)->where('br.status','!=','draft')
+            ->whereRaw("COALESCE(br.budget_category,ss.budget_category) = 'annual_budget'")
+            ->select('br.budget_report_id','br.barangay_id','b.barangay_name','br.total_amount','br.submitted_at','br.created_at')
+            ->orderBy('b.barangay_name')->orderByDesc('br.submitted_at')->orderByDesc('br.budget_report_id')
+            ->get()->groupBy('barangay_id')->map(fn($records)=>$records->first())->values();
+    }
+
+    protected function annualCoaRows(int $year,int $termId): Collection
+    {
+        return DB::table('budget_reports as br')
+            ->join('barangays as b','b.barangay_id','=','br.barangay_id')
+            ->leftJoin('submission_slots as ss',function($join){$join->on('ss.slot_id','=','br.slot_id')->on('ss.term_id','=','br.term_id');})
+            ->where('br.term_id',$termId)->where('br.fiscal_year',$year)->where('br.status','!=','draft')
+            ->whereRaw("COALESCE(br.budget_category,ss.budget_category) = 'coa_report'")
+            ->whereRaw("COALESCE(br.budget_period_type,ss.budget_period_type) = 'annual'")
+            ->select('br.budget_report_id','br.barangay_id','b.barangay_name','br.actual_expenditure','br.submitted_at','br.created_at')
+            ->orderBy('b.barangay_name')->orderByDesc('br.submitted_at')->orderByDesc('br.budget_report_id')
+            ->get()->groupBy('barangay_id')->map(fn($records)=>$records->first())->values();
+    }
+
+    protected function downloadSelectedPdfs(Request $request): Response|RedirectResponse
+    {
+        $validated=$request->validate([
+            'tab'=>['required','in:accomplishment,budget'],'year'=>['required','integer','min:2000','max:2100'],
+            'sources'=>['required','array','min:1','max:100'],
+            'sources.*'=>['required','regex:/^(accomplishment_report|budget_report):[1-9][0-9]*$/'],
+        ]);
+        $filters=$this->documentFilters($request);
+        abort_if($filters['tab']==='budget'&&($filters['budget_category']==='annual_budget'||($filters['budget_category']==='coa_report'&&$filters['period']==='annual')),422,'Annual Budget and Annual COA use data consolidation.');
+        $visible=$this->consolidationDocuments($filters)->keyBy(fn($item)=>$item->source_type.':'.$item->source_id);
+        $selected=collect($validated['sources'])->unique()->map(function($key)use($visible){
+            abort_unless($visible->has($key),404);
+            return $visible->get($key);
+        })->values();
+        $termId=$this->currentTermId();
+        abort_unless($termId,404);
+        $temporary=[];
+        try{
+            $sourcePaths=[];
+            foreach($selected as $item){
+                $record=$this->resolveConsolidationSource($item,$termId);
+                if(isset($record['temporary'])){$temporary[]=$record['path'];}
+                $sourcePaths[]=$record['path'];
+            }
+            $term=DB::table('administration_terms')->where('term_id',$termId)->first();
+            $cover=Pdf::loadView('sk_pres.consolidation-output',[
+                'mode'=>'pdf','year'=>(int)$validated['year'],'rows'=>$selected,'term'=>$term,'generatedAt'=>now(),'summary'=>[],
+            ])->setPaper('a4','portrait')->output();
+            $coverPath=tempnam(sys_get_temp_dir(),'sk360-cover-');
+            File::put($coverPath,$cover);
+            $temporary[]=$coverPath;
+            $pdf=new Fpdi();
+            foreach(array_merge([$coverPath],$sourcePaths) as $path){
+                $pageCount=$pdf->setSourceFile($path);
+                for($page=1;$page<=$pageCount;$page++){
+                    $template=$pdf->importPage($page);
+                    $size=$pdf->getTemplateSize($template);
+                    $pdf->AddPage($size['orientation'],[$size['width'],$size['height']]);
+                    $pdf->useTemplate($template);
+                }
+            }
+            $filename='consolidated-'.($filters['tab']==='budget'?'budget':'accomplishment').'-'.$validated['year'].'.pdf';
+            return response($pdf->Output('S'),200,['Content-Type'=>'application/pdf','Content-Disposition'=>'attachment; filename="'.$filename.'"','X-Content-Type-Options'=>'nosniff']);
+        }catch(\Throwable $exception){
+            report($exception);
+            return back()->with('consolidation_error','One or more selected PDFs could not be merged. Check that each source is a readable PDF.');
+        }finally{
+            foreach(array_unique($temporary) as $path){if(is_file($path))@unlink($path);}
+        }
+    }
+
+    protected function resolveConsolidationSource(object $item,int $termId): array
+    {
+        if($item->source_type==='accomplishment_report'){
+            $record=DB::table('accomplishment_reports')->where('report_id',$item->source_id)->where('term_id',$termId)->where('status','!=','draft')->first();
+            abort_unless($record,404);
+            $relative=$record->uploaded_file_path?:$record->generated_pdf_path;
+            return ['path'=>$this->safeConsolidationPdfPath($relative,'uploads/reports')];
+        }
+        $record=DB::table('budget_reports')->where('budget_report_id',$item->source_id)->where('term_id',$termId)->where('status','!=','draft')->first();
+        abort_unless($record,404);
+        if(!empty($record->uploaded_file_path)){
+            return ['path'=>$this->safeConsolidationPdfPath($record->uploaded_file_path,'uploads/budget_reports')];
+        }
+        abort_unless(($record->generated_pdf_path??null)==='TEMPLATE_GEN'&&!empty($record->template_data),404);
+        $data=json_decode($record->template_data,true);
+        abort_unless(is_array($data)&&$data,404);
+        $barangayName=DB::table('barangays')->where('barangay_id',$record->barangay_id)->value('barangay_name')?:'Barangay';
+        $paper=($data['report_type']??'quarterly')==='monthly'?'portrait':'landscape';
+        $bytes=Pdf::loadView('shared.budget-template-download',['data'=>$data,'barangayName'=>$barangayName])->setPaper('a4',$paper)->output();
+        $path=tempnam(sys_get_temp_dir(),'sk360-budget-');File::put($path,$bytes);
+        return ['path'=>$path,'temporary'=>true];
+    }
+
+    protected function safeConsolidationPdfPath(?string $relative,string $directory): string
+    {
+        abort_unless($relative,404,'The submitted PDF is unavailable.');
+        $relative=str_replace('\\','/',ltrim($relative,'/\\'));
+        abort_unless(str_starts_with($relative,$directory.'/')&&strtolower(pathinfo($relative,PATHINFO_EXTENSION))==='pdf',404,'The submitted PDF is unavailable.');
+        $public=realpath(public_path());$base=realpath(public_path($directory));$path=realpath(public_path($relative));
+        abort_unless($public&&$base&&$path&&str_starts_with(strtolower($base),strtolower(rtrim($public,DIRECTORY_SEPARATOR).DIRECTORY_SEPARATOR))&&str_starts_with(strtolower($path),strtolower(rtrim($base,DIRECTORY_SEPARATOR).DIRECTORY_SEPARATOR))&&File::isFile($path),404,'The submitted PDF is unavailable.');
+        return $path;
     }
 
 

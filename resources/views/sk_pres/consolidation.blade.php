@@ -31,12 +31,6 @@
                     <h1 class="sk-page-title">Report Consolidation</h1>
                     <p class="sk-page-subtitle">Automatically compile barangay reports into unified monthly, quarterly, and annual documents.</p>
                 </div>
-                <div class="sk-page-head__actions">
-                    <button type="submit" form="consolidationFilters" formaction="{{ $downloadRoute }}" class="sk-btn sk-btn--primary sk-btn--lg">
-                        @include('partials.ui.icon', ['icon'=>'download','iconSize'=>18])
-                        Download Consolidated PDF
-                    </button>
-                </div>
             </div>
 
             @if(session('quality_status'))
@@ -50,6 +44,127 @@
                     {{ $errors->first('quality_review') }}
                 </div>
             @endif
+
+            @if(session('consolidation_error'))
+                <div class="mb-6 rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-700">{{ session('consolidation_error') }}</div>
+            @endif
+            @if($errors->has('sources'))
+                <div class="mb-6 rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-700">Select at least one PDF document to consolidate.</div>
+            @endif
+
+            <section class="sk-card mb-8 overflow-hidden">
+                <div class="border-b border-gray-100 px-6 py-5">
+                    <h2 class="sk-section-title">Hybrid Report Consolidation</h2>
+                    <p class="sk-section-subtitle">Annual Budget and Annual COA use stored financial values. Other reports are consolidated from their submitted PDFs.</p>
+                    <p class="mt-2 text-xs text-gray-500">Current administration: {{ $documentTerm ? $documentTerm->start_year.'–'.$documentTerm->end_year : 'No active administration term' }}</p>
+                </div>
+                <div class="flex gap-2 border-b border-gray-100 px-6 pt-4">
+                    @foreach(['accomplishment'=>'Accomplishment Reports','budget'=>'Budget Reports'] as $tabKey=>$tabLabel)
+                        <a href="{{ route('sk_pres.consolidation',array_merge(request()->query(),['tab'=>$tabKey])) }}" class="rounded-t-xl px-4 py-3 text-sm font-bold {{ $documentFilters['tab']===$tabKey?'bg-red-50 text-red-700 border border-b-0 border-red-100':'text-gray-500 hover:bg-gray-50' }}">{{ $tabLabel }}</a>
+                    @endforeach
+                </div>
+                <form id="documentConsolidationFilters" method="GET" action="{{ route('sk_pres.consolidation') }}" class="p-6">
+                    <input type="hidden" name="tab" value="{{ $documentFilters['tab'] }}">
+                    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
+                        <div>
+                            <label class="sk-overline mb-2 block">Fiscal / Reporting Year</label>
+                            <select name="year" onchange="this.form.submit()" class="w-full rounded-xl border border-gray-200 bg-white px-3 py-3 text-sm">
+                                @foreach($documentYears as $year)<option value="{{ $year }}" @selected($documentFilters['year']===$year)>{{ $year }}</option>@endforeach
+                            </select>
+                        </div>
+                        @if($documentFilters['tab']==='accomplishment')
+                            <div>
+                                <label class="sk-overline mb-2 block">Category</label>
+                                <select name="category" onchange="this.form.submit()" class="w-full rounded-xl border border-gray-200 bg-white px-3 py-3 text-sm">
+                                    @foreach(['all'=>'All Categories','general'=>'General Accomplishment','youth_development_program'=>'Youth Development Program','kk_assembly'=>'KK Assembly'] as $value=>$label)<option value="{{ $value }}" @selected($documentFilters['category']===$value)>{{ $label }}</option>@endforeach
+                                </select>
+                            </div>
+                        @else
+                            <div>
+                                <label class="sk-overline mb-2 block">Budget Category</label>
+                                <select name="budget_category" onchange="this.form.submit()" class="w-full rounded-xl border border-gray-200 bg-white px-3 py-3 text-sm">
+                                    @foreach(['all'=>'Other Budget PDFs','annual_budget'=>'Annual Budget','supplemental_budget'=>'Supplemental Budget','coa_report'=>'COA Report'] as $value=>$label)<option value="{{ $value }}" @selected($documentFilters['budget_category']===$value)>{{ $label }}</option>@endforeach
+                                </select>
+                            </div>
+                        @endif
+                        @if($documentFilters['tab']==='accomplishment'||$documentFilters['budget_category']!=='annual_budget')
+                            <div>
+                                <label class="sk-overline mb-2 block">Reporting Period</label>
+                                <select name="report_period" onchange="this.form.submit()" class="w-full rounded-xl border border-gray-200 bg-white px-3 py-3 text-sm">
+                                    <option value="all" @selected($documentFilters['period']==='all')>All Periods</option>
+                                    <option value="monthly" @selected($documentFilters['period']==='monthly')>Monthly</option>
+                                    <option value="quarterly" @selected($documentFilters['period']==='quarterly')>Quarterly</option>
+                                    @if($documentFilters['tab']==='budget')<option value="semi_annual" @selected($documentFilters['period']==='semi_annual')>Semi-Annual</option>@endif
+                                    <option value="annual" @selected($documentFilters['period']==='annual')>Annual</option>
+                                </select>
+                            </div>
+                        @endif
+                        @if(($documentFilters['tab']==='accomplishment'||$documentFilters['budget_category']!=='annual_budget')&&$documentFilters['period']==='monthly')
+                            <div><label class="sk-overline mb-2 block">Month</label><select name="month" onchange="this.form.submit()" class="w-full rounded-xl border border-gray-200 bg-white px-3 py-3 text-sm">@foreach($months as $number=>$month)<option value="{{ $number }}" @selected($documentFilters['month']===$number)>{{ $month }}</option>@endforeach</select></div>
+                        @elseif(($documentFilters['tab']==='accomplishment'||$documentFilters['budget_category']!=='annual_budget')&&$documentFilters['period']==='quarterly')
+                            <div><label class="sk-overline mb-2 block">Quarter</label><select name="quarter" onchange="this.form.submit()" class="w-full rounded-xl border border-gray-200 bg-white px-3 py-3 text-sm">@foreach($quarters as $quarter)<option value="{{ $quarter }}" @selected($documentFilters['quarter']===$quarter)>{{ $quarter }}</option>@endforeach</select></div>
+                        @elseif($documentFilters['budget_category']!=='annual_budget'&&$documentFilters['period']==='semi_annual' && $documentFilters['tab']==='budget')
+                            <div><label class="sk-overline mb-2 block">Half</label><select name="half" onchange="this.form.submit()" class="w-full rounded-xl border border-gray-200 bg-white px-3 py-3 text-sm"><option value="H1" @selected($documentFilters['half']==='H1')>First Half</option><option value="H2" @selected($documentFilters['half']==='H2')>Second Half</option></select></div>
+                        @endif
+                        <div>
+                            <label class="sk-overline mb-2 block">Barangay</label>
+                            <input name="document_barangay" value="{{ $documentFilters['barangay'] }}" placeholder="Search barangay..." class="w-full rounded-xl border border-gray-200 bg-white px-3 py-3 text-sm">
+                        </div>
+                    </div>
+                    <div class="mt-6 flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                            @php
+                                $dataMode=$documentFilters['tab']==='budget'&&($documentFilters['budget_category']==='annual_budget'||($documentFilters['budget_category']==='coa_report'&&$documentFilters['period']==='annual'));
+                                $modeBadge=$documentFilters['tab']==='accomplishment'||!$dataMode?'PDF CONSOLIDATION':'DATA CONSOLIDATION';
+                            @endphp
+                            <span class="rounded-full px-3 py-1.5 text-[10px] font-black uppercase tracking-wider {{ $dataMode?'bg-blue-100 text-blue-700':'bg-purple-100 text-purple-700' }}">{{ $modeBadge }}</span>
+                            @if($documentFilters['tab']==='budget'&&$documentFilters['budget_category']==='coa_report'&&$documentFilters['period']==='all')
+                                <span class="ml-2 text-xs text-gray-500">Annual COA records are excluded from this PDF list; choose Annual to generate its financial consolidation.</span>
+                            @endif
+                        </div>
+                        @if(!$dataMode)
+                            <div class="flex flex-wrap gap-2">
+                                <a href="{{ route('sk_pres.consolidation',['tab'=>$documentFilters['tab']]) }}" class="sk-btn sk-btn--secondary sk-btn--sm">Reset Filters</a>
+                                <button type="submit" formaction="{{ route('sk_pres.consolidation') }}" class="sk-btn sk-btn--secondary sk-btn--sm">Apply Barangay Search</button>
+                                <button type="button" data-select-documents class="sk-btn sk-btn--secondary sk-btn--sm">Select All Filtered</button>
+                                <button type="button" data-clear-documents class="sk-btn sk-btn--secondary sk-btn--sm">Clear Selection</button>
+                            </div>
+                        @else
+                            <div class="flex gap-2"><a href="{{ route('sk_pres.consolidation',['tab'=>'budget']) }}" class="sk-btn sk-btn--secondary sk-btn--sm">Reset Filters</a><button type="submit" formaction="{{ route('sk_pres.consolidation') }}" class="sk-btn sk-btn--secondary sk-btn--sm">Apply Barangay Search</button></div>
+                        @endif
+                    </div>
+                    <div class="mt-4 overflow-x-auto rounded-2xl border border-gray-100">
+                        <table class="w-full min-w-[780px] text-left text-sm">
+                            <thead class="bg-gray-50 text-[10px] font-black uppercase tracking-wide text-gray-500"><tr><th class="px-4 py-3">Select</th><th class="px-4 py-3">Barangay</th><th class="px-4 py-3">Report / Category</th><th class="px-4 py-3">Period</th><th class="px-4 py-3">Submitted</th><th class="px-4 py-3">Quality</th><th class="px-4 py-3">Document</th></tr></thead>
+                            <tbody class="divide-y divide-gray-100">
+                                @forelse($documentSubmissions as $item)
+                                    @php $status=$item->quality_status; $selectable=!$dataMode&&!$item->is_data_consolidation&&$item->has_pdf; @endphp
+                                    <tr>
+                                        <td class="px-4 py-3"><input type="checkbox" name="sources[]" value="{{ $item->source_type.':'.$item->source_id }}" @disabled(!$selectable) class="rounded border-gray-300 text-red-600 focus:ring-red-500"></td>
+                                        <td class="px-4 py-3 font-semibold text-gray-800">{{ $item->barangay_name }}</td>
+                                        <td class="px-4 py-3"><div class="font-semibold text-gray-800">{{ $item->title }}</div><div class="mt-1 text-xs text-gray-500">{{ $item->category_label }}</div></td>
+                                        <td class="px-4 py-3 text-gray-600">{{ $item->period_label }}</td>
+                                        <td class="px-4 py-3 text-gray-600">{{ $item->submitted_label }}</td>
+                                        <td class="px-4 py-3"><span class="rounded-full px-2.5 py-1 text-[10px] font-bold {{ $status==='approved'?'bg-green-100 text-green-700':($status==='needs_revision'?'bg-red-100 text-red-700':'bg-yellow-100 text-yellow-700') }}">{{ $status==='approved'?'Approved':($status==='needs_revision'?'Needs Revision':'Pending Review') }}</span></td>
+                                        <td class="px-4 py-3">@if($item->has_pdf)<a href="{{ $item->view_url }}" target="_blank" rel="noopener" class="text-xs font-bold text-blue-700 hover:underline">View PDF</a>@else<span class="text-xs text-gray-400">No PDF available</span>@endif</td>
+                                    </tr>
+                                @empty
+                                    <tr><td colspan="7" class="px-4 py-10 text-center text-sm text-gray-400">No submitted documents match these filters.</td></tr>
+                                @endforelse
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="mt-5 flex justify-end">
+                        @if($documentFilters['tab']==='budget'&&$documentFilters['budget_category']==='annual_budget')
+                            <button type="submit" name="mode" value="annual_budget" formaction="{{ route('sk_pres.consolidation.download') }}" class="sk-btn sk-btn--primary">@include('partials.ui.icon',['icon'=>'download','iconSize'=>16]) Generate Annual Budget Consolidation</button>
+                        @elseif($documentFilters['tab']==='budget'&&$documentFilters['budget_category']==='coa_report'&&$documentFilters['period']==='annual')
+                            <button type="submit" name="mode" value="annual_coa" formaction="{{ route('sk_pres.consolidation.download') }}" class="sk-btn sk-btn--primary">@include('partials.ui.icon',['icon'=>'download','iconSize'=>16]) Generate Annual Financial Consolidation</button>
+                        @else
+                            <button type="submit" name="mode" value="pdf" formaction="{{ route('sk_pres.consolidation.download') }}" class="sk-btn sk-btn--primary">@include('partials.ui.icon',['icon'=>'files','iconSize'=>16]) Consolidate Selected PDFs</button>
+                        @endif
+                    </div>
+                </form>
+            </section>
 
             <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5 mb-8">
                 @foreach($stats as $stat)
@@ -463,6 +578,8 @@
 
 @push('scripts')
 <script>
+document.querySelector('[data-select-documents]')?.addEventListener('click',()=>document.querySelectorAll('#documentConsolidationFilters input[name="sources[]"]:not(:disabled)').forEach(input=>input.checked=true));
+document.querySelector('[data-clear-documents]')?.addEventListener('click',()=>document.querySelectorAll('#documentConsolidationFilters input[name="sources[]"]').forEach(input=>input.checked=false));
 const notifBtn=document.getElementById('notifBtn');
 const notifDropdown=document.getElementById('notifDropdown');
 const userMenuBtn=document.getElementById('userMenuBtn');
