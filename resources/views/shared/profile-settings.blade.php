@@ -56,6 +56,7 @@
 .pf-modal__panel .sk-modal__subtitle{margin-top:6px;font-size:14px;color:#64748b}
 .pf-pass{position:relative}
 .pf-pass .pf-input{height:52px;padding-right:48px;background:#fff;border:1px solid #cbd5e1;border-radius:13px}
+.pf-pass input[type="password"]::-ms-reveal{display:none}
 .pf-pass .pf-input:focus{border-color:#f3a5ae;box-shadow:0 0 0 4px rgba(201,35,54,.12)}
 .pf-eye{position:absolute;top:50%;right:8px;transform:translateY(-50%);display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;border:0;border-radius:9px;background:transparent;color:#64748b;cursor:pointer}
 .pf-eye:hover{background:#f8fafc;color:#334155}
