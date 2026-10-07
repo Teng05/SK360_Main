@@ -33,7 +33,6 @@ class ProfileSettingsController extends Controller
                 ['route'=>'sk_pres.leadership','icon'=>'&#128101;','label'=>'Leadership'],
                 ['route'=>'sk_pres.archive','icon'=>'&#128450;','label'=>'Archive'],
                 ['route'=>'sk_pres.user-management','icon'=>'&#128100;','label'=>'User Management'],
-                ['route'=>'sk_pres.profile','icon'=>'&#128100;','label'=>'Profile'],
             ],
         ],
         'sk_chairman'=>[
@@ -51,7 +50,6 @@ class ProfileSettingsController extends Controller
                 ['route'=>'sk_chairman.rankings','icon'=>'&#127942;','label'=>'Rankings'],
                 ['route'=>'sk_chairman.leadership','icon'=>'&#128101;','label'=>'Leadership'],
                 ['route'=>'sk_chairman.archive','icon'=>'&#128465;','label'=>'Archive'],
-                ['route'=>'sk_chairman.profile','icon'=>'&#128100;','label'=>'Profile'],
             ],
         ],
         'sk_secretary'=>[
@@ -68,7 +66,6 @@ class ProfileSettingsController extends Controller
                 ['route'=>'sk_secretary.meetings','icon'=>'&#128222;','label'=>'Meetings'],
                 ['route'=>'sk_secretary.rankings','icon'=>'&#127942;','label'=>'Rankings'],
                 ['route'=>'sk_secretary.leadership','icon'=>'&#128101;','label'=>'Leadership'],
-                ['route'=>'sk_secretary.profile','icon'=>'&#128100;','label'=>'Profile'],
             ],
         ],
     ];
