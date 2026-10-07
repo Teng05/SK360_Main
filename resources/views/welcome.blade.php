@@ -24,6 +24,13 @@
         ['icon' => 'eye', 'tone' => 'yellow', 'title' => 'Public Transparency', 'text' => 'Provide the community with easy access to public announcements, activities, current SK leadership, and barangay Annual Budget information.'],
         ['icon' => 'shield-check', 'tone' => '', 'title' => 'Secure Access', 'text' => 'Role-based authentication ensures that administrative tools and private information remain protected.'],
     ];
+
+    $teamMembers = [
+        ['name'=>'Marielle O. Bautista','role'=>'Web System Development','image'=>'images/team/marielle.jpg','initials'=>'MB'],
+        ['name'=>'Paul Vincent M. Monje','role'=>'Mobile Application Development','image'=>'images/team/paul.jpg','initials'=>'PM'],
+        ['name'=>'Alexa E. Sumadsad','role'=>'Mobile UI/UX Design & Project Manager','image'=>'images/team/alexa.jpg','initials'=>'AS'],
+        ['name'=>'Giorgia Schen C. Janda','role'=>'Project Documentation','image'=>'images/team/giorgia.jpg','initials'=>'GJ'],
+    ];
 @endphp
 
 <div class="sk-landing" id="home">
@@ -297,17 +304,19 @@
                     <ul class="sk-footer__contact">
                         <li>
                             @include('landing.icon', ['icon' => 'mail', 'iconSize' => 17])
-                            sk360@lipacity.gov.ph
+                            <a href="mailto:skfederationlipacity23@gmail.com">skfederationlipacity23@gmail.com</a>
                         </li>
 
-                        <li>
-                            @include('landing.icon', ['icon' => 'phone', 'iconSize' => 17])
-                            (043) 756-1234
-                        </li>
+                        {{-- Restore a telephone row here once the official office number is confirmed. --}}
 
                         <li>
                             @include('landing.icon', ['icon' => 'map-pin', 'iconSize' => 17])
-                            City Hall, Lipa City, Batangas, Philippines
+                            <span>5th Floor, Left Wing, New Lipa City Hall,<br>Areza Estate, Barangay Bulacnin,<br>Lipa City, Batangas</span>
+                        </li>
+
+                        <li>
+                            @include('landing.icon', ['icon' => 'globe', 'iconSize' => 17])
+                            <a href="https://www.facebook.com/share/19osdKNcpx/?mibextid=wwXIfr" target="_blank" rel="noopener noreferrer">Sangguniang Kabataan Lipa City</a>
                         </li>
                     </ul>
                 </div>
@@ -317,12 +326,38 @@
                 <p>&copy; {{ date('Y') }} SK 360&deg;. All rights reserved.</p>
 
                 <div class="sk-footer__legal">
-                    <a href="#">Privacy Policy</a>
-                    <a href="#">Terms of Service</a>
+                    <span class="sk-footer__credit">Developed by the SK 360&deg; Development Team<br>as an academic capstone project.</span>
+                    <button type="button" class="sk-footer__team-trigger" data-team-open aria-haspopup="dialog" aria-controls="skTeamModal">Meet the Team</button>
+                    <a href="{{ route('legal.privacy-policy') }}">Privacy Policy</a>
+                    <a href="{{ route('legal.terms-of-service') }}">Terms of Service</a>
                 </div>
             </div>
         </div>
     </footer>
+
+    <div class="sk-team-modal" id="skTeamModal" role="dialog" aria-modal="true" aria-labelledby="skTeamTitle" aria-hidden="true" hidden>
+        <div class="sk-team-modal__backdrop" data-team-close></div>
+        <section class="sk-team-modal__panel" tabindex="-1">
+            <button type="button" class="sk-team-modal__close" data-team-close aria-label="Close team dialog">&times;</button>
+            <span class="sk-team-modal__eyebrow">The people behind SK 360&deg;</span>
+            <h2 id="skTeamTitle">Meet the Team</h2>
+            <p class="sk-team-modal__intro">Developed as an academic capstone project.</p>
+            <div class="sk-team-grid">
+                @foreach($teamMembers as $member)
+                    <article class="sk-team-card">
+                        <div class="sk-team-card__photo">
+                            <span class="sk-team-card__initials" aria-hidden="true">{{ $member['initials'] }}</span>
+                            @if(file_exists(public_path($member['image'])))
+                                <img src="{{ asset($member['image']) }}" alt="{{ $member['name'] }}" loading="lazy" onerror="this.remove()">
+                            @endif
+                        </div>
+                        <h3>{{ $member['name'] }}</h3>
+                        <p>{{ $member['role'] }}</p>
+                    </article>
+                @endforeach
+            </div>
+        </section>
+    </div>
 </div>
 @endsection
 
@@ -344,6 +379,25 @@
         toggle?.addEventListener('click', () => nav.classList.toggle('is-open'));
         nav.querySelectorAll('.sk-lnav__links a').forEach((link) => {
             link.addEventListener('click', () => nav.classList.remove('is-open'));
+        });
+
+        const modal = document.getElementById('skTeamModal');
+        const opener = document.querySelector('[data-team-open]');
+        const closeButtons = modal?.querySelectorAll('[data-team-close]');
+        const closeModal = () => {
+            if (!modal) return;
+            modal.hidden = true;
+            modal.setAttribute('aria-hidden', 'true');
+            opener?.focus();
+        };
+        opener?.addEventListener('click', () => {
+            modal.hidden = false;
+            modal.setAttribute('aria-hidden', 'false');
+            modal.querySelector('.sk-team-modal__close')?.focus();
+        });
+        closeButtons?.forEach((button) => button.addEventListener('click', closeModal));
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape' && modal && !modal.hidden) closeModal();
         });
     })();
 </script>

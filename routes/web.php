@@ -69,6 +69,9 @@ Route::get('/', function(){
     return view('welcome');
 });
 
+Route::view('/privacy-policy', 'legal.privacy-policy')->name('legal.privacy-policy');
+Route::view('/terms-of-service', 'legal.terms-of-service')->name('legal.terms-of-service');
+
 Route::get('/mobile/meetings/{meeting}/call', [MobileApiController::class, 'mobileMeetingCall'])
     ->middleware('signed')
     ->name('mobile.meetings.call');
