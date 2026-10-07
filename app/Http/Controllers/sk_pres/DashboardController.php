@@ -306,9 +306,13 @@ class DashboardController extends Controller
                 'required' => 0,
                 'submitted' => 0,
                 'on_time' => 0,
+                'late' => 0,
                 'pending' => 0,
+                'pending_accomplishment' => 0,
+                'pending_budget' => 0,
                 'submission_rate' => 0,
                 'on_time_rate' => 0,
+                'late_rate' => 0,
             ];
         }
 
@@ -320,9 +324,13 @@ class DashboardController extends Controller
                 'required' => 0,
                 'submitted' => 0,
                 'on_time' => 0,
+                'late' => 0,
                 'pending' => 0,
+                'pending_accomplishment' => 0,
+                'pending_budget' => 0,
                 'submission_rate' => 0,
                 'on_time_rate' => 0,
+                'late_rate' => 0,
             ];
         }
 
@@ -383,9 +391,13 @@ class DashboardController extends Controller
                 'required' => 0,
                 'submitted' => 0,
                 'on_time' => 0,
+                'late' => 0,
                 'pending' => 0,
+                'pending_accomplishment' => 0,
+                'pending_budget' => 0,
                 'submission_rate' => 0,
                 'on_time_rate' => 0,
+                'late_rate' => 0,
             ];
         }
 
@@ -475,6 +487,8 @@ class DashboardController extends Controller
         $required = 0;
         $submitted = 0;
         $onTime = 0;
+        $pendingAccomplishment = 0;
+        $pendingBudget = 0;
 
         foreach ($slots as $slot) {
             if ($slot->role === 'SK Chairman') {
@@ -496,6 +510,11 @@ class DashboardController extends Controller
                     .':'.$barangayIdValue;
 
                 if (!isset($submissionMap[$key])) {
+                    if ($slot->submission_type === 'accomplishment_report') {
+                        $pendingAccomplishment++;
+                    } elseif ($slot->submission_type === 'budget_report') {
+                        $pendingBudget++;
+                    }
                     continue;
                 }
 
@@ -511,19 +530,26 @@ class DashboardController extends Controller
             }
         }
 
-        $pending = max($required - $submitted, 0);
+        $pending = $pendingAccomplishment + $pendingBudget;
+        $late = max($submitted - $onTime, 0);
 
         return [
             'year' => $year,
             'required' => $required,
             'submitted' => $submitted,
             'on_time' => $onTime,
+            'late' => $late,
             'pending' => $pending,
+            'pending_accomplishment' => $pendingAccomplishment,
+            'pending_budget' => $pendingBudget,
             'submission_rate' => $required > 0
                 ? round(($submitted / $required) * 100, 1)
                 : 0,
             'on_time_rate' => $submitted > 0
                 ? round(($onTime / $submitted) * 100, 1)
+                : 0,
+            'late_rate' => $submitted > 0
+                ? round(($late / $submitted) * 100, 1)
                 : 0,
         ];
     }

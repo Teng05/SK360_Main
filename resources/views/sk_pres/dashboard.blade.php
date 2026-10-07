@@ -152,7 +152,7 @@
                     </span>
                 </div>
 
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6">
                     <div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-5">
                         <div class="flex justify-between items-start mb-4">
                             <div>
@@ -179,9 +179,9 @@
                     <div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-5">
                         <div class="flex justify-between items-start mb-4">
                             <div>
-                                <p class="text-sm text-gray-500">On-Time Submission Rate</p>
+                                <p class="text-sm text-gray-500">On-Time Submissions</p>
                                 <h2 class="text-4xl font-bold text-gray-900">
-                                    {{ number_format($submissionKpis['on_time_rate'], 1) }}%
+                                    {{ $submissionKpis['on_time'] }}
                                 </h2>
                             </div>
 
@@ -191,7 +191,7 @@
                         </div>
 
                         <p class="text-sm text-gray-500">
-                            {{ $submissionKpis['on_time'] }} of {{ $submissionKpis['submitted'] }} submissions received on or before deadline
+                            {{ number_format($submissionKpis['on_time_rate'], 1) }}% of {{ $submissionKpis['submitted'] }} submitted
                         </p>
 
                         <div class="mt-4 h-2 rounded-full bg-gray-100 overflow-hidden">
@@ -202,7 +202,25 @@
                     <div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-5">
                         <div class="flex justify-between items-start mb-4">
                             <div>
-                                <p class="text-sm text-gray-500">Pending Reports</p>
+                                <p class="text-sm text-gray-500">Late Submissions</p>
+                                <h2 class="text-4xl font-bold text-gray-900">{{ $submissionKpis['late'] }}</h2>
+                            </div>
+                            <span class="sk-icon-tile sk-icon-tile--orange">
+                                @include('partials.ui.icon', ['icon'=>'triangle-alert','iconSize'=>21])
+                            </span>
+                        </div>
+                        <p class="text-sm text-gray-500">
+                            {{ number_format($submissionKpis['late_rate'], 1) }}% of {{ $submissionKpis['submitted'] }} submitted
+                        </p>
+                        <div class="mt-4 h-2 rounded-full bg-gray-100 overflow-hidden">
+                            <div class="h-full bg-orange-500 rounded-full" style="width: {{ min($submissionKpis['late_rate'], 100) }}%"></div>
+                        </div>
+                    </div>
+
+                    <div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-5">
+                        <div class="flex justify-between items-start mb-4">
+                            <div>
+                                <p class="text-sm text-gray-500">Pending Submissions</p>
                                 <h2 class="text-4xl font-bold text-gray-900">
                                     {{ $submissionKpis['pending'] }}
                                 </h2>
@@ -216,6 +234,13 @@
                         <p class="text-sm text-gray-500">
                             Required submissions that have not yet been received
                         </p>
+
+                        <div class="mt-3 flex items-center justify-between text-xs font-semibold text-gray-500">
+                            <span>Accomplishment</span><span>{{ $submissionKpis['pending_accomplishment'] }}</span>
+                        </div>
+                        <div class="mt-1 flex items-center justify-between text-xs font-semibold text-gray-500">
+                            <span>Budget</span><span>{{ $submissionKpis['pending_budget'] }}</span>
+                        </div>
 
                         <p class="mt-4 text-xs font-semibold text-gray-400">
                             Started submission slots only
