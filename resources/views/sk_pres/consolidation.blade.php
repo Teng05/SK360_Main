@@ -8,14 +8,6 @@
 @endsection
 
 @section('content')
-@php
-    $statStyles=[
-        'Total Barangays'=>['icon'=>'building-2','tone'=>'blue'],
-        'Submitted'=>['icon'=>'circle-check','tone'=>'green'],
-        'Pending'=>['icon'=>'hourglass','tone'=>'yellow'],
-        'Late'=>['icon'=>'triangle-alert','tone'=>''],
-    ];
-@endphp
 <div class="flex h-screen overflow-hidden bg-gray-100">
         @include('partials.app.sidebar')
 
@@ -29,7 +21,7 @@
                 <div class="sk-page-head__text">
                     <span class="sk-eyebrow"><span class="sk-dot"></span>Consolidation</span>
                     <h1 class="sk-page-title">Report Consolidation</h1>
-                    <p class="sk-page-subtitle">Automatically compile barangay reports into unified monthly, quarterly, and annual documents.</p>
+                    <p class="sk-page-subtitle">Review submitted barangay documents and generate consolidated reports for the selected reporting period.</p>
                 </div>
             </div>
 
@@ -54,7 +46,7 @@
 
             <section class="sk-card mb-8 overflow-hidden">
                 <div class="border-b border-gray-100 px-6 py-5">
-                    <h2 class="sk-section-title">Hybrid Report Consolidation</h2>
+                    <h2 class="sk-section-title">Submitted Documents</h2>
                     <p class="sk-section-subtitle">Annual Budget and Annual COA use stored financial values. Other reports are consolidated from their submitted PDFs.</p>
                     <p class="mt-2 text-xs text-gray-500">Current administration: {{ $documentTerm ? $documentTerm->start_year.'–'.$documentTerm->end_year : 'No active administration term' }}</p>
                 </div>
@@ -164,139 +156,6 @@
                         @endif
                     </div>
                 </form>
-            </section>
-
-            <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5 mb-8">
-                @foreach($stats as $stat)
-                    @php $style=$statStyles[$stat['label']] ?? ['icon'=>'layout-grid','tone'=>'']; @endphp
-                    <div class="sk-stat">
-                        <div class="sk-stat__top">
-                            <div><p class="sk-stat__label">{{ $stat['label'] }}</p><p class="sk-stat__value {{ $stat['valueClass'] }}">{{ $stat['value'] }}</p></div>
-                            <span class="sk-icon-tile {{ $style['tone'] ? 'sk-icon-tile--'.$style['tone'] : '' }}">@include('partials.ui.icon',['icon'=>$style['icon'],'iconSize'=>21])</span>
-                        </div>
-                    </div>
-                @endforeach
-            </div>
-
-            <section class="sk-card overflow-hidden">
-                <div class="px-6 pt-6">
-                    <h2 class="sk-section-title">Barangay Submissions</h2>
-                    <p class="sk-section-subtitle">Review citywide report completion and archive consolidated outputs.</p>
-                </div>
-
-                <form id="consolidationFilters" method="GET" action="{{ route('sk_pres.consolidation') }}" class="mx-6 mt-5 flex flex-col xl:flex-row xl:items-end gap-4 rounded-2xl border border-gray-100 bg-[#f8f9fb] p-4">
-                    <div class="w-full xl:max-w-xs">
-                        <label for="barangaySearch" class="sk-overline block mb-2">Search Barangay</label>
-                        <div class="sk-search">
-                            @include('partials.ui.icon', ['icon'=>'search','iconSize'=>18])
-                            <input id="barangaySearch" name="barangay" value="{{ $filters['barangay'] ?? '' }}" type="text" placeholder="Search barangay..." class="!bg-white !border-gray-200">
-                        </div>
-                    </div>
-
-                    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 flex-1">
-                        <div>
-                            <label class="sk-overline block mb-2">Year</label>
-                            <select name="year" class="w-full h-11 rounded-xl border border-gray-200 bg-white px-3.5 text-sm font-semibold text-gray-700">
-                                @foreach($years as $year)
-                                    <option value="{{ $year }}" {{ (int)$filters['year']===(int)$year ? 'selected' : '' }}>{{ $year }}</option>
-                                @endforeach
-                            </select>
-                        </div>
-                        <div>
-                            <label class="sk-overline block mb-2">Period</label>
-                            <select name="period" id="periodFilter" class="w-full h-11 rounded-xl border border-gray-200 bg-white px-3.5 text-sm font-semibold text-gray-700">
-                                <option value="all" {{ $filters['period']==='all' ? 'selected' : '' }}>All Reports</option>
-                                <option value="monthly" {{ $filters['period']==='monthly' ? 'selected' : '' }}>Monthly</option>
-                                <option value="quarterly" {{ $filters['period']==='quarterly' ? 'selected' : '' }}>Quarterly</option>
-                                <option value="annual" {{ $filters['period']==='annual' ? 'selected' : '' }}>Annual</option>
-                            </select>
-                        </div>
-                        <div id="monthFilterWrap">
-                            <label class="sk-overline block mb-2">Month</label>
-                            <select name="month" class="w-full h-11 rounded-xl border border-gray-200 bg-white px-3.5 text-sm font-semibold text-gray-700">
-                                @foreach($months as $number=>$month)
-                                    <option value="{{ $number }}" {{ (int)$filters['month']===(int)$number ? 'selected' : '' }}>{{ $month }}</option>
-                                @endforeach
-                            </select>
-                        </div>
-                        <div id="quarterFilterWrap">
-                            <label class="sk-overline block mb-2">Quarter</label>
-                            <select name="quarter" class="w-full h-11 rounded-xl border border-gray-200 bg-white px-3.5 text-sm font-semibold text-gray-700">
-                                @foreach($quarters as $quarter)
-                                    <option value="{{ $quarter }}" {{ $filters['quarter']===$quarter ? 'selected' : '' }}>{{ $quarter }}</option>
-                                @endforeach
-                            </select>
-                        </div>
-                    </div>
-
-                    <div class="flex gap-2">
-                        <button type="submit" class="sk-btn sk-btn--primary">
-                            @include('partials.ui.icon', ['icon'=>'filter','iconSize'=>16])
-                            Apply
-                        </button>
-                        <a href="{{ route('sk_pres.consolidation') }}" class="sk-btn sk-btn--secondary">Reset</a>
-                    </div>
-                </form>
-
-                <div class="sk-alert sk-alert--info mx-6 mt-4">
-                    @include('partials.ui.icon', ['icon'=>'info','iconSize'=>18])
-                    <span>This module compiles barangay accomplishment reports into one citywide view for monthly, quarterly, and annual monitoring.</span>
-                </div>
-
-                <div class="overflow-x-auto mt-5 border-t border-gray-100">
-                    <table class="w-full text-sm text-left">
-                        <thead>
-                            <tr>
-                                <th class="px-6 py-3.5">Barangay</th>
-                                <th class="px-6 py-3.5">Monthly</th>
-                                <th class="px-6 py-3.5">Quarterly</th>
-                                <th class="px-6 py-3.5">Annual</th>
-                                <th class="px-6 py-3.5">Last Submission</th>
-                                <th class="px-6 py-3.5 text-center">Status</th>
-                            </tr>
-                        </thead>
-                        <tbody id="submissionRows">
-                            @forelse($submissions as $submission)
-                                <tr data-barangay="{{ strtolower($submission['barangay']) }}">
-                                    <td class="px-6 py-4">
-                                        <div class="flex items-center gap-3">
-                                            <span class="sk-icon-tile sk-icon-tile--sm sk-icon-tile--gray">
-                                                @include('partials.ui.icon', ['icon'=>'building-2','iconSize'=>16])
-                                            </span>
-                                            <span class="font-bold text-gray-900">Barangay {{ $submission['barangay'] }}</span>
-                                        </div>
-                                    </td>
-                                    <td class="px-6 py-4"><span class="sk-badge {{ $submission['monthly_count']>0 ? 'sk-badge--green' : 'sk-badge--yellow' }}">{{ $submission['monthly'] }}</span></td>
-                                    <td class="px-6 py-4"><span class="sk-badge {{ $submission['quarterly_count']>0 ? 'sk-badge--green' : 'sk-badge--yellow' }}">{{ $submission['quarterly'] }}</span></td>
-                                    <td class="px-6 py-4"><span class="sk-badge {{ $submission['annual_count']>0 ? 'sk-badge--green' : 'sk-badge--yellow' }}">{{ $submission['annual'] }}</span></td>
-                                    <td class="px-6 py-4 font-semibold text-gray-600 whitespace-nowrap">{{ $submission['last_submission'] }}</td>
-                                    <td class="px-6 py-4 text-center"><span class="sk-badge sk-badge--dot {{ $submission['status']==='submitted' ? 'sk-badge--green' : 'sk-badge--yellow' }} capitalize">{{ $submission['status'] }}</span></td>
-                                </tr>
-                            @empty
-                                <tr>
-                                    <td colspan="6">
-                                        <div class="sk-empty">
-                                            <span class="sk-icon-tile sk-icon-tile--gray">@include('partials.ui.icon',['icon'=>'inbox','iconSize'=>24])</span>
-                                            <p class="sk-empty__text">No barangay submissions yet.</p>
-                                        </div>
-                                    </td>
-                                </tr>
-                            @endforelse
-                            <tr id="submissionNoResults" class="hidden">
-                                <td colspan="6" class="px-6 py-10 text-center text-gray-400">No barangay matched your search.</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-
-                <div id="submissionPagination" class="px-6 py-5 border-t border-gray-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                    <p id="submissionPaginationInfo" class="text-xs text-gray-500"></p>
-                    <div class="flex items-center gap-2">
-                        <button id="submissionPrevPage" type="button" class="sk-btn sk-btn--secondary !px-3 !py-2 disabled:opacity-40 disabled:cursor-not-allowed">Previous</button>
-                        <div id="submissionPageButtons" class="flex items-center gap-1"></div>
-                        <button id="submissionNextPage" type="button" class="sk-btn sk-btn--secondary !px-3 !py-2 disabled:opacity-40 disabled:cursor-not-allowed">Next</button>
-                    </div>
-                </div>
             </section>
 
             @php
@@ -584,17 +443,6 @@ const notifBtn=document.getElementById('notifBtn');
 const notifDropdown=document.getElementById('notifDropdown');
 const userMenuBtn=document.getElementById('userMenuBtn');
 const userDropdown=document.getElementById('userDropdown');
-const searchInput=document.getElementById('barangaySearch');
-const periodFilter=document.getElementById('periodFilter');
-const monthFilterWrap=document.getElementById('monthFilterWrap');
-const quarterFilterWrap=document.getElementById('quarterFilterWrap');
-const submissionRows=Array.from(document.querySelectorAll('#submissionRows tr[data-barangay]'));
-const submissionNoResults=document.getElementById('submissionNoResults');
-const submissionPagination=document.getElementById('submissionPagination');
-const submissionPaginationInfo=document.getElementById('submissionPaginationInfo');
-const submissionPageButtons=document.getElementById('submissionPageButtons');
-const submissionPrevPage=document.getElementById('submissionPrevPage');
-const submissionNextPage=document.getElementById('submissionNextPage');
 const qualityBarangaySearch=document.getElementById('qualityBarangaySearch');
 const qualityStatusFilter=document.getElementById('qualityStatusFilter');
 const qualityTypeFilter=document.getElementById('qualityTypeFilter');
@@ -624,97 +472,6 @@ document.addEventListener('click',function(e){
         userDropdown.classList.add('hidden');
     }
 });
-
-function syncPeriodControls(){
-    monthFilterWrap.classList.toggle('hidden',periodFilter.value!=='monthly');
-    quarterFilterWrap.classList.toggle('hidden',periodFilter.value!=='quarterly');
-}
-
-periodFilter.addEventListener('change',syncPeriodControls);
-syncPeriodControls();
-
-function filteredSubmissionRows(){
-    const keyword=searchInput.value.toLowerCase().trim();
-
-    return submissionRows.filter((row)=>{
-        return row.dataset.barangay.includes(keyword);
-    });
-}
-
-function renderSubmissionPagination(){
-    const filteredRows=filteredSubmissionRows();
-    const totalRows=filteredRows.length;
-    const totalPages=Math.max(1,Math.ceil(totalRows/submissionPerPage));
-
-    if(submissionCurrentPage>totalPages){
-        submissionCurrentPage=totalPages;
-    }
-
-    const startIndex=(submissionCurrentPage-1)*submissionPerPage;
-    const endIndex=Math.min(startIndex+submissionPerPage,totalRows);
-
-    submissionRows.forEach((row)=>{
-        row.classList.add('hidden');
-    });
-
-    filteredRows.slice(startIndex,endIndex).forEach((row)=>{
-        row.classList.remove('hidden');
-    });
-
-    submissionNoResults.classList.toggle('hidden',totalRows!==0);
-    submissionPagination.classList.toggle('hidden',submissionRows.length===0);
-
-    submissionPaginationInfo.textContent=totalRows>0
-        ? `Showing ${startIndex+1}-${endIndex} of ${totalRows} barangays`
-        : 'No barangays to display';
-
-    submissionPrevPage.disabled=submissionCurrentPage<=1;
-    submissionNextPage.disabled=submissionCurrentPage>=totalPages || totalRows===0;
-    submissionPageButtons.innerHTML='';
-
-    if(totalRows===0){
-        return;
-    }
-
-    for(let page=1;page<=totalPages;page++){
-        const button=document.createElement('button');
-        button.type='button';
-        button.textContent=page;
-        button.className=page===submissionCurrentPage
-            ? 'w-8 h-8 rounded-lg bg-red-500 text-white text-xs font-bold'
-            : 'w-8 h-8 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 text-gray-600 text-xs font-semibold';
-
-        button.addEventListener('click',function(){
-            submissionCurrentPage=page;
-            renderSubmissionPagination();
-        });
-
-        submissionPageButtons.appendChild(button);
-    }
-}
-
-submissionPrevPage.addEventListener('click',function(){
-    if(submissionCurrentPage>1){
-        submissionCurrentPage--;
-        renderSubmissionPagination();
-    }
-});
-
-submissionNextPage.addEventListener('click',function(){
-    const totalPages=Math.max(1,Math.ceil(filteredSubmissionRows().length/submissionPerPage));
-
-    if(submissionCurrentPage<totalPages){
-        submissionCurrentPage++;
-        renderSubmissionPagination();
-    }
-});
-
-searchInput.addEventListener('input',function(){
-    submissionCurrentPage=1;
-    renderSubmissionPagination();
-});
-
-renderSubmissionPagination();
 
 document.querySelectorAll('[data-quality-toggle]').forEach((button)=>{
     button.addEventListener('click',function(){
