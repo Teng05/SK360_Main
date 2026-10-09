@@ -278,6 +278,55 @@
                             </div>
                         </div>
                     </form>
+                @elseif(($submissionType ?? '')==='report')
+                    <form method="GET" action="{{ url()->current() }}" class="mb-8 rounded-3xl border border-gray-100 bg-white p-5 shadow-sm">
+                        <div class="mb-4">
+                            <h2 class="text-sm font-black uppercase tracking-tight text-gray-800">Filter Submitted Reports</h2>
+                            <p class="mt-1 text-xs text-gray-400">Filter your submitted accomplishment reports by reporting period and year.</p>
+                        </div>
+                        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                            <div>
+                                <label for="reportPeriodFilter" class="mb-1.5 block text-[10px] font-black uppercase tracking-widest text-gray-400">Reporting Period</label>
+                                <select id="reportPeriodFilter" name="period" class="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-700 outline-none focus:ring-2 focus:ring-red-200">
+                                    @foreach(['all'=>'All Records','monthly'=>'Monthly','quarterly'=>'Quarterly','annual'=>'Annual'] as $value=>$label)
+                                        <option value="{{ $value }}" @selected($reportFilters['period']===$value)>{{ $label }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div>
+                                <label for="reportYearFilter" class="mb-1.5 block text-[10px] font-black uppercase tracking-widest text-gray-400">Reporting Year</label>
+                                <select id="reportYearFilter" name="year" class="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-700 outline-none focus:ring-2 focus:ring-red-200">
+                                    <option value="all" @selected($reportFilters['year']==='all')>All Years</option>
+                                    @foreach($reportYears as $year)
+                                        <option value="{{ $year }}" @selected((string)$reportFilters['year']===(string)$year)>{{ $year }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div id="reportMonthFilterWrap" class="{{ $reportFilters['period']==='monthly'?'':'hidden' }}">
+                                <label for="reportMonthFilter" class="mb-1.5 block text-[10px] font-black uppercase tracking-widest text-gray-400">Month</label>
+                                <select id="reportMonthFilter" name="month" @disabled($reportFilters['period']!=='monthly') class="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-700 outline-none focus:ring-2 focus:ring-red-200">
+                                    @foreach($reportMonths as $number=>$month)
+                                        <option value="{{ $number }}" @selected((int)$reportFilters['month']===(int)$number)>{{ $month }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div id="reportQuarterFilterWrap" class="{{ $reportFilters['period']==='quarterly'?'':'hidden' }}">
+                                <label for="reportQuarterFilter" class="mb-1.5 block text-[10px] font-black uppercase tracking-widest text-gray-400">Quarter</label>
+                                <select id="reportQuarterFilter" name="quarter" @disabled($reportFilters['period']!=='quarterly') class="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-700 outline-none focus:ring-2 focus:ring-red-200">
+                                    @foreach($reportQuarters as $quarter)
+                                        <option value="{{ $quarter }}" @selected($reportFilters['quarter']===$quarter)>{{ $quarter }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                        </div>
+                        <div class="mt-4 flex flex-wrap items-center justify-between gap-3">
+                            <p class="text-[10px] text-gray-400">Active submission slots remain visible while report records are filtered.</p>
+                            <div class="flex gap-2">
+                                <a href="{{ url()->current() }}" class="rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-xs font-bold text-gray-500 transition hover:bg-gray-50">Reset</a>
+                                <button type="submit" class="rounded-xl bg-red-600 px-5 py-2.5 text-xs font-black uppercase text-white transition hover:bg-red-700">Apply Filter</button>
+                            </div>
+                        </div>
+                    </form>
                 @endif
                 @php
                     $focusId=(int)request()->query('focus_id',0);
@@ -1129,6 +1178,22 @@ function syncBudgetFilterFields(){
 budgetPeriodFilter?.addEventListener('change',syncBudgetFilterFields);
 budgetFilterForm?.addEventListener('submit',syncBudgetFilterFields);
 syncBudgetFilterFields();
+const reportPeriodFilter=document.getElementById('reportPeriodFilter');
+const reportMonthFilterWrap=document.getElementById('reportMonthFilterWrap');
+const reportQuarterFilterWrap=document.getElementById('reportQuarterFilterWrap');
+const reportMonthFilter=document.getElementById('reportMonthFilter');
+const reportQuarterFilter=document.getElementById('reportQuarterFilter');
+function syncReportFilterFields(){
+    if(!reportPeriodFilter)return;
+    const monthly=reportPeriodFilter.value==='monthly';
+    const quarterly=reportPeriodFilter.value==='quarterly';
+    reportMonthFilterWrap?.classList.toggle('hidden',!monthly);
+    reportQuarterFilterWrap?.classList.toggle('hidden',!quarterly);
+    if(reportMonthFilter)reportMonthFilter.disabled=!monthly;
+    if(reportQuarterFilter)reportQuarterFilter.disabled=!quarterly;
+}
+reportPeriodFilter?.addEventListener('change',syncReportFilterFields);
+syncReportFilterFields();
 const submissionSearch=document.getElementById('submissionSearch');
 const submissionSlotCards=Array.from(document.querySelectorAll('.submission-slot-card'));
 const submissionRecordRows=Array.from(document.querySelectorAll('.submission-record-row'));

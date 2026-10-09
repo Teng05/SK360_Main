@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\View\View;
 class ReportController extends Controller
 {
-    public function index(): View
+    public function index(Request $request): View
     {
         abort_unless(auth()->check() && auth()->user()->role==='sk_secretary',403);
         $user=auth()->user();
@@ -91,6 +91,14 @@ class ReportController extends Controller
                 $report->view_url=$report->download_url;
                 return $report;
             });
+        $reportYears=$reports
+            ->map(fn($report)=>(int)($report->reporting_year ?: $report->submitted_at->year))
+            ->filter(fn($year)=>$year>=2000)
+            ->unique()
+            ->sortDesc()
+            ->values();
+        $reportFilters=$this->reportFilters($request,$reportYears);
+        $reports=$reports->filter(fn($report)=>$this->matchesReportFilter($report,$reportFilters))->values();
         return view('sk_secretary.reports',[
             'fullName'=>$fullName,
             'barangayName'=>$barangayName,
@@ -102,6 +110,10 @@ class ReportController extends Controller
             'currentUrl'=>url()->current(),
             'slots'=>$slots,
             'submissions'=>$reports,
+            'reportFilters'=>$reportFilters,
+            'reportYears'=>$reportYears,
+            'reportMonths'=>$this->reportMonths(),
+            'reportQuarters'=>['Q1','Q2','Q3','Q4'],
             'pageTitle'=>'Accomplishment Reports',
             'pageDescription'=>'Submit accomplishment reports only through active slots created by the SK President.',
             'slotSectionTitle'=>'Active Report Slots',
@@ -356,6 +368,33 @@ class ReportController extends Controller
         }catch(\Throwable $e){
             report($e);
         }
+    }
+    protected function reportFilters(Request $request,$years): array
+    {
+        $period=(string)$request->query('period','all');
+        if(!in_array($period,['all','monthly','quarterly','annual'],true)) $period='all';
+        $year=(string)$request->query('year','all');
+        if($year!=='all'&&!$years->contains((int)$year)) $year='all';
+        $month=(int)$request->query('month',now()->month);
+        $quarter=(string)$request->query('quarter','Q'.(int)ceil(now()->month/3));
+        return [
+            'period'=>$period,
+            'year'=>$year,
+            'month'=>$month>=1&&$month<=12?$month:now()->month,
+            'quarter'=>in_array($quarter,['Q1','Q2','Q3','Q4'],true)?$quarter:'Q'.(int)ceil(now()->month/3),
+        ];
+    }
+    protected function reportMonths(): array
+    {
+        return [1=>'January',2=>'February',3=>'March',4=>'April',5=>'May',6=>'June',7=>'July',8=>'August',9=>'September',10=>'October',11=>'November',12=>'December'];
+    }
+    protected function matchesReportFilter(object $report,array $filters): bool
+    {
+        $type=strtolower((string)($report->report_type ?? ''));
+        return ($filters['period']==='all'||$type===$filters['period'])
+            && ($filters['year']==='all'||(int)($report->reporting_year ?: $report->submitted_at->year)===(int)$filters['year'])
+            && ($filters['period']!=='monthly'||(int)($report->reporting_month ?? 0)===(int)$filters['month'])
+            && ($filters['period']!=='quarterly'||(string)($report->reporting_quarter ?? '')===$filters['quarter']);
     }
     protected function reportPeriodLabel(object $report): string
     {
