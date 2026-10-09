@@ -517,279 +517,6 @@
     </div>
 </div>
 
-<!-- REAPPOINT FORMER OFFICIALS MODAL -->
-<div id="reappointLeadershipModal" class="hidden fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4">
-    <div class="bg-white rounded-3xl w-full max-w-5xl max-h-[90vh] overflow-y-auto shadow-2xl">
-
-        <div class="bg-gray-800 p-6 text-white flex justify-between items-center">
-            <div>
-                <h2 class="text-xl font-black uppercase tracking-tighter">Reappoint Former Officials</h2>
-                <p class="text-[10px] opacity-80 uppercase font-bold">
-                    Search and filter officials from any completed administration.
-                </p>
-            </div>
-
-            <button type="button"
-                onclick="toggleModal('reappointLeadershipModal')"
-                class="text-2xl">
-                &times;
-            </button>
-        </div>
-
-        <div class="p-6">
-
-            @if($currentAdministration)
-                <div class="mb-4 rounded-xl bg-green-50 border border-green-100 px-4 py-3">
-                    <p class="text-[10px] font-black text-green-600 uppercase">Reappointing For</p>
-
-                    <p class="mt-1 text-sm font-black text-green-700">
-                        {{ $currentAdministration->start_year }} - {{ $currentAdministration->end_year }} Administration
-                    </p>
-                </div>
-            @endif
-
-            <div class="mb-5 rounded-xl bg-blue-50 border border-blue-100 px-4 py-3">
-                <p class="text-[10px] font-black uppercase text-blue-700">Account Security</p>
-
-                <p class="mt-1 text-[10px] text-blue-600">
-                    Reappointed Secretaries reuse their existing SK360 account, but their old password is invalidated. A new password setup link will be sent before the account becomes active.
-                </p>
-
-                <p class="mt-1 text-[10px] text-gray-500">
-                    Treasurers and Councilors do not have SK360 accounts, so no password setup email is required for those positions.
-                </p>
-            </div>
-
-            <!-- FILTERS -->
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-3 mb-5">
-
-                <div class="md:col-span-2">
-                    <label class="block mb-1 text-[9px] font-black text-gray-400 uppercase">
-                        Search Former Official
-                    </label>
-
-                    <input type="text"
-                        id="reappointSearch"
-                        placeholder="Search name, email, phone, position or term..."
-                        autocomplete="off"
-                        class="w-full rounded-xl border border-gray-200 px-4 py-3 text-xs font-semibold outline-none focus:border-red-400">
-                </div>
-
-                <div>
-                    <label class="block mb-1 text-[9px] font-black text-gray-400 uppercase">
-                        Position
-                    </label>
-
-                    <select id="reappointPosition"
-                        class="w-full rounded-xl border border-gray-200 px-3 py-3 text-xs font-bold outline-none focus:border-red-400">
-                        <option value="all">All Positions</option>
-                        <option value="secretary">SK Secretary</option>
-                        <option value="treasurer">SK Treasurer</option>
-                        <option value="councilor">SK Councilor</option>
-                    </select>
-                </div>
-
-                <div>
-                    <label class="block mb-1 text-[9px] font-black text-gray-400 uppercase">
-                        Previous Term
-                    </label>
-
-                    <select id="reappointTerm"
-                        class="w-full rounded-xl border border-gray-200 px-3 py-3 text-xs font-bold outline-none focus:border-red-400">
-                        <option value="all">All Previous Terms</option>
-
-                        @foreach($reappointmentTerms as $term)
-                            <option value="{{ $term }}">{{ $term }}</option>
-                        @endforeach
-                    </select>
-                </div>
-            </div>
-
-            <div class="flex items-center justify-between mb-4">
-                <p id="reappointResultCount"
-                    class="text-[10px] font-black uppercase tracking-widest text-gray-400">
-                    {{ $formerOfficials->count() }} Former Official{{ $formerOfficials->count() === 1 ? '' : 's' }}
-                </p>
-
-                <button type="button"
-                    id="clearReappointFilters"
-                    class="text-[10px] font-black uppercase text-red-600 hover:text-red-700">
-                    Clear Filters
-                </button>
-            </div>
-
-            <!-- FORMER OFFICIALS -->
-            <div id="reappointOfficialsList"
-                class="grid grid-cols-1 md:grid-cols-2 gap-3">
-
-                @forelse($formerOfficials as $former)
-
-                    @php
-                        $isSecretary=$former['type'] === 'secretary';
-                        $isTreasurer=$former['type'] === 'treasurer';
-
-                        $positionFilled=
-                            ($isSecretary && !$canAddSecretary) ||
-                            ($isTreasurer && !empty($treasurer));
-
-                        if($isSecretary){
-                            $cardBorder='border-blue-100';
-                            $positionBadge='bg-blue-100 text-blue-700';
-                        }elseif($isTreasurer){
-                            $cardBorder='border-yellow-200';
-                            $positionBadge='bg-yellow-100 text-yellow-700';
-                        }else{
-                            $cardBorder='border-red-100';
-                            $positionBadge='bg-red-100 text-red-700';
-                        }
-
-                        $searchText=strtolower(
-                            ($former['name'] ?? '').' '.
-                            ($former['email'] ?? '').' '.
-                            ($former['phone'] ?? '').' '.
-                            ($former['position'] ?? '').' '.
-                            implode(' ',$former['terms'] ?? [])
-                        );
-                    @endphp
-
-                    <div
-                        class="reappoint-official-card rounded-2xl border {{ $cardBorder }} bg-gray-50/50 p-4"
-                        data-position="{{ $former['type'] }}"
-                        data-terms="{{ implode('|',$former['terms']) }}"
-                        data-search="{{ $searchText }}">
-
-                        <div class="flex items-start justify-between gap-3">
-
-                            <div class="min-w-0">
-
-                                <div class="flex flex-wrap items-center gap-2">
-
-                                    <h3 class="text-sm font-black text-gray-800 uppercase">
-                                        {{ $former['name'] }}
-                                    </h3>
-
-                                    <span class="rounded-full px-2.5 py-1 text-[8px] font-black uppercase {{ $positionBadge }}">
-                                        {{ $former['position'] }}
-                                    </span>
-                                </div>
-
-                                <div class="mt-2 space-y-1 text-[10px] text-gray-500">
-                                    <p>
-                                        <span class="inline-flex align-middle">@include('partials.ui.icon', ['icon' => 'mail', 'iconSize' => 16])</span>
-                                        {{ $former['email'] ?: 'No email provided' }}
-                                    </p>
-
-                                    <p>
-                                        <span class="inline-flex align-middle">@include('partials.ui.icon', ['icon' => 'phone', 'iconSize' => 16])</span>
-                                        {{ $former['phone'] ?: 'No phone provided' }}
-                                    </p>
-                                </div>
-                            </div>
-
-                            @if($positionFilled)
-                                <span class="shrink-0 rounded-full bg-gray-200 px-2.5 py-1 text-[8px] font-black uppercase text-gray-500">
-                                    Position Filled
-                                </span>
-                            @endif
-                        </div>
-
-                        <div class="mt-4">
-
-                            <p class="mb-2 text-[8px] font-black uppercase tracking-widest text-gray-400">
-                                Previous Service
-                            </p>
-
-                            <div class="flex flex-wrap gap-1.5">
-
-                                @foreach($former['terms'] as $term)
-                                    <span class="rounded-lg bg-white border border-gray-200 px-2 py-1 text-[9px] font-black text-gray-600">
-                                        {{ $term }}
-                                    </span>
-                                @endforeach
-
-                            </div>
-                        </div>
-
-                        <div class="mt-4 flex justify-end">
-
-                            @if($positionFilled)
-
-                                <button type="button"
-                                    disabled
-                                    class="rounded-xl bg-gray-200 px-4 py-2.5 text-[9px] font-black uppercase text-gray-400 cursor-not-allowed">
-                                    Cannot Reappoint
-                                </button>
-
-                            @elseif($isSecretary)
-
-                                <form method="POST"
-                                    action="{{ route('sk_chairman.leadership.secretary.reappoint',$former['action_id']) }}"
-                                    onsubmit="return confirm(@js('Reappoint '.$former['name'].' as SK Secretary for the current administration? Their existing SK360 account will be reused, but their old password will be invalidated and a new password setup link will be sent.'));">
-
-                                    @csrf
-
-                                    <button type="submit"
-                                        class="rounded-xl bg-blue-600 hover:bg-blue-700 px-4 py-2.5 text-[9px] font-black uppercase text-white">
-                                        Reappoint Secretary
-                                    </button>
-                                </form>
-
-                            @else
-
-                                <form method="POST"
-                                    action="{{ route('sk_chairman.leadership.council.reappoint',$former['action_id']) }}"
-                                    onsubmit="return confirm(@js('Reappoint '.$former['name'].' as '.$former['position'].' for the current administration?'));">
-
-                                    @csrf
-
-                                    <button type="submit"
-                                        class="rounded-xl {{ $isTreasurer ? 'bg-yellow-500 hover:bg-yellow-600' : 'bg-red-600 hover:bg-red-700' }} px-4 py-2.5 text-[9px] font-black uppercase text-white">
-                                        Reappoint {{ $isTreasurer ? 'Treasurer' : 'Councilor' }}
-                                    </button>
-                                </form>
-
-                            @endif
-
-                        </div>
-                    </div>
-
-                @empty
-
-                    <div class="md:col-span-2 rounded-2xl bg-gray-50 p-8 text-center">
-
-                        <p class="text-sm font-bold text-gray-500">
-                            No former officials available for reappointment.
-                        </p>
-
-                        <p class="mt-1 text-xs text-gray-400">
-                            Completed leadership records will appear here in future administrations.
-                        </p>
-
-                    </div>
-
-                @endforelse
-
-            </div>
-
-            <div id="reappointNoResults"
-                class="hidden rounded-2xl bg-gray-50 p-8 text-center">
-
-                <div class="text-2xl mb-2">
-                    <span class="inline-flex align-middle">@include('partials.ui.icon', ['icon' => 'search', 'iconSize' => 16])</span>
-                </div>
-
-                <p class="text-sm font-bold text-gray-500">
-                    No former officials match your filters.
-                </p>
-
-                <p class="mt-1 text-xs text-gray-400">
-                    Try another name, position, or previous administration term.
-                </p>
-            </div>
-        </div>
-    </div>
-</div>
-
 <!-- MAIN PAGE -->
 <div class="flex h-screen bg-gray-100 overflow-hidden">
     @include('partials.app.sidebar')
@@ -806,7 +533,7 @@
             @endif
 
             <!-- PAGE TITLE -->
-            <div class="flex justify-between items-end mb-8">
+            <div class="flex justify-between items-end mb-6">
 
                 <div>
                     <span class="sk-eyebrow"><span class="sk-dot"></span>Leadership</span>
@@ -820,24 +547,28 @@
                 </div>
 
                 <div class="flex items-center gap-2">
-
-                    @if($formerOfficials->isNotEmpty())
+                    @if(($activeTab ?? 'current')==='current')
                         <button type="button"
-                            onclick="toggleModal('reappointLeadershipModal')"
-                            class="bg-white hover:bg-gray-50 text-gray-600 border border-gray-200 px-5 py-3 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-sm transition-all">
-
-                            &#8635; Reappoint Former
+                            onclick="toggleModal('bulkCouncilorModal')"
+                            class="bg-gray-800 hover:bg-gray-900 text-white px-5 py-3 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-lg transition-all">
+                            <span class="inline-flex align-[-3px]">@include('partials.ui.icon', ['icon' => 'users', 'iconSize' => 16])</span> Add Councilors
                         </button>
                     @endif
-
-                    <button type="button"
-                        onclick="toggleModal('bulkCouncilorModal')"
-                        class="bg-gray-800 hover:bg-gray-900 text-white px-5 py-3 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-lg transition-all">
-
-                        <span class="inline-flex align-[-3px]">@include('partials.ui.icon', ['icon' => 'users', 'iconSize' => 16])</span> Add Councilors
-                    </button>
                 </div>
             </div>
+
+            <div class="mb-6 flex gap-2 rounded-2xl border border-gray-100 bg-white p-2 shadow-sm">
+                <a href="{{ route('sk_chairman.leadership',['tab'=>'current']) }}"
+                    class="flex-1 rounded-xl px-4 py-3 text-center text-xs font-black uppercase transition {{ ($activeTab ?? 'current')==='current' ? 'bg-red-600 text-white' : 'text-gray-500 hover:bg-gray-50' }}">
+                    <span class="inline-flex align-[-3px]">@include('partials.ui.icon',['icon'=>'users','iconSize'=>16])</span> Current Leadership
+                </a>
+                <a href="{{ route('sk_chairman.leadership',['tab'=>'history']) }}"
+                    class="flex-1 rounded-xl px-4 py-3 text-center text-xs font-black uppercase transition {{ ($activeTab ?? 'current')==='history' ? 'bg-gray-800 text-white' : 'text-gray-500 hover:bg-gray-50' }}">
+                    <span class="inline-flex align-[-3px]">@include('partials.ui.icon',['icon'=>'archive','iconSize'=>16])</span> Leadership History
+                </a>
+            </div>
+
+            @if(($activeTab ?? 'current')==='current')
 
             <!-- BARANGAY CARD -->
             <div class="bg-red-600 rounded-2xl p-6 text-white mb-8 shadow-md flex justify-between items-center">
@@ -1291,6 +1022,188 @@
                     Try a different name, position, email, phone number, term, or status.
                 </p>
             </div>
+
+            @else
+
+                @php
+                    $historyAdministration=$historyTerms->firstWhere('term_id',$selectedHistoryTermId);
+                    $historyExecutives=$historyRecords->whereIn('role',['sk_chairman','sk_secretary','sk_treasurer']);
+                    $historyCouncilors=$historyRecords->where('role','sk_councilor');
+                @endphp
+
+                <!-- History Filter -->
+                <div class="mb-6 rounded-3xl border border-gray-100 bg-white p-6 shadow-sm">
+                    <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                        <div>
+                            <p class="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">Leadership History</p>
+                            <h2 class="mt-1 text-xl font-black text-gray-800">Previous SK Administrations</h2>
+                            <p class="mt-1 text-xs text-gray-500">View completed leadership records for Barangay {{ $barangayName }}.</p>
+                        </div>
+                        <form method="GET" action="{{ route('sk_chairman.leadership') }}" class="w-full lg:w-72">
+                            <input type="hidden" name="tab" value="history">
+                            <label for="historyTerm" class="mb-1.5 block text-[9px] font-black uppercase tracking-widest text-gray-400">Administration</label>
+                            <select id="historyTerm" name="history_term" onchange="this.form.submit()"
+                                class="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-xs font-bold text-gray-700 outline-none focus:ring-2 focus:ring-red-200">
+                                @forelse($historyTerms as $term)
+                                    <option value="{{ $term->term_id }}" @selected((int)$selectedHistoryTermId===(int)$term->term_id)>{{ $term->start_year }} - {{ $term->end_year }}</option>
+                                @empty
+                                    <option value="">No completed administrations</option>
+                                @endforelse
+                            </select>
+                        </form>
+                    </div>
+                </div>
+
+                @if($historyTerms->isEmpty())
+                    <div class="rounded-3xl border border-dashed border-gray-200 bg-white p-10 text-center">
+                        <div class="mb-3 text-4xl"><span class="inline-flex align-[-3px]">@include('partials.ui.icon',['icon'=>'archive','iconSize'=>16])</span></div>
+                        <h3 class="text-lg font-black text-gray-700">No Leadership History Yet</h3>
+                        <p class="mt-2 text-xs text-gray-400">Completed administration records for Barangay {{ $barangayName }} will appear here.</p>
+                    </div>
+                @elseif(!$historyAdministration)
+                    <div class="rounded-3xl border border-yellow-200 bg-yellow-50 p-8 text-center">
+                        <h3 class="text-sm font-black text-yellow-700">Administration Not Available</h3>
+                        <p class="mt-2 text-xs text-yellow-600">The selected administration could not be found.</p>
+                    </div>
+                @else
+                    <div class="mb-6 flex flex-col gap-4 rounded-2xl bg-gray-800 p-6 text-white shadow-md md:flex-row md:items-center md:justify-between">
+                        <div class="flex items-center gap-4">
+                            <div class="rounded-xl bg-white/10 p-3 text-2xl">@include('partials.ui.icon',['icon'=>'archive','iconSize'=>18])</div>
+                            <div>
+                                <p class="text-[9px] font-black uppercase tracking-[0.18em] text-gray-300">Completed Administration</p>
+                                <h2 class="mt-1 text-xl font-black uppercase tracking-tight">{{ $historyAdministration->start_year }} - {{ $historyAdministration->end_year }}</h2>
+                                <p class="mt-1 text-xs text-gray-300">Barangay {{ $barangayName }}</p>
+                            </div>
+                        </div>
+                        <div class="flex flex-wrap gap-2">
+                            <span class="rounded-full border border-white/10 bg-white/10 px-4 py-2 text-[10px] font-bold uppercase tracking-widest">{{ $historyRecords->count() }} Total Members</span>
+                            <span class="rounded-full border border-white/10 bg-white/10 px-4 py-2 text-[10px] font-bold uppercase tracking-widest">{{ $historyCouncilors->count() }} Councilors</span>
+                        </div>
+                    </div>
+
+                    <div class="mb-6 rounded-3xl border border-gray-100 bg-white p-6 shadow-sm">
+                        <div class="mb-5 flex items-center justify-between border-b border-gray-100 pb-4">
+                            <div>
+                                <div class="flex items-center gap-2">
+                                    <span class="font-bold text-gray-500">@include('partials.ui.icon',['icon'=>'shield-check','iconSize'=>16])</span>
+                                    <h3 class="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500">Executive Officers</h3>
+                                </div>
+                                <p class="mt-1 text-[9px] text-gray-400">Chairman, Secretary and Treasurer from this administration</p>
+                            </div>
+                            <span class="rounded-full bg-gray-100 px-3 py-1 text-[9px] font-black text-gray-500">{{ $historyExecutives->count() }}</span>
+                        </div>
+                        <div class="grid grid-cols-1 gap-4 xl:grid-cols-3">
+                            @forelse($historyExecutives as $record)
+                                @php
+                                    $style=match($record['position']){
+                                        'SK Chairman'=>['avatar'=>'bg-green-600','badge'=>'bg-green-50 text-green-700','border'=>'border-green-100'],
+                                        'SK Secretary'=>['avatar'=>'bg-blue-600','badge'=>'bg-blue-50 text-blue-700','border'=>'border-blue-100'],
+                                        'SK Treasurer'=>['avatar'=>'bg-yellow-500','badge'=>'bg-yellow-50 text-yellow-700','border'=>'border-yellow-100'],
+                                        default=>['avatar'=>'bg-gray-600','badge'=>'bg-gray-100 text-gray-600','border'=>'border-gray-200'],
+                                    };
+                                    $completedLabel=$record['completed_at'] ? \Carbon\Carbon::parse($record['completed_at'])->format('M j, Y') : 'Administration completed';
+                                    $actionKey=$record['source'].':'.$record['record_id'];
+                                    $reappointType=$reappointmentActions[$actionKey] ?? null;
+                                @endphp
+                                <article class="leadership-search-item rounded-2xl border {{ $style['border'] }} bg-white p-5 transition hover:shadow-sm"
+                                    data-search="{{ strtolower($record['name'].' '.$record['position'].' '.$record['email'].' '.$record['phone'].' '.$record['start_year'].'-'.$record['end_year']) }}">
+                                    <div class="flex items-start gap-4">
+                                        <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl {{ $style['avatar'] }} font-black text-white">{{ strtoupper(substr($record['name'] ?: 'NA',0,2)) }}</div>
+                                        <div class="min-w-0 flex-1">
+                                            <div class="flex flex-wrap items-center gap-2">
+                                                <h4 class="text-sm font-black uppercase text-gray-800">{{ $record['name'] }}</h4>
+                                                <span class="rounded-full px-2.5 py-1 text-[8px] font-black uppercase {{ $style['badge'] }}">{{ $record['position'] }}</span>
+                                            </div>
+                                            <div class="mt-2"><span class="inline-flex rounded-full bg-gray-100 px-2.5 py-1 text-[8px] font-black uppercase text-gray-500">Completed</span></div>
+                                            <div class="mt-3 space-y-1.5 text-[10px] text-gray-500">
+                                                <p class="truncate">@include('partials.ui.icon',['icon'=>'mail','iconSize'=>15]) {{ $record['email'] ?: 'No email provided' }}</p>
+                                                <p>@include('partials.ui.icon',['icon'=>'phone','iconSize'=>15]) {{ $record['phone'] ?: 'No phone provided' }}</p>
+                                                <p>@include('partials.ui.icon',['icon'=>'calendar-days','iconSize'=>15]) Term: {{ $record['start_year'] }} - {{ $record['end_year'] }}</p>
+                                                <p>✓ Service ended: {{ $completedLabel }}</p>
+                                            </div>
+                                            @if($reappointType==='secretary')
+                                                <form method="POST" action="{{ route('sk_chairman.leadership.secretary.reappoint',$record['record_id']) }}" class="mt-4"
+                                                    onsubmit="return confirm(@js('Reappoint '.$record['name'].' as SK Secretary for the current administration? Their existing account will be reused and a new password setup link will be sent.'))">
+                                                    @csrf
+                                                    <button type="submit" class="rounded-xl bg-blue-600 px-4 py-2.5 text-[9px] font-black uppercase text-white transition hover:bg-blue-700">Reappoint Secretary</button>
+                                                </form>
+                                            @elseif($reappointType==='treasurer')
+                                                <form method="POST" action="{{ route('sk_chairman.leadership.council.reappoint',$record['record_id']) }}" class="mt-4"
+                                                    onsubmit="return confirm(@js('Reappoint '.$record['name'].' as SK Treasurer for the current administration?'))">
+                                                    @csrf
+                                                    <button type="submit" class="rounded-xl bg-yellow-500 px-4 py-2.5 text-[9px] font-black uppercase text-white transition hover:bg-yellow-600">Reappoint Treasurer</button>
+                                                </form>
+                                            @endif
+                                        </div>
+                                    </div>
+                                </article>
+                            @empty
+                                <div class="rounded-2xl border border-dashed border-gray-200 bg-gray-50 p-8 text-center xl:col-span-3">
+                                    <p class="text-sm font-bold text-gray-500">No executive officers found.</p>
+                                    <p class="mt-1 text-xs text-gray-400">No historical Chairman, Secretary, or Treasurer records were found for this administration.</p>
+                                </div>
+                            @endforelse
+                        </div>
+                    </div>
+
+                    <div class="rounded-3xl border border-gray-100 bg-white p-6 shadow-sm">
+                        <div class="mb-5 flex items-center justify-between border-b border-gray-100 pb-4">
+                            <div>
+                                <div class="flex items-center gap-2">
+                                    <span class="font-bold text-purple-500">@include('partials.ui.icon',['icon'=>'award','iconSize'=>16])</span>
+                                    <h3 class="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500">SK Councilors</h3>
+                                </div>
+                                <p class="mt-1 text-[9px] text-gray-400">Council members recorded for this completed administration</p>
+                            </div>
+                            <span class="rounded-full bg-purple-50 px-3 py-1 text-[9px] font-black text-purple-600">{{ $historyCouncilors->count() }}</span>
+                        </div>
+                        <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                            @forelse($historyCouncilors as $record)
+                                @php
+                                    $completedLabel=$record['completed_at'] ? \Carbon\Carbon::parse($record['completed_at'])->format('M j, Y') : 'Administration completed';
+                                    $actionKey=$record['source'].':'.$record['record_id'];
+                                    $reappointType=$reappointmentActions[$actionKey] ?? null;
+                                @endphp
+                                <article class="leadership-search-item rounded-2xl border border-purple-100 bg-white p-4 transition hover:shadow-sm"
+                                    data-search="{{ strtolower($record['name'].' '.$record['position'].' '.$record['email'].' '.$record['phone'].' '.$record['start_year'].'-'.$record['end_year']) }}">
+                                    <div class="flex items-start gap-3">
+                                        <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-purple-600 text-xs font-black text-white">{{ strtoupper(substr($record['name'] ?: 'NA',0,2)) }}</div>
+                                        <div class="min-w-0 flex-1">
+                                            <h4 class="truncate text-xs font-black uppercase text-gray-800">{{ $record['name'] }}</h4>
+                                            <div class="mt-1"><span class="rounded-full bg-purple-50 px-2 py-1 text-[8px] font-black uppercase text-purple-700">SK Councilor</span></div>
+                                            <div class="mt-3 space-y-1 text-[9px] text-gray-400">
+                                                <p class="truncate">@include('partials.ui.icon',['icon'=>'mail','iconSize'=>14]) {{ $record['email'] ?: 'No email provided' }}</p>
+                                                <p>@include('partials.ui.icon',['icon'=>'phone','iconSize'=>14]) {{ $record['phone'] ?: 'No phone provided' }}</p>
+                                                <p>@include('partials.ui.icon',['icon'=>'calendar-days','iconSize'=>14]) {{ $record['start_year'] }} - {{ $record['end_year'] }}</p>
+                                                <p>✓ Service ended: {{ $completedLabel }}</p>
+                                            </div>
+                                            @if($reappointType==='councilor')
+                                                <form method="POST" action="{{ route('sk_chairman.leadership.council.reappoint',$record['record_id']) }}" class="mt-4"
+                                                    onsubmit="return confirm(@js('Reappoint '.$record['name'].' as SK Councilor for the current administration?'))">
+                                                    @csrf
+                                                    <button type="submit" class="rounded-xl bg-red-600 px-4 py-2.5 text-[9px] font-black uppercase text-white transition hover:bg-red-700">Reappoint Councilor</button>
+                                                </form>
+                                            @endif
+                                        </div>
+                                    </div>
+                                </article>
+                            @empty
+                                <div class="rounded-2xl border border-dashed border-gray-200 bg-gray-50 p-8 text-center md:col-span-2 xl:col-span-3">
+                                    <p class="text-sm font-bold text-gray-500">No SK Councilors found.</p>
+                                    <p class="mt-1 text-xs text-gray-400">No historical Councilor records were found for this administration.</p>
+                                </div>
+                            @endforelse
+                        </div>
+                    </div>
+
+                    <div id="leadershipNoResults" class="mt-6 hidden rounded-2xl border border-gray-200 bg-white p-8 text-center">
+                        <div class="text-3xl">@include('partials.ui.icon',['icon'=>'search','iconSize'=>18])</div>
+                        <p class="mt-2 text-sm font-bold text-gray-600">No leadership record matched your search.</p>
+                        <p class="mt-1 text-xs text-gray-400">Search by official name, position, email, phone or administration term.</p>
+                    </div>
+                @endif
+
+            @endif
         </main>
     </div>
 </div>
@@ -1518,76 +1431,6 @@ document.addEventListener('DOMContentLoaded',()=>{
 
     /*
     |--------------------------------------------------------------------------
-    | REAPPOINTMENT FILTERS
-    |--------------------------------------------------------------------------
-    */
-    const reappointSearch=document.getElementById('reappointSearch');
-    const reappointPosition=document.getElementById('reappointPosition');
-    const reappointTerm=document.getElementById('reappointTerm');
-    const clearReappointFilters=document.getElementById('clearReappointFilters');
-    const reappointResultCount=document.getElementById('reappointResultCount');
-    const reappointNoResults=document.getElementById('reappointNoResults');
-
-    function filterReappointmentOfficials(){
-        const search=(reappointSearch?.value || '').trim().toLowerCase();
-        const position=reappointPosition?.value || 'all';
-        const term=reappointTerm?.value || 'all';
-        const cards=document.querySelectorAll('.reappoint-official-card');
-
-        let visibleCount=0;
-
-        cards.forEach((card)=>{
-            const searchable=(card.dataset.search || '').toLowerCase();
-            const cardPosition=card.dataset.position || '';
-            const terms=(card.dataset.terms || '').split('|').filter(Boolean);
-
-            const matchesSearch=search==='' || searchable.includes(search);
-            const matchesPosition=position==='all' || cardPosition===position;
-            const matchesTerm=term==='all' || terms.includes(term);
-            const matched=matchesSearch && matchesPosition && matchesTerm;
-
-            card.classList.toggle('hidden',!matched);
-
-            if(matched){
-                visibleCount++;
-            }
-        });
-
-        if(reappointResultCount){
-            reappointResultCount.textContent=
-                `${visibleCount} Former Official${visibleCount===1 ? '' : 's'}`;
-        }
-
-        if(reappointNoResults){
-            reappointNoResults.classList.toggle(
-                'hidden',
-                visibleCount>0 || cards.length===0
-            );
-        }
-    }
-
-    reappointSearch?.addEventListener('input',filterReappointmentOfficials);
-    reappointPosition?.addEventListener('change',filterReappointmentOfficials);
-    reappointTerm?.addEventListener('change',filterReappointmentOfficials);
-
-    clearReappointFilters?.addEventListener('click',()=>{
-        if(reappointSearch){
-            reappointSearch.value='';
-        }
-
-        if(reappointPosition){
-            reappointPosition.value='all';
-        }
-
-        if(reappointTerm){
-            reappointTerm.value='all';
-        }
-
-        filterReappointmentOfficials();
-    });
-
-    /*
-    |--------------------------------------------------------------------------
     | CLOSE DROPDOWNS
     |--------------------------------------------------------------------------
     */
@@ -1628,8 +1471,7 @@ document.addEventListener('DOMContentLoaded',()=>{
         'editSecretaryModal',
         'addTreasurerModal',
         'editTreasurerModal',
-        'editCouncilorModal',
-        'reappointLeadershipModal'
+        'editCouncilorModal'
     ].forEach((id)=>{
         const modal=document.getElementById(id);
 

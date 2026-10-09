@@ -18,6 +18,7 @@ class LeadershipController extends Controller
     {
         abort_unless(auth()->check() && auth()->user()->role === 'sk_chairman',403);
 
+        $request=request();
         $user=auth()->user();
         $fullName=trim(($user->first_name ?? '').' '.($user->last_name ?? '')) ?: 'User';
         $barangayId=(int)($user->barangay_id ?? 0);
@@ -137,6 +138,40 @@ class LeadershipController extends Controller
 
         $councilMembers=$executives->merge($kagawads)->values();
         $reappointment=$this->formerLeadershipMembers($barangayId,$currentAdministration);
+        $reappointmentActions=[];
+        $eligibleSecretaryIds=[];
+        $eligibleCouncilMembers=[];
+
+        foreach($reappointment['officials'] as $former){
+            if($former['type']==='secretary' && !$hasCurrentSecretary){
+                $eligibleSecretaryIds[]=(int)$former['user_id'];
+            }elseif($former['type']==='treasurer' && empty($treasurer)){
+                $eligibleCouncilMembers[]=$this->councilReappointmentKey($former);
+            }elseif($former['type']==='councilor'){
+                $eligibleCouncilMembers[]=$this->councilReappointmentKey($former);
+            }
+        }
+
+        $activeTab=in_array((string)$request->query('tab','current'),['current','history'],true)
+            ? (string)$request->query('tab','current')
+            : 'current';
+        $historyTerms=$this->leadershipHistoryTerms($barangayId);
+        $requestedHistoryTermId=(int)$request->query('history_term',0);
+        $selectedHistoryTermId=$historyTerms->contains(
+            fn($term)=>(int)$term->term_id===$requestedHistoryTermId
+        ) ? $requestedHistoryTermId : (int)($historyTerms->first()->term_id ?? 0);
+        $historyRecords=$this->leadershipHistoryForTerm($barangayId,$selectedHistoryTermId);
+
+        foreach($historyRecords as $record){
+            if($record['source']==='official_term' && in_array((int)$record['user_id'],$eligibleSecretaryIds,true)){
+                $reappointmentActions['official_term:'.$record['record_id']]='secretary';
+            }elseif(
+                $record['source']==='sk_council' &&
+                in_array($this->councilReappointmentKey($record),$eligibleCouncilMembers,true)
+            ){
+                $reappointmentActions['sk_council:'.$record['record_id']]=$record['role']==='sk_treasurer' ? 'treasurer' : 'councilor';
+            }
+        }
 
         return view('sk_chairman.leadership',[
             'fullName'=>$fullName,
@@ -153,6 +188,11 @@ class LeadershipController extends Controller
             'currentAdministration'=>$currentAdministration,
             'formerOfficials'=>$reappointment['officials'],
             'reappointmentTerms'=>$reappointment['terms'],
+            'reappointmentActions'=>$reappointmentActions,
+            'activeTab'=>$activeTab,
+            'historyTerms'=>$historyTerms,
+            'selectedHistoryTermId'=>$selectedHistoryTermId,
+            'historyRecords'=>$historyRecords,
         ]);
     }
 
@@ -1141,6 +1181,7 @@ class LeadershipController extends Controller
             if(!isset($grouped[$key])){
                 $grouped[$key]=[
                     'type'=>'secretary',
+                    'user_id'=>(int)$row->user_id,
                     'position'=>'SK Secretary',
                     'action_id'=>$row->official_term_id,
                     'name'=>trim(($row->first_name ?? '').' '.($row->last_name ?? '')),
@@ -1240,6 +1281,132 @@ class LeadershipController extends Controller
             'officials'=>$officials,
             'terms'=>$terms,
         ];
+    }
+
+    protected function leadershipHistoryTerms(int $barangayId)
+    {
+        if($barangayId<=0){
+            return collect();
+        }
+
+        $officialTermIds=DB::table('official_terms')
+            ->where('barangay_id',$barangayId)
+            ->whereIn('role',['sk_chairman','sk_secretary'])
+            ->where('status','completed')
+            ->pluck('term_id');
+        $councilTermIds=DB::table('sk_council')
+            ->where('barangay_id',$barangayId)
+            ->where('status','completed')
+            ->pluck('term_id');
+        $termIds=$officialTermIds->merge($councilTermIds)->filter()->unique()->values();
+
+        return $termIds->isEmpty() ? collect() : DB::table('administration_terms')
+            ->whereIn('term_id',$termIds)
+            ->where('status','completed')
+            ->select('term_id','start_year','end_year')
+            ->orderByDesc('start_year')
+            ->orderByDesc('term_id')
+            ->get();
+    }
+
+    protected function leadershipHistoryForTerm(int $barangayId,int $termId)
+    {
+        if($barangayId<=0 || $termId<=0){
+            return collect();
+        }
+
+        $officials=DB::table('official_terms as ot')
+            ->join('users as u','ot.user_id','=','u.user_id')
+            ->join('administration_terms as t','ot.term_id','=','t.term_id')
+            ->where('ot.barangay_id',$barangayId)
+            ->where('ot.term_id',$termId)
+            ->whereIn('ot.role',['sk_chairman','sk_secretary'])
+            ->where('ot.status','completed')
+            ->where('t.status','completed')
+            ->select(
+                'ot.official_term_id as record_id',
+                'ot.user_id',
+                'ot.role',
+                'u.first_name',
+                'u.last_name',
+                'u.email',
+                'u.phone_number as phone',
+                'ot.completed_at',
+                't.term_id',
+                't.start_year',
+                't.end_year'
+            )
+            ->get()
+            ->map(fn($row)=>[
+                'source'=>'official_term',
+                'record_id'=>(int)$row->record_id,
+                'user_id'=>(int)$row->user_id,
+                'role'=>$row->role,
+                'position'=>$row->role==='sk_secretary' ? 'SK Secretary' : 'SK Chairman',
+                'name'=>trim(($row->first_name ?? '').' '.($row->last_name ?? '')),
+                'email'=>$row->email,
+                'phone'=>$row->phone,
+                'completed_at'=>$row->completed_at,
+                'term_id'=>(int)$row->term_id,
+                'start_year'=>$row->start_year,
+                'end_year'=>$row->end_year,
+            ]);
+
+        $council=DB::table('sk_council as sc')
+            ->join('administration_terms as t','sc.term_id','=','t.term_id')
+            ->where('sc.barangay_id',$barangayId)
+            ->where('sc.term_id',$termId)
+            ->where('sc.status','completed')
+            ->where('t.status','completed')
+            ->where(function($query){
+                $query->whereRaw('LOWER(TRIM(sc.position))=?',['sk treasurer'])
+                    ->orWhereRaw('LOWER(sc.position) LIKE ?',['%councilor%'])
+                    ->orWhereRaw('LOWER(sc.position) LIKE ?',['%kagawad%']);
+            })
+            ->select(
+                'sc.council_id as record_id',
+                'sc.position',
+                'sc.name',
+                'sc.email',
+                'sc.phone',
+                'sc.completed_at',
+                't.term_id',
+                't.start_year',
+                't.end_year'
+            )
+            ->get()
+            ->map(function($row){
+                $isTreasurer=strtolower(trim($row->position ?? ''))==='sk treasurer';
+                return [
+                    'source'=>'sk_council',
+                    'record_id'=>(int)$row->record_id,
+                    'role'=>$isTreasurer ? 'sk_treasurer' : 'sk_councilor',
+                    'position'=>$isTreasurer ? 'SK Treasurer' : 'SK Councilor',
+                    'name'=>$row->name,
+                    'email'=>$row->email,
+                    'phone'=>$row->phone,
+                    'completed_at'=>$row->completed_at,
+                    'term_id'=>(int)$row->term_id,
+                    'start_year'=>$row->start_year,
+                    'end_year'=>$row->end_year,
+                ];
+            });
+
+        return $officials->concat($council)
+            ->sortBy(fn($row)=>[$row['role'],$row['name']])
+            ->values();
+    }
+
+    protected function councilReappointmentKey(array $member): string
+    {
+        $email=strtolower(trim($member['email'] ?? ''));
+        $phone=preg_replace('/\D+/','',$member['phone'] ?? '');
+        $name=strtolower(trim(preg_replace('/\s+/',' ',$member['name'] ?? '')));
+        $type=($member['type'] ?? $member['role'] ?? '')==='treasurer' || ($member['role'] ?? '')==='sk_treasurer'
+            ? 'treasurer'
+            : 'councilor';
+
+        return $type.'|'.$name.'|'.$email.'|'.$phone;
     }
 
     protected function secretaryForChairman(int $userId): User
