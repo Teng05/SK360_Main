@@ -26,10 +26,10 @@
     ];
 
     $teamMembers = [
-        ['name'=>'Marielle O. Bautista','role'=>'Web System Development','image'=>'images/team/marielle.jpg','initials'=>'MB'],
-        ['name'=>'Paul Vincent M. Monje','role'=>'Mobile Application Development','image'=>'images/team/paul.jpg','initials'=>'PM'],
-        ['name'=>'Alexa E. Sumadsad','role'=>'Mobile UI/UX Design & Project Manager','image'=>'images/team/alexa.jpg','initials'=>'AS'],
-        ['name'=>'Giorgia Schen C. Janda','role'=>'Project Documentation','image'=>'images/team/giorgia.jpg','initials'=>'GJ'],
+        ['name'=>'Marielle O. Bautista','role'=>'Web System Development','email'=>'bautistamarielle1226@gmail.com','phone'=>'09184659874','image'=>'images/team/marielle.jpg','initials'=>'MB'],
+        ['name'=>'Paul Vincent M. Monje','role'=>'Mobile Application Development','email'=>'paulmonje123@gmail.com','phone'=>'09917924021','image'=>'images/team/paul.jpg','initials'=>'PM'],
+        ['name'=>'Alexa E. Sumadsad','role'=>'Mobile UI/UX Design & Project Manager','email'=>'alexasmdsd24@gmail.com','phone'=>'09924921722','image'=>'images/team/alexa.jpg','initials'=>'AS'],
+        ['name'=>'Giorgia Schen C. Janda','role'=>'Project Documentation','email'=>'gjanda17@gmail.com','phone'=>'09911355176','image'=>'images/team/giorgia.jpg','initials'=>'GJ'],
     ];
 @endphp
 
@@ -354,6 +354,10 @@
                         </div>
                         <h3>{{ $member['name'] }}</h3>
                         <p>{{ $member['role'] }}</p>
+                        <div class="sk-team-card__contacts">
+                            <div><span class="sk-team-card__contact-icon" aria-label="Email">@include('landing.icon',['icon'=>'mail','iconSize'=>14])</span>{{ $member['email'] }}</div>
+                            <div><span class="sk-team-card__contact-icon" aria-label="Phone">@include('landing.icon',['icon'=>'phone','iconSize'=>14])</span>{{ $member['phone'] }}</div>
+                        </div>
                     </article>
                 @endforeach
             </div>
