@@ -279,7 +279,10 @@ $isActive=($user->status??'active')==='active';
                             @foreach(['email'=>'Email address','phone_number'=>'Phone number'] as $field=>$label)
                             <div class="pf-field">
                                 <label class="pf-label" for="{{ $field==='email'?'profile_email':'profile_phone' }}">{{ $label }}</label>
-                                <input id="{{ $field==='email'?'profile_email':'profile_phone' }}" name="{{ $field }}" type="{{ $field==='email'?'email':'tel' }}" class="pf-input" value="{{ old($field,$user->{$field}) }}" data-initial="{{ $user->{$field} }}" data-editable readonly>
+                                <input id="{{ $field==='email'?'profile_email':'profile_phone' }}" name="{{ $field }}" type="{{ $field==='email'?'email':'tel' }}" class="pf-input" value="{{ old($field,$user->{$field}) }}" data-initial="{{ $user->{$field} }}" @if($field==='phone_number') placeholder="e.g., 09123456789" aria-describedby="profile_phone_hint" @endif data-editable readonly>
+                                @if($field==='phone_number')
+                                    <p id="profile_phone_hint" class="pf-hint mt-2">Enter an 11-digit Philippine mobile number starting with 09 (e.g., 09123456789).</p>
+                                @endif
                             </div>
                             @endforeach
                         </div>
