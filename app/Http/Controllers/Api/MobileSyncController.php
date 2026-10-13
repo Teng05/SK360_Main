@@ -306,8 +306,13 @@ class MobileSyncController extends Controller
         ], now()->addMinutes(15));
 
         $label = $type === 'email' ? 'email address' : 'phone number';
-        Mail::raw(
-            "Your SK360 verification code for changing your {$label} is: {$code}\n\nThis code expires in 15 minutes.",
+        Mail::send('email.verification-code', [
+            'heading'=>'Verify your '.$label.' change',
+            'purpose'=>'Use the code below to confirm the change to your SK360 '.$label.'.',
+            'first_name'=>$user->first_name,
+            'code'=>$code,
+            'expiresMinutes'=>15,
+        ],
             function ($message) use ($deliveryEmail, $user, $label) {
                 $message->to($deliveryEmail, trim($user->first_name.' '.$user->last_name))
                     ->subject('SK360 '.ucfirst($label).' Change Verification');

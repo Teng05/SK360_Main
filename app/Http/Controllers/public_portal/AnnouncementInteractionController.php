@@ -251,10 +251,13 @@ class AnnouncementInteractionController extends Controller
                 'created_at'=>now(),
             ]);
 
-            Mail::raw(
-                "Your SK360 feedback verification code is: {$otp}\n\n".
-                "This code will expire in 10 minutes.\n".
-                "Enter this code in the SK360 Public Portal to post your feedback.",
+            Mail::send('email.verification-code', [
+                'heading'=>'Verify your feedback',
+                'purpose'=>'Enter the code below in the SK360 Public Portal to post your feedback.',
+                'first_name'=>$validated['name'],
+                'code'=>$otp,
+                'expiresMinutes'=>10,
+            ],
                 function($message) use($validated){
                     $message->to(
                         $validated['email'],
@@ -445,10 +448,13 @@ class AnnouncementInteractionController extends Controller
                     ]
                 );
 
-            Mail::raw(
-                "Your new SK360 feedback verification code is: {$otp}\n\n".
-                "This code will expire in 10 minutes.\n".
-                "Your previous verification code is no longer valid.",
+            Mail::send('email.verification-code', [
+                'heading'=>'Your new feedback verification code',
+                'purpose'=>'Enter the code below in the SK360 Public Portal to post your feedback. Your previous code is no longer valid.',
+                'first_name'=>$feedback->name,
+                'code'=>$otp,
+                'expiresMinutes'=>10,
+            ],
                 function($message) use($feedback){
                     $message->to(
                         $feedback->email,

@@ -36,7 +36,13 @@ class ProfileContactController extends ProfileSettingsController
                     if(in_array(config('mail.default'),['log','array'],true)) throw new \RuntimeException('Email delivery is not configured.');
                     $code=(string)random_int(100000,999999);
                     $pending['hash']=Hash::make($code);
-                    Mail::raw("Your SK360 contact change code is: {$code}\nThis code expires in 10 minutes. If you did not request this change, ignore this message.",function($mail) use($value){
+                    Mail::send('email.verification-code',[
+                        'heading'=>'Verify your new email address',
+                        'purpose'=>'Use the code below to confirm your new SK360 email address.',
+                        'first_name'=>$user->first_name,
+                        'code'=>$code,
+                        'expiresMinutes'=>10,
+                    ],function($mail) use($value){
                         $mail->to($value)->subject('Verify your new SK360 email address');
                     });
                 }else{
