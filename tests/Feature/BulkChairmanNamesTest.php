@@ -145,7 +145,7 @@ class BulkChairmanNamesTest extends TestCase
             $this->assertStringContainsString('/set-password/', $data['setupLink']);
             $recipients[]=$data['user']->email;
         });
-        $this->post(route('sk_pres.user-management.resend-pending-setup-links'))->assertSessionHas('success');
+        $this->post(route('sk_pres.user-management.resend-pending-setup-links'))->assertSessionHas('warning');
         $this->assertSame(['pending1@example.test','pending2@example.test','pending3@example.test','pending4@example.test'], $recipients);
         $this->assertDatabaseCount('password_reset_tokens', 4);
         $this->assertNotSame('old-token', DB::table('password_reset_tokens')->where('email','pending1@example.test')->value('token'));
@@ -168,5 +168,18 @@ class BulkChairmanNamesTest extends TestCase
         $this->actingAs((new User())->forceFill(['user_id'=>98, 'role'=>'sk_chairman']));
         $this->post(route('sk_pres.user-management.resend-pending-setup-links'))->assertForbidden();
         $this->assertDatabaseCount('password_reset_tokens', 0);
+    }
+
+    public function test_visible_pending_count_includes_unverified_accounts_with_current_assignments(): void
+    {
+        $this->pendingAccounts(4);
+        DB::table('official_terms')->where('user_id',4)->update(['status'=>'current']);
+        $controller = new class extends \App\Http\Controllers\sk_pres\UserManagementController {
+            public function visibleCount(): int { return $this->pendingSetupDisplayCount(); }
+        };
+        $this->assertSame(4, $controller->visibleCount());
+        Mail::shouldReceive('send')->times(3);
+        $this->post(route('sk_pres.user-management.resend-pending-setup-links'))->assertSessionHas('warning', fn ($message)=>str_contains($message, '3 setup link(s) sent.') && str_contains($message, '1 pending account(s) skipped'));
+        $this->assertDatabaseCount('password_reset_tokens', 3);
     }
 }

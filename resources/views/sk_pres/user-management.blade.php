@@ -39,7 +39,6 @@
                 </div>
                 @if(($activeTab ?? 'current') === 'current')
                     <div class="flex flex-wrap items-center gap-2">
-                        @include('sk_pres.partials.resend-pending-setup')
                         <button id="openNewTermModal"
                             type="button"
                             class="sk-btn sk-btn--secondary">
@@ -197,9 +196,14 @@
                                         </p>
                                     </div>
                                 </div>
-                                <span class="text-gray-400">
-                                    @include('partials.ui.icon', ['icon'=>'chevron-down','iconSize'=>16])
-                                </span>
+                                <div class="flex shrink-0 items-center gap-3">
+                                    @if($group['label'] === 'SK Chairmen')
+                                        @include('sk_pres.partials.resend-pending-setup')
+                                    @endif
+                                    <span class="text-gray-400">
+                                        @include('partials.ui.icon', ['icon'=>'chevron-down','iconSize'=>16])
+                                    </span>
+                                </div>
                             </summary>
                             <div class="space-y-3 border-t border-gray-100 px-5 py-4 bg-gray-50/30">
                                 @forelse($group['users'] as $groupUser)

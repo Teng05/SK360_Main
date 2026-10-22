@@ -47,7 +47,7 @@ class UserManagementController extends Controller
             'availableChairmanBarangays'=>$availableChairmanBarangays,
             'currentAdministration'=>$currentAdministration,
             'pendingPresident'=>$pendingPresident,
-            'pendingSetupCount'=>$this->pendingSetupAccounts($currentAdministration?->term_id)->count(),
+            'pendingSetupCount'=>$this->pendingSetupDisplayCount(),
             'activeTab'=>$activeTab,
             'historyTerms'=>$historyTerms,
             'selectedHistoryTerm'=>$selectedHistoryTerm,
@@ -584,13 +584,22 @@ class UserManagementController extends Controller
             });
     }
 
+    protected function pendingSetupDisplayCount(): int
+    {
+        // Match the Pending badges on Current Officials, not assignment status.
+        return User::query()->whereNull('archived_at')->where('is_verified', false)
+            ->whereIn('role', ['sk_president', 'sk_chairman', 'sk_secretary'])->count();
+    }
+
     public function resendPendingSetupLinks(): RedirectResponse
     {
         abort_unless(auth()->check() && auth()->user()->role === 'sk_president', 403);
         $accounts = $this->pendingSetupAccounts($this->currentAdministrationTerm()?->term_id)->get();
-        if ($accounts->count() <= 3) {
+        $displayPendingCount = $this->pendingSetupDisplayCount();
+        if ($displayPendingCount <= 3) {
             return back()->with('warning', 'Bulk resend is available only when more than 3 accounts are pending. Use the individual resend buttons.');
         }
+        $skipped = $displayPendingCount - $accounts->count();
         $sent = 0;
         $failed = 0;
         foreach ($accounts as $account) {
@@ -606,7 +615,9 @@ class UserManagementController extends Controller
             }
         }
         $message = $sent.' setup link(s) sent. Each new link is valid for 24 hours and replaces the previous link.';
+        if ($skipped) $message .= ' '.$skipped.' pending account(s) skipped: Secretary invitations are managed by their Chairman; other accounts need a valid pending assignment in the current administration.';
         if ($failed) return back()->with('warning', $message.' '.$failed.' could not be sent; use individual resend to retry.');
+        if ($skipped) return back()->with('warning', $message);
         return back()->with('success', $message);
     }
 
