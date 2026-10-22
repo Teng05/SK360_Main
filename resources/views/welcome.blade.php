@@ -370,7 +370,7 @@
             <button type="button" class="sk-download-modal__close" data-download-close aria-label="Close app download dialog">&times;</button>
             <div class="sk-download-modal__qr">
                 @if(file_exists(public_path('images/mobile-app-qr.jpg')))
-                    <img src="{{ asset('images/mobile-app-qr.jpg') }}" alt="QR code to download the SK360 Android APK" width="260" height="260">
+                    <img src="{{ asset('images/mobile-app-qr.jpg') }}?v={{ filemtime(public_path('images/mobile-app-qr.jpg')) }}" alt="QR code to download the SK360 Android APK" width="260" height="260">
                 @else
                     <p class="sk-download-modal__missing">QR code image is not available yet. Use the download button or add the provided image at <code>public/images/mobile-app-qr.png</code>.</p>
                 @endif
@@ -379,7 +379,7 @@
                 <span class="sk-download-modal__eyebrow">SK 360&deg; MOBILE APP</span>
                 <h2 id="skDownloadTitle">Get SK360 for Android</h2>
                 <p id="skDownloadDescription">Scan the QR code using your phone to access the SK360 app download.</p>
-                <a class="sk-download-modal__button" href="https://drive.usercontent.google.com/download?id=194h2O9TwWd04J3XyswPvgQmW7fxHUA-9&amp;export=download&amp;authuser=0" target="_blank" rel="noopener noreferrer">Download Android APK</a>
+                <a class="sk-download-modal__button" href="https://drive.usercontent.google.com/download?id=1M5h-R48_-17b8EetHvAOfiizq46EZkGB&amp;export=download&amp;authuser=0" target="_blank" rel="noopener noreferrer">Download Android APK</a>
                 <span class="sk-download-modal__source">Android APK &middot; Google Drive</span>
             </div>
         </section>
