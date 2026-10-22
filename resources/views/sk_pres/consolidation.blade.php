@@ -326,6 +326,9 @@
                                                         @endif
                                                     </div>
 
+                                                    @if($item->source_type === 'budget_report')
+                                                        <p class="text-sm my-3"><a class="text-red-800 underline" href="{{ route('sk_pres.finances', ['year' => $item->year, 'barangay_id' => $item->barangay_id]) }}#barangay-{{ $item->barangay_id }}">Review related expenses, private proofs and reconciliation status</a></p>
+                                                    @endif
                                                     @if($status==='approved')
                                                         <div class="rounded-xl bg-green-50 border border-green-100 p-4">
                                                             <p class="text-sm font-semibold text-green-700">Document Approved</p>

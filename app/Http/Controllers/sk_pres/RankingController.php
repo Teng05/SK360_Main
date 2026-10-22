@@ -29,7 +29,7 @@ class RankingController extends Controller
 
         return view('sk_pres.rankings', [
             'fullName' => $fullName,
-            'roleLabel' => 'SK President',
+            'roleLabel' => 'SK Federation President',
             'menuItems' => $this->menuItems(),
             'currentUrl' => url()->current(),
             'topRankings' => $this->topRankings($leaderboard),

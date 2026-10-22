@@ -1,8 +1,10 @@
 {{-- File guide: Blade view template for resources/views/shared/submission-slots-page.blade.php. --}}
 @php
     $chairmanReportUi = $chairmanReportUi ?? false;
+    $embeddedFinancial = $embeddedFinancial ?? false;
     $slotUiClass = fn ($original, $web) => $chairmanReportUi ? $web : $original;
 @endphp
+@if(!$embeddedFinancial)
 <div class="flex h-screen bg-gray-100 overflow-hidden">
     {{-- SIDEBAR --}}
     @include('partials.app.sidebar')
@@ -13,6 +15,12 @@
         {{-- CONTENT --}}
         <main class="{{ $slotUiClass('flex-1 overflow-y-auto p-8 bg-gray-50', 'flex-1 overflow-y-auto p-8') }}">
             <div class="max-w-6xl mx-auto">
+@endif
+                @if(!$embeddedFinancial && ($submissionType ?? '') === 'budget' && auth()->user()->role === 'sk_chairman')
+                    <link rel="stylesheet" href="{{ asset('css/budget-monitoring.css') }}?v={{ filemtime(public_path('css/budget-monitoring.css')) }}">
+                    @include('shared.financial-section-nav')
+                    <p class="mb-5 text-sm text-gray-600">Submit financial documents below. <a class="budget-link" href="{{ route('sk_chairman.finances', ['year' => request('year', now()->year), 'section' => 'documents']) }}">Manage liquidation expense links</a></p>
+                @endif
                 {{-- SUCCESS --}}
                 @if(session('report_success'))
                     <div class="mb-6 rounded-2xl border border-green-200 bg-green-50 px-5 py-4 text-sm font-semibold text-green-700">
@@ -50,6 +58,7 @@
     $isBudgetPage = ($submissionType ?? '') === 'budget';
                 @endphp
                 {{-- PAGE TITLE --}}
+                @if(!$embeddedFinancial)
                 <div class="sk-page-head">
                     <div class="sk-page-head__text">
                         <span class="sk-eyebrow"><span class="sk-dot"></span>Submission Slots</span>
@@ -62,6 +71,11 @@
                         </p>
                     </div>
                 </div>
+                @else
+                <h2 class="sk-section-title mb-2">Budget Submissions</h2>
+                <p class="sk-section-subtitle mb-6">{{ $pageDescription }}</p>
+                <label class="sk-search mb-6"><span class="sr-only">Search submission slots and records</span>@include('partials.ui.icon', ['icon' => 'search', 'iconSize' => 18])<input id="submissionSearch" type="search" placeholder="Search slots and submitted records..."></label>
+                @endif
 
                 {{-- SUMMARY --}}
                 <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5 mb-8">
@@ -143,6 +157,7 @@
                         action="{{ url()->current() }}"
                         class="mb-8 rounded-3xl border border-gray-100 bg-white p-5 shadow-sm"
                     >
+                        @if($embeddedFinancial)<input type="hidden" name="section" value="submissions">@endif
                         <div class="mb-4">
                             <h2 class="text-sm font-black uppercase tracking-tight text-gray-800">
                                 Filter Budget Records
@@ -774,10 +789,12 @@
                         </table>
                     </div>
                 </div>
+@if(!$embeddedFinancial)
             </div>
         </main>
     </div>
 </div>
+@endif
 {{-- SUBMISSION MODAL --}}
 <div
     id="slotSubmissionModal"

@@ -9,19 +9,34 @@
     };
     $skNavGroups = [
         'Main' => ['home', 'dashboard', 'community', 'announcements', 'calendar'],
-        'Management' => ['reports', 'budget', 'submission slots', 'consolidation', 'meetings', 'video meetings', 'module management', 'rankings'],
+        'Management' => ['reports', 'budget', 'budget monitoring', 'budget & finance', 'submission slots', 'consolidation', 'meetings', 'video meetings', 'module management', 'rankings'],
         'Organization' => ['leadership', 'user management', 'barangays'],
         'Resources' => ['learning modules', 'archive'],
         'Communication' => ['chat'],
     ];
     $skNavIcons = [
         'home' => 'house','dashboard' => 'layout-dashboard','community' => 'users','announcements' => 'megaphone','calendar' => 'calendar-days',
-        'reports' => 'file-text','budget' => 'wallet','submission slots' => 'file-plus','consolidation' => 'files','meetings' => 'video','video meetings' => 'video',
+        'reports' => 'file-text','budget' => 'wallet','budget monitoring' => 'wallet','budget & finance' => 'wallet','submission slots' => 'file-plus','consolidation' => 'files','meetings' => 'video','video meetings' => 'video',
         'module management' => 'settings','rankings' => 'chart-column','leadership' => 'id-card','user management' => 'user-cog','barangays' => 'building-2',
         'learning modules' => 'file-text','archive' => 'archive','chat' => 'message-square',
     ];
     $skSections = array_fill_keys(array_keys($skNavGroups), []);
-    foreach ($menuItems ?? [] as $skItem) {
+    $skItemsForNavigation = $menuItems ?? [];
+    if (in_array($skRole, ['sk_president', 'sk_chairman'], true)) {
+        $skFinancePrefix = $skRole === 'sk_president' ? 'sk_pres' : 'sk_chairman';
+        $skFinanceItem = ['label' => $skRole === 'sk_president' ? 'Budget & Finance' : 'Budget', 'link' => route($skFinancePrefix.'.finances'), 'financial' => true];
+        $skFinanceInserted = false;
+        $skItemsForNavigation = array_values(array_filter(array_map(function ($item) use ($skFinancePrefix, $skFinanceItem, &$skFinanceInserted) {
+            $isFinancial = in_array(strtolower(trim($item['label'])), ['budget', 'budget monitoring', 'budget & finance'], true)
+                || in_array($item['link'], [route($skFinancePrefix.'.finances'), url($skFinancePrefix.'/budget')], true);
+            if (!$isFinancial) return $item;
+            if ($skFinanceInserted) return null;
+            $skFinanceInserted = true;
+            return $skFinanceItem;
+        }, $skItemsForNavigation)));
+        if (!$skFinanceInserted) $skItemsForNavigation[] = $skFinanceItem;
+    }
+    foreach ($skItemsForNavigation as $skItem) {
         $skKey = strtolower(trim($skItem['label']));
         $skGroup = 'More';
         foreach ($skNavGroups as $skName => $skLabels) {
@@ -50,7 +65,11 @@
         @foreach ($skSections as $skGroup => $skItems)
             <p class="sk-nav__heading">{{ $skGroup }}</p>
             @foreach ($skItems as $skItem)
-                @php $skActive = $skItem['link'] === ($currentUrl ?? null); @endphp
+                @php
+                    $skActive = !empty($skItem['financial'])
+                        ? request()->routeIs($skFinancePrefix.'.finances*', $skFinancePrefix.'.budget*')
+                        : $skItem['link'] === ($currentUrl ?? null);
+                @endphp
                 <a href="{{ $skItem['link'] }}" class="sk-nav__link {{ $skActive ? 'is-active' : '' }}" @if ($skActive) aria-current="page" @endif>
                     @include('partials.ui.icon', ['icon' => $skItem['skIcon'], 'iconSize' => 19])
                     <span class="truncate">{{ $skItem['label'] }}</span>
