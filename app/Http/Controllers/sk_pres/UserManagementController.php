@@ -11,6 +11,8 @@ use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
 use Illuminate\Validation\Rule;
+use App\Rules\DeliverableEmail;
+use Illuminate\Support\Facades\Validator;
 class UserManagementController extends Controller
 {
     public function index(): View
@@ -69,7 +71,7 @@ class UserManagementController extends Controller
         $validated=$request->validateWithBag('singleAdd',[
             'first_name'=>['required','string','max:100'],
             'last_name'=>['required','string','max:100'],
-            'email'=>['required','email','max:100',Rule::unique('users','email')->where(fn ($query) => $query->where('status','active')->whereNull('archived_at'))],
+            'email'=>['required',new DeliverableEmail(),'max:100',Rule::unique('users','email')],
             'phone_number'=>['nullable','string','max:20','unique:users,phone_number'],
             'barangay_id'=>['required','integer','exists:barangays,barangay_id'],
         ],[
@@ -152,13 +154,15 @@ class UserManagementController extends Controller
         }
         $validated=$request->validateWithBag('bulkAdd',[
             'officials'=>['required','array','min:1'],
-            'officials.*.full_name'=>['required','string','max:120'],
-            'officials.*.email'=>['required','email','max:100'],
+            'officials.*.first_name'=>['required','string','max:100'],
+            'officials.*.last_name'=>['required','string','max:100'],
+            'officials.*.email'=>['required',new DeliverableEmail(),'max:100'],
             'officials.*.phone_number'=>['nullable','string','max:20'],
             'officials.*.barangay_id'=>['required','integer','exists:barangays,barangay_id','distinct'],
         ],[
             'officials.required'=>'Add at least one SK Chairman.',
-            'officials.*.full_name.required'=>'Full name is required for every SK Chairman.',
+            'officials.*.first_name.required'=>'First name is required for every SK Chairman.',
+            'officials.*.last_name.required'=>'Last name is required for every SK Chairman.',
             'officials.*.email.required'=>'Email address is required for every SK Chairman.',
             'officials.*.email.email'=>'Enter a valid email address for every SK Chairman.',
             'officials.*.barangay_id.required'=>'Select a barangay for every SK Chairman.',
@@ -202,10 +206,9 @@ class UserManagementController extends Controller
                     'officials'=>'Barangay '.($barangay->barangay_name ?? '').' already has a current or pending SK Chairman.',
                 ],'bulkAdd');
             }
-            [$firstName,$lastName]=$this->splitFullName($official['full_name']);
             $prepared[]=[
-                'first_name'=>$firstName,
-                'last_name'=>$lastName,
+                'first_name'=>$official['first_name'],
+                'last_name'=>$official['last_name'],
                 'email'=>$official['email'],
                 'phone_number'=>$official['phone_number'] ?: null,
                 'barangay_id'=>$official['barangay_id'],
@@ -398,8 +401,8 @@ class UserManagementController extends Controller
                 $errors[]="Row {$line}: Last name is required.";
                 $rowHasError=true;
             }
-            if(!filter_var($row['email'],FILTER_VALIDATE_EMAIL)){
-                $errors[]="Row {$line}: '{$row['email']}' is not a valid email address.";
+            if(Validator::make(['email'=>$row['email']],['email'=>['required',new DeliverableEmail(),'max:100']])->fails()){
+                $errors[]="Row {$line}: Enter a complete email address with a verified mail domain for '{$row['email']}'.";
                 $rowHasError=true;
             }else{
                 $email=strtolower($row['email']);
@@ -597,7 +600,7 @@ class UserManagementController extends Controller
             'edit_user_id'=>['nullable','integer'],
             'first_name'=>['required','string','max:100'],
             'last_name'=>['required','string','max:100'],
-            'email'=>['required','email','max:100','unique:users,email,'.$userId.',user_id'],
+            'email'=>['required',new DeliverableEmail(),'max:100','unique:users,email,'.$userId.',user_id'],
             'phone_number'=>['nullable','string','max:20','unique:users,phone_number,'.$userId.',user_id'],
             'barangay_id'=>['nullable','integer','exists:barangays,barangay_id'],
             'role'=>['required','string'],
@@ -734,7 +737,7 @@ class UserManagementController extends Controller
             'president_mode'=>['required','in:continue,assign_new'],
             'new_president_first_name'=>['nullable','required_if:president_mode,assign_new','string','max:100'],
             'new_president_last_name'=>['nullable','required_if:president_mode,assign_new','string','max:100'],
-            'new_president_email'=>['nullable','required_if:president_mode,assign_new','email','max:100','unique:users,email'],
+            'new_president_email'=>['nullable','required_if:president_mode,assign_new',new DeliverableEmail(),'max:100','unique:users,email'],
             'new_president_phone'=>['nullable','string','max:20','unique:users,phone_number'],
         ],[
             'start_year.min'=>'Start year cannot be earlier than '.$minimumStartYear.'.',

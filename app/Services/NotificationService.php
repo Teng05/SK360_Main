@@ -5,6 +5,7 @@ use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 class NotificationService
 {
     public function notifyAnnouncementCreated(object $announcement,User $actor): void
@@ -269,6 +270,8 @@ class NotificationService
         $slots=DB::table('submission_slots')
             ->where('term_id',$termId)
             ->where('status','open')
+            ->whereDate('start_date','<=',$today->toDateString())
+            ->whereIn('submission_type',['budget_report','accomplishment_report'])
             ->whereDate(
                 'end_date',
                 '>=',
@@ -277,7 +280,7 @@ class NotificationService
             ->whereDate(
                 'end_date',
                 '<=',
-                $tomorrow->toDateString()
+                $today->copy()->addDays(3)->toDateString()
             )
             ->get([
                 'slot_id',
@@ -305,6 +308,21 @@ class NotificationService
                 continue;
             }
             $isBudget=$slot->submission_type==='budget_report';
+            $table=$isBudget ? 'budget_reports' : 'accomplishment_reports';
+            $primaryKey=$isBudget ? 'budget_report_id' : 'report_id';
+            $completedBarangays=DB::table($table.' as submission')
+                ->where('submission.term_id',$termId)->where('submission.slot_id',$slot->slot_id)
+                ->whereIn('submission.status',$isBudget ? ['submitted','recorded','archived'] : ['submitted','reviewed','approved'])
+                ->when(Schema::hasTable('submission_quality_reviews'),function($query) use($primaryKey,$slot){
+                    $query->whereNotExists(function($review) use($primaryKey,$slot){
+                        $review->selectRaw('1')->from('submission_quality_reviews as review')
+                            ->whereColumn('review.source_id','submission.'.$primaryKey)
+                            ->where('review.source_type',$slot->submission_type)->where('review.status','needs_revision');
+                    });
+                })->pluck('submission.barangay_id');
+            $recipients=$recipients->reject(fn($recipient)=>$completedBarangays->contains($recipient->barangay_id));
+            $daysLeft=(int)$today->diffInDays($deadline);
+            $timing=$isToday ? 'today' : ($daysLeft===1 ? 'tomorrow' : 'in '.$daysLeft.' days');
             $this->createUniqueForUsers(
                 $recipients,
                 $actor,
@@ -312,10 +330,8 @@ class NotificationService
                     'type'=>$isBudget
                         ? 'budget_deadline'
                         : 'report_deadline',
-                    'title'=>$isToday
-                        ? 'Submission deadline today'
-                        : 'Submission deadline tomorrow',
-                    'message'=>$slot->title.' is due '.$deadline->format('M d, Y').'. Submit before the deadline.',
+                    'title'=>'Submission deadline '.$timing,
+                    'message'=>$slot->title.' is due '.$timing.' ('.$deadline->format('M d, Y').', 11:59 PM Asia/Manila). Submit your document or required correction before the deadline.',
                     'slot_id'=>(int)$slot->slot_id,
                 ]
             );
@@ -536,7 +552,8 @@ class NotificationService
             )
             ->select(
                 'u.user_id',
-                'u.role'
+                'u.role',
+                'u.barangay_id'
             )
             ->distinct()
             ->get();

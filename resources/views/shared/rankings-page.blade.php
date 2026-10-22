@@ -1,9 +1,9 @@
 {{-- File guide: Blade view template for resources/views/shared/rankings-page.blade.php. --}}
-<div class="flex h-screen bg-gray-100">
+<div class="flex h-screen overflow-hidden bg-gray-100">
     @include('partials.app.sidebar')
-    <div class="flex-1 flex flex-col min-w-0">
+    <div class="flex-1 flex flex-col overflow-hidden min-w-0">
         @include('partials.app.topbar')
-        <div class="p-8 overflow-y-auto h-full bg-gray-50">
+        <div class="flex-1 min-h-0 p-8 overflow-y-auto bg-gray-50">
             <div class="sk-page-head">
                 <div class="sk-page-head__text">
                     <span class="sk-eyebrow"><span class="sk-dot"></span>Barangay Rankings</span>

@@ -15,6 +15,7 @@
 
     <script src="https://cdn.tailwindcss.com"></script>
     @include('public_portal.partials.assets')
+    <link rel="stylesheet" href="{{ asset('css/public-budget-transparency.css') }}">
 </head>
 
 <body class="sk-public sk-app sk-portal bg-gray-50 text-gray-800">
@@ -27,13 +28,12 @@
 @include('public_portal.partials.hero',[
     'eyebrow'=>'Public Transparency',
     'title'=>'Annual Budget & LYDP',
-    'description'=>'View published Annual Budget records and the Local Youth Development Plan available through the SK360 Public Information Portal.',
+    'description'=>'View authorized published financial summaries and the Local Youth Development Plan available through the SK360 Public Information Portal.',
     'centered'=>true,
     'width'=>'max-w-6xl'
 ])
 
     <section class="max-w-6xl mx-auto px-6 py-10">
-
         {{-- LYDP --}}
         @php
             $lydpRelativePath='uploads/public_documents/lydp.pdf';
@@ -106,7 +106,7 @@
                 </h3>
 
                 <p class="text-sm text-gray-500 mt-2">
-                    Filter the Annual Budget records available in the SK360 Public Portal.
+                    Filter the published financial summaries available in the SK360 Public Portal.
                 </p>
 
             </div>
@@ -232,7 +232,7 @@
             <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
 
                 <p class="text-[10px] font-black uppercase tracking-widest text-gray-400">
-                    Total Reported Budget
+                    Published Allotted Budget
                 </p>
 
                 <p class="text-2xl font-black text-gray-800 mt-2">
@@ -257,7 +257,7 @@
                 </h3>
 
                 <p class="text-sm text-gray-500 mt-2">
-                    Annual Budget information below is based on records submitted through SK360.
+                    Only explicitly published financial snapshots are shown. Pending expenses are excluded.
                 </p>
 
                 <p class="text-xs text-gray-400 mt-2">
@@ -318,119 +318,22 @@
 
                             </div>
 
-                            @if($item->has_budget)
-
-                                <span class="shrink-0 rounded-full bg-green-50 px-3 py-1 text-[9px] font-black uppercase text-green-600">
-                                    Available
-                                </span>
-
-                            @else
-
-                                <span class="shrink-0 rounded-full bg-gray-100 px-3 py-1 text-[9px] font-black uppercase text-gray-500">
-                                    Not Available
-                                </span>
-
-                            @endif
-
+                            <span class="shrink-0 rounded-full bg-gray-100 px-3 py-1 text-[9px] font-black uppercase text-gray-600">{{ $item->summary ? 'Published' : 'Not Published' }}</span>
                         </div>
-
-                        @if($item->has_budget)
-
+                        <p class="text-xs text-gray-500 mt-3">FY {{ $item->fiscal_year }}</p>
+                        @if($item->summary)
                             <div class="mt-6">
-
-                                <p class="text-[10px] font-black uppercase tracking-widest text-gray-400">
-                                    Annual Budget
-                                </p>
-
-                                @if(
-                                    $item->total_amount !== null &&
-                                    $item->total_amount > 0
-                                )
-
-                                    <p class="text-3xl font-black text-red-600 mt-1 break-words">
-                                        ₱{{ number_format($item->total_amount, 2) }}
-                                    </p>
-
-                                @else
-
-                                    <p class="text-sm font-bold text-gray-500 mt-2">
-                                        Amount not encoded
-                                    </p>
-
-                                @endif
-
+                                <p class="text-xs font-bold text-gray-500">Published Allotted Budget</p>
+                                <p class="text-3xl font-black text-red-600 mt-1 break-words">PHP {{ number_format((float) $item->summary['allotted'], 2) }}</p>
+                                <p class="text-xs font-bold text-gray-500 mt-4">Published Verified Expenditures</p>
+                                <p class="text-xl font-black text-gray-800 mt-1">PHP {{ number_format((float) $item->summary['verified_expenses'], 2) }}</p>
                             </div>
-
-                            <div class="mt-5 border-t border-gray-100 pt-4 space-y-3 text-xs text-gray-500">
-
-                                <div class="flex items-center justify-between gap-4">
-
-                                    <span class="font-bold text-gray-400">
-                                        Fiscal Year
-                                    </span>
-
-                                    <span class="font-black text-gray-700">
-                                        FY {{ $item->fiscal_year }}
-                                    </span>
-
-                                </div>
-
-                                @if($item->submitted_at)
-
-                                    <div class="flex items-center justify-between gap-4">
-
-                                        <span class="font-bold text-gray-400">
-                                            Submitted
-                                        </span>
-
-                                        <span class="font-black text-gray-700">
-                                            {{ \Carbon\Carbon::parse($item->submitted_at)->format('M d, Y') }}
-                                        </span>
-
-                                    </div>
-
-                                @endif
-
-                            </div>
-
-                            @if(!empty($item->uploaded_file_path))
-
-                                <a
-                                    href="{{ asset($item->uploaded_file_path) }}"
-                                    target="_blank"
-                                    rel="noopener"
-                                    class="mt-5 flex items-center justify-center gap-2 rounded-xl bg-red-600 px-4 py-3 text-xs font-black uppercase text-white hover:bg-red-700 transition"
-                                >
-                                    @include('public_portal.partials.icon',['icon'=>'file-text','iconSize'=>16])
-                                    View Annual Budget
-                                </a>
-
-                            @else
-
-                                <div class="mt-5 rounded-xl bg-gray-100 px-4 py-3 text-center text-xs font-bold text-gray-500">
-                                    Annual Budget document unavailable.
-                                </div>
-
-                            @endif
-
+                            <button type="button" data-financial-summary="{{ route('public.budgets.summary', $item->summary['annual_budget_id']) }}" aria-haspopup="dialog" aria-controls="public-financial-summary" class="mt-5 w-full rounded-xl bg-red-600 px-4 py-3 text-xs font-black uppercase text-white hover:bg-red-700 transition">View Financial Summary</button>
                         @else
-
                             <div class="mt-6 rounded-2xl border border-dashed border-gray-200 bg-gray-50 p-6 text-center">
-
-                                <div class="sk-empty-icon mx-auto mb-3">
-                                    @include('public_portal.partials.icon',['icon'=>'file-text','iconSize'=>24])
-                                </div>
-
-                                <p class="font-black text-gray-600">
-                                    No Annual Budget Available
-                                </p>
-
-                                <p class="text-xs text-gray-400 mt-2">
-                                    No Annual Budget record has been submitted for FY {{ $selectedYear }}.
-                                </p>
-
+                                <p class="font-black text-gray-600">Financial Summary Not Available</p>
+                                <p class="text-xs text-gray-500 mt-2">No authorized financial summary is published for FY {{ $selectedYear }}.</p>
                             </div>
-
                         @endif
 
                     </div>
@@ -473,7 +376,9 @@
 
 </main>
 
+@include('public_portal.partials.financial-summary-modal')
 @include('public_portal.partials.footer')
+<script src="{{ asset('js/public-budget-transparency.js') }}" defer></script>
 
 </body>
 </html>

@@ -1,0 +1,10 @@
+<dialog id="expense-proof" class="budget-dialog budget-proof-dialog" aria-labelledby="proof-title">
+    <div class="budget-dialog-head"><div><h2 id="proof-title" class="sk-section-title">Proof of Expense</h2><p id="proof-description" class="sk-section-subtitle budget-wrap"></p></div><button type="button" class="sk-icon-btn" data-close-dialog aria-label="Close proof preview">@include('partials.ui.icon', ['icon' => 'x', 'iconSize' => 20])</button></div>
+    <div class="px-6 py-4"><dl class="budget-proof-metadata"><div><dt>Barangay</dt><dd id="proof-barangay"></dd></div><div><dt>Amount</dt><dd id="proof-amount"></dd></div><div><dt>Expense date</dt><dd id="proof-date"></dd></div><div><dt>Receipt / reference</dt><dd id="proof-reference"></dd></div></dl><p id="proof-filename" class="text-xs text-gray-500 mt-3 budget-wrap"></p></div>
+    <div id="proof-loading" class="p-8 text-center text-sm text-gray-500" role="status">Loading private proof&hellip;</div>
+    <div id="proof-error" class="m-6 sk-alert sk-alert--error" role="alert" hidden></div>
+    <div id="proof-toolbar" class="px-6 pb-3 flex gap-2 items-center" hidden><button type="button" class="sk-btn sk-btn--secondary" data-proof-zoom="-0.25" aria-label="Zoom out">−</button><button type="button" class="sk-btn sk-btn--secondary" data-proof-reset>Reset zoom</button><button type="button" class="sk-btn sk-btn--secondary" data-proof-zoom="0.25" aria-label="Zoom in">+</button></div>
+    <div id="proof-viewport" class="budget-proof-viewport" hidden><img id="proof-image" alt="Expense proof" hidden><iframe id="proof-pdf" title="PDF proof of expense" referrerpolicy="no-referrer" hidden></iframe></div>
+    <p id="proof-pdf-help" class="px-6 py-3 text-sm text-gray-500" hidden>PDF viewer unavailable? <a id="proof-open" class="budget-link" target="_blank" rel="noopener noreferrer">Open proof in a new tab</a>.</p>
+    <div class="budget-dialog-footer"><button type="button" class="sk-btn sk-btn--secondary" data-close-dialog>Close</button></div>
+</dialog>

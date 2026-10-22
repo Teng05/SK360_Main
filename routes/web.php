@@ -109,6 +109,7 @@ Route::controller(AuthController::class)->group(function () {
 });
 
 Route::middleware('auth')->group(function(){
+    Route::get('/financial-attachments/{attachment}', [\App\Http\Controllers\BudgetMonitoringController::class, 'attachment'])->whereNumber('attachment')->name('finances.attachments');
     Route::get('/notifications/feed',[NotificationController::class,'feed'])->name('notifications.feed');
     Route::post('/notifications/{notification}/read',[NotificationController::class,'markRead'])->name('notifications.read');
     Route::post('/wall/posts',[WallPostController::class,'store'])->name('wall.posts.store');
@@ -128,6 +129,12 @@ Route::middleware('auth')->group(function(){
 */
 
 Route::middleware('auth')->prefix('sk_pres')->name('sk_pres.')->group(function(){
+
+    Route::get('/finances', [\App\Http\Controllers\BudgetMonitoringController::class, 'index'])->name('finances');
+    Route::post('/finances', [\App\Http\Controllers\BudgetMonitoringController::class, 'store'])->name('finances.store');
+    Route::post('/finances/{budget}/publish', [\App\Http\Controllers\BudgetMonitoringController::class, 'publish'])->whereNumber('budget')->name('finances.publish');
+    Route::patch('/finances/{budget}', [\App\Http\Controllers\BudgetMonitoringController::class, 'update'])->whereNumber('budget')->name('finances.update');
+    Route::patch('/financial-expenses/{expense}/status', [\App\Http\Controllers\BudgetMonitoringController::class, 'transition'])->whereNumber('expense')->name('finances.expenses.status');
 
     Route::get('/home',[HomeController::class,'index'])->name('home');
     Route::get('/dashboard',[DashboardController::class,'index'])->name('dashboard');
@@ -233,6 +240,12 @@ Route::middleware('auth')->prefix('sk_pres')->name('sk_pres.')->group(function()
 */
 
 Route::middleware('auth')->prefix('sk_chairman')->name('sk_chairman.')->group(function () {
+    Route::get('/finances', [\App\Http\Controllers\BudgetMonitoringController::class, 'index'])->name('finances');
+    Route::post('/finances/{budget}/projects', [\App\Http\Controllers\BudgetMonitoringController::class, 'project'])->whereNumber('budget')->name('finances.projects.store');
+    Route::post('/financial-expenses', [\App\Http\Controllers\BudgetMonitoringController::class, 'expense'])->name('finances.expenses.store');
+    Route::post('/financial-reports/{report}/expenses', [\App\Http\Controllers\BudgetMonitoringController::class, 'linkReport'])->whereNumber('report')->name('finances.reports.link');
+    Route::post('/financial-expenses/{expense}', [\App\Http\Controllers\BudgetMonitoringController::class, 'expense'])->whereNumber('expense')->name('finances.expenses.update');
+    Route::patch('/financial-expenses/{expense}/status', [\App\Http\Controllers\BudgetMonitoringController::class, 'transition'])->whereNumber('expense')->name('finances.expenses.status');
 
     Route::get('/home', [SkChairmanHomeController::class, 'index'])->name('home');
 
@@ -345,6 +358,7 @@ Route::prefix('public-portal')->name('public.')->group(function(){
     Route::get('/calendar',[PublicCalendarController::class,'index'])->name('calendar');
     Route::get('/leadership',[PublicLeadershipController::class,'index'])->name('leadership');
     Route::get('/annual-budgets',[PublicBudgetController::class,'index'])->name('budgets');
+    Route::get('/annual-budgets/{budget}/summary', [PublicBudgetController::class, 'summary'])->whereNumber('budget')->name('budgets.summary');
 
     Route::post('/announcements/{announcementId}/like',[PublicAnnouncementInteractionController::class,'toggleLike'])->middleware('throttle:30,1')->name('announcements.like');
     Route::post('/announcements/{announcementId}/view',[PublicAnnouncementInteractionController::class,'trackView'])->middleware('throttle:120,1')->name('announcements.view');

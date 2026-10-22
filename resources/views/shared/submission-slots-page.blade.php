@@ -1,8 +1,10 @@
 {{-- File guide: Blade view template for resources/views/shared/submission-slots-page.blade.php. --}}
 @php
     $chairmanReportUi = $chairmanReportUi ?? false;
+    $embeddedFinancial = $embeddedFinancial ?? false;
     $slotUiClass = fn ($original, $web) => $chairmanReportUi ? $web : $original;
 @endphp
+@if(!$embeddedFinancial)
 <div class="flex h-screen bg-gray-100 overflow-hidden">
     {{-- SIDEBAR --}}
     @include('partials.app.sidebar')
@@ -13,6 +15,12 @@
         {{-- CONTENT --}}
         <main class="{{ $slotUiClass('flex-1 overflow-y-auto p-8 bg-gray-50', 'flex-1 overflow-y-auto p-8') }}">
             <div class="max-w-6xl mx-auto">
+@endif
+                @if(!$embeddedFinancial && ($submissionType ?? '') === 'budget' && auth()->user()->role === 'sk_chairman')
+                    <link rel="stylesheet" href="{{ asset('css/budget-monitoring.css') }}?v={{ filemtime(public_path('css/budget-monitoring.css')) }}">
+                    @include('shared.financial-section-nav')
+                    <p class="mb-5 text-sm text-gray-600">Submit financial documents below. <a class="budget-link" href="{{ route('sk_chairman.finances', ['year' => request('year', now()->year), 'section' => 'documents']) }}">Manage liquidation expense links</a></p>
+                @endif
                 {{-- SUCCESS --}}
                 @if(session('report_success'))
                     <div class="mb-6 rounded-2xl border border-green-200 bg-green-50 px-5 py-4 text-sm font-semibold text-green-700">
@@ -50,6 +58,7 @@
     $isBudgetPage = ($submissionType ?? '') === 'budget';
                 @endphp
                 {{-- PAGE TITLE --}}
+                @if(!$embeddedFinancial)
                 <div class="sk-page-head">
                     <div class="sk-page-head__text">
                         <span class="sk-eyebrow"><span class="sk-dot"></span>Submission Slots</span>
@@ -62,6 +71,11 @@
                         </p>
                     </div>
                 </div>
+                @else
+                <h2 class="sk-section-title mb-2">Budget Submissions</h2>
+                <p class="sk-section-subtitle mb-6">{{ $pageDescription }}</p>
+                <label class="sk-search mb-6"><span class="sr-only">Search submission slots and records</span>@include('partials.ui.icon', ['icon' => 'search', 'iconSize' => 18])<input id="submissionSearch" type="search" placeholder="Search slots and submitted records..."></label>
+                @endif
 
                 {{-- SUMMARY --}}
                 <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5 mb-8">
@@ -143,6 +157,7 @@
                         action="{{ url()->current() }}"
                         class="mb-8 rounded-3xl border border-gray-100 bg-white p-5 shadow-sm"
                     >
+                        @if($embeddedFinancial)<input type="hidden" name="section" value="submissions">@endif
                         <div class="mb-4">
                             <h2 class="text-sm font-black uppercase tracking-tight text-gray-800">
                                 Filter Budget Records
@@ -376,10 +391,11 @@
                                 id="submission-slot-{{ $slot->slot_id }}"
                                 class="submission-slot-card {{ $chairmanReportUi ? 'relative flex flex-col' : '' }} rounded-2xl border p-5 transition-all duration-500 {{ $isFocusedCard ? 'border-yellow-400 bg-yellow-50 ring-4 ring-yellow-200 shadow-lg' : ($chairmanReportUi ? 'border-gray-200 bg-white hover:shadow-md' : 'border-red-100 bg-red-50/30') }}"
                                 data-focus-slot-card="{{ $isFocusedCard ? '1' : '0' }}"
+                                data-focus-normal-class="{{ $chairmanReportUi ? 'border-gray-200 bg-white hover:shadow-md' : 'border-red-100 bg-red-50/30' }}"
                                 data-search="{{ strtolower(($slot->title ?? '').' '.($slot->description ?? '').' '.($slot->role ?? '').' '.($slot->budget_category_label ?? '').' '.($slot->budget_period_label ?? '').' '.($slot->accomplishment_category_label ?? '')) }}"
                             >
                                 @if($isFocusedCard)
-                                    <div class="mb-4 flex items-center gap-2 rounded-xl border border-yellow-200 bg-yellow-100 px-4 py-3 text-xs font-bold text-yellow-800">
+                                    <div data-notification-focus-badge class="mb-4 flex items-center gap-2 rounded-xl border border-yellow-200 bg-yellow-100 px-4 py-3 text-xs font-bold text-yellow-800">
                                         <span><span class="inline-flex align-middle">@include('partials.ui.icon', ['icon' => 'bell', 'iconSize' => 16])</span></span>
                                         <span>
                                             {{ $isFocusedSubmissionSlot
@@ -646,6 +662,7 @@
                                         id="submission-{{ $submissionId }}"
                                         class="submission-record-row transition border-b {{ $isFocusedSubmission ? 'border-yellow-300 bg-yellow-50 ring-2 ring-inset ring-yellow-200' : 'border-gray-50 hover:bg-gray-50' }}"
                                         data-focus-submission="{{ $isFocusedSubmission ? '1' : '0' }}"
+                                        data-focus-normal-class="border-gray-50 hover:bg-gray-50"
                                         data-search="{{ strtolower(($submission->title ?? $submission->report_title ?? '').' '.($submission->period_label ?? '').' '.($submission->method_label ?? '').' '.($submission->quality_status_label ?? '')) }}"
                                     >
                                         <td class="{{ $slotUiClass('px-8 py-5', 'px-6 py-4') }}">
@@ -653,7 +670,7 @@
                                                 {{ $submission->title ?? $submission->report_title }}
                                             </div>
                                             @if($isFocusedSubmission)
-                                                <div class="mt-2 inline-flex items-center gap-1 rounded-full bg-yellow-100 px-2 py-1 text-[9px] font-black uppercase text-yellow-700">
+                                                <div data-notification-focus-badge class="mt-2 inline-flex items-center gap-1 rounded-full bg-yellow-100 px-2 py-1 text-[9px] font-black uppercase text-yellow-700">
                                                     <span><span class="inline-flex align-middle">@include('partials.ui.icon', ['icon' => 'bell', 'iconSize' => 16])</span></span>
                                                     Opened from notification
                                                 </div>
@@ -774,10 +791,12 @@
                         </table>
                     </div>
                 </div>
+@if(!$embeddedFinancial)
             </div>
         </main>
     </div>
 </div>
+@endif
 {{-- SUBMISSION MODAL --}}
 <div
     id="slotSubmissionModal"
@@ -792,14 +811,10 @@
             </span>
 
             <div class="min-w-0 flex-1">
-                <h3 class="sk-modal__title !text-xl">
-                    Submit to Slot
-                </h3>
-
-                <p
+                <h3
                     id="slotSubmissionTitle"
-                    class="sk-modal__subtitle"
-                ></p>
+                    class="sk-modal__title !text-xl break-words"
+                ></h3>
             </div>
 
             <button
@@ -1105,7 +1120,21 @@ document.addEventListener('DOMContentLoaded',()=>{
             block:'center'
         });
     },250);
+    setTimeout(()=>{
+        document.querySelectorAll('[data-focus-slot-card="1"], [data-focus-submission="1"]').forEach(element=>{
+            element.classList.remove('border-yellow-400','border-yellow-300','bg-yellow-50','ring-4','ring-2','ring-inset','ring-yellow-200','shadow-lg');
+            element.classList.add(...element.dataset.focusNormalClass.split(' '));
+            element.querySelectorAll('[data-notification-focus-badge]').forEach(badge=>badge.remove());
+            if(element.hasAttribute('data-focus-slot-card')) element.dataset.focusSlotCard='0';
+            if(element.hasAttribute('data-focus-submission')) element.dataset.focusSubmission='0';
+        });
+        const url=new URL(window.location.href);
+        url.searchParams.delete('focus_slot');
+        url.searchParams.delete('focus_id');
+        window.history.replaceState(window.history.state,'',url);
+    },10000);
 });
+@if(!$embeddedFinancial)
 notifBtn?.addEventListener('click',(e)=>{
     e.stopPropagation();
     notifDropdown?.classList.toggle('hidden');
@@ -1134,6 +1163,7 @@ document.addEventListener('click',(e)=>{
         userDropdown.classList.add('hidden');
     }
 });
+@endif
 const budgetFilterForm=document.getElementById('budgetFilterForm');
 const budgetPeriodFilter=document.getElementById('budgetPeriodFilter');
 const budgetMonthFilterWrap=document.getElementById('budgetMonthFilterWrap');

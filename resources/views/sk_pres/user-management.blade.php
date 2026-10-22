@@ -1062,7 +1062,7 @@
                     </select>
                     <p id="pendingStatusNote"
                         class="hidden mt-1 text-[10px] text-yellow-600">
-                        Pending officials are activated automatically after setting their password.
+                        Accounts remain inactive until the recipient opens the emailed setup link and sets their password.
                     </p>
                 </div>
             </div>
@@ -1223,7 +1223,8 @@
 @php
     $oldOfficials=old('officials',[
         [
-            'full_name'=>'',
+            'first_name'=>'',
+            'last_name'=>'',
             'email'=>'',
             'phone_number'=>'',
             'barangay_id'=>'',
@@ -1242,7 +1243,7 @@
                     Add SK Chairmen
                 </h2>
                 <p class="text-xs text-gray-500">
-                    Create multiple SK Chairman accounts at once. Barangays with a current or pending Chairman are automatically excluded.
+                    Create multiple SK Chairman accounts at once. Accounts remain pending email verification until setup is completed. Barangays with a current or pending Chairman are automatically excluded.
                 </p>
             </div>
             <button id="closeBulkModal"
@@ -1317,13 +1318,27 @@
                         <div class="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
                             <div>
                                 <label class="mb-1.5 block text-xs font-black uppercase text-gray-500">
-                                    Full Name
-                                </label>
+                                    First Name
                                 <input type="text"
-                                    name="officials[{{ $index }}][full_name]"
-                                    value="{{ $official['full_name'] ?? '' }}"
-                                    class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm"
+                                    name="officials[{{ $index }}][first_name]"
+                                    value="{{ $official['first_name'] ?? '' }}"
+                                    autocomplete="given-name"
+                                    maxlength="100"
+                                    class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-normal normal-case"
                                     required>
+                                </label>
+                            </div>
+                            <div>
+                                <label class="mb-1.5 block text-xs font-black uppercase text-gray-500">
+                                    Last Name
+                                <input type="text"
+                                    name="officials[{{ $index }}][last_name]"
+                                    value="{{ $official['last_name'] ?? '' }}"
+                                    autocomplete="family-name"
+                                    maxlength="100"
+                                    class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-normal normal-case"
+                                    required>
+                                </label>
                             </div>
                             <div>
                                 <label class="mb-1.5 block text-xs font-black uppercase text-gray-500">

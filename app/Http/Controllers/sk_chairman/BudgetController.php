@@ -16,6 +16,11 @@ class BudgetController extends Controller
 {
     public function index(Request $request): View
     {
+        abort_unless(auth()->check() && auth()->user()->role === 'sk_chairman', 403);
+        return app(\App\Http\Controllers\BudgetMonitoringController::class)->index($request, app(\App\Services\BudgetMonitoringService::class));
+    }
+    public function submissionData(Request $request): array
+    {
         abort_unless(auth()->check() && auth()->user()->role==='sk_chairman',403);
         $user=auth()->user();
         $fullName=trim(($user->first_name ?? '').' '.($user->last_name ?? '')) ?: 'User';
@@ -109,7 +114,7 @@ class BudgetController extends Controller
             })
             ->filter(fn($submission)=>$this->matchesBudgetFilter($submission,$budgetFilters))
             ->values();
-        return view('sk_chairman.budget',[
+        return [
             'fullName'=>$fullName,
             'barangayName'=>$barangayName,
             'initials'=>strtoupper(
@@ -137,7 +142,7 @@ class BudgetController extends Controller
                 'H1'=>'First Half',
                 'H2'=>'Second Half',
             ],
-        ]);
+        ];
     }
     public function store(Request $request): RedirectResponse
     {

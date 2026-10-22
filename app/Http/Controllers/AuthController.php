@@ -195,20 +195,32 @@ class AuthController extends Controller
             ]);
         }
 
-        $pendingAssignment=DB::table('official_terms')
-            ->where('user_id',$user->user_id)
-            ->where('status','pending')
-            ->orderByDesc('official_term_id')
-            ->first();
-
+        $pendingAssignment=null;
         $endedPresidentUserIds=[];
 
-        DB::transaction(function() use($user,$validated,$pendingAssignment,&$endedPresidentUserIds){
+        DB::transaction(function() use($user,$validated,&$pendingAssignment,&$endedPresidentUserIds){
+            $administration=DB::table('administration_terms')
+                ->where('status','current')->orderByDesc('term_id')->lockForUpdate()->first();
+            $pendingAssignment=DB::table('official_terms')
+                ->where('user_id',$user->user_id)->where('status','pending')
+                ->orderByDesc('official_term_id')->lockForUpdate()->first();
+
+            if(!$administration || !$pendingAssignment
+                || (int)$pendingAssignment->term_id !== (int)$administration->term_id
+                || $pendingAssignment->role !== $user->role){
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'email'=>'This account does not have a pending assignment in the current administration. Please contact your administrator for reassignment and a new setup invitation.',
+                ]);
+            }
+
             $user->update([
                 'password'=>Hash::make($validated['password']),
                 'is_verified'=>1,
                 'status'=>'active',
                 'archived_at'=>null,
+                // Match the year-boundary convention used by mobile account creation.
+                'term_start'=>$administration->start_year.'-01-01',
+                'term_end'=>$administration->end_year.'-12-31',
             ]);
 
             /*
@@ -258,8 +270,7 @@ class AuthController extends Controller
                     ]);
             }else{
                 DB::table('official_terms')
-                    ->where('user_id',$user->user_id)
-                    ->where('status','pending')
+                    ->where('official_term_id',$pendingAssignment->official_term_id)
                     ->update([
                         'status'=>'current',
                         'started_at'=>now(),
