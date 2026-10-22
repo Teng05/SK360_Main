@@ -296,7 +296,7 @@
                                                         </span>
                                                         @if($isPending)
                                                             <span class="rounded-full bg-yellow-100 text-yellow-700 px-2 py-0.5 text-[9px] font-bold uppercase">
-                                                                {{ $isReappointment ? 'Reappointment Pending ? Email Setup Required' : 'Pending Email Verification' }}
+                                                                {{ $isReappointment ? 'Reappointment Pending' : 'Pending' }}
                                                             </span>
                                                         @elseif($isCaretaker)
                                                             <span class="rounded-full bg-orange-100 text-orange-700 px-2 py-0.5 text-[9px] font-bold uppercase">
