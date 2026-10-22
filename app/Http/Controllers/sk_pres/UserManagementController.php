@@ -152,13 +152,15 @@ class UserManagementController extends Controller
         }
         $validated=$request->validateWithBag('bulkAdd',[
             'officials'=>['required','array','min:1'],
-            'officials.*.full_name'=>['required','string','max:120'],
+            'officials.*.first_name'=>['required','string','max:100'],
+            'officials.*.last_name'=>['required','string','max:100'],
             'officials.*.email'=>['required','email','max:100'],
             'officials.*.phone_number'=>['nullable','string','max:20'],
             'officials.*.barangay_id'=>['required','integer','exists:barangays,barangay_id','distinct'],
         ],[
             'officials.required'=>'Add at least one SK Chairman.',
-            'officials.*.full_name.required'=>'Full name is required for every SK Chairman.',
+            'officials.*.first_name.required'=>'First name is required for every SK Chairman.',
+            'officials.*.last_name.required'=>'Last name is required for every SK Chairman.',
             'officials.*.email.required'=>'Email address is required for every SK Chairman.',
             'officials.*.email.email'=>'Enter a valid email address for every SK Chairman.',
             'officials.*.barangay_id.required'=>'Select a barangay for every SK Chairman.',
@@ -202,10 +204,9 @@ class UserManagementController extends Controller
                     'officials'=>'Barangay '.($barangay->barangay_name ?? '').' already has a current or pending SK Chairman.',
                 ],'bulkAdd');
             }
-            [$firstName,$lastName]=$this->splitFullName($official['full_name']);
             $prepared[]=[
-                'first_name'=>$firstName,
-                'last_name'=>$lastName,
+                'first_name'=>$official['first_name'],
+                'last_name'=>$official['last_name'],
                 'email'=>$official['email'],
                 'phone_number'=>$official['phone_number'] ?: null,
                 'barangay_id'=>$official['barangay_id'],
