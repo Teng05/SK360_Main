@@ -8,6 +8,7 @@ use App\Models\Meeting;
 use App\Models\MobileApiToken;
 use App\Models\User;
 use App\Services\MobileNotificationService as NotificationService;
+use App\Services\BudgetMonitoringService;
 use App\Services\RankingPointsService;
 use Carbon\Carbon;
 use Illuminate\Database\Query\Builder;
@@ -451,6 +452,79 @@ class MobileSyncController extends Controller
     // MOBILE: Sync data downloaded by the mobile app
     // -----------------------------------------------------------------
     // Sends the records currently shared between web and mobile.
+    public function storeFinancialExpense(Request $request, BudgetMonitoringService $service): JsonResponse
+    {
+        abort_unless($request->user()->role === 'sk_chairman' && $request->user()->barangay_id, 403);
+        $validated = $request->validate([
+            'project_title' => ['required', 'string', 'max:255'],
+            'fiscal_year' => ['required', 'integer', 'between:2000,2100'],
+            'client_request_id' => ['required', 'uuid'],
+            'description' => ['required', 'string', 'max:5000'],
+            'amount' => ['required', 'regex:/^\\d{1,13}(\\.\\d{1,2})?$/', 'numeric', 'min:0.01'],
+            'expense_date' => ['required', 'date_format:Y-m-d', 'before_or_equal:today'],
+            'document_reference' => ['nullable', 'string', 'max:150'],
+            'payee_name' => ['nullable', 'string', 'max:255'],
+            'proof' => ['required', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:5120'],
+        ]);
+
+        $budget = DB::table('annual_budgets')
+            ->where('barangay_id', $request->user()->barangay_id)
+            ->where('fiscal_year', $validated['fiscal_year'])
+            ->where('status', 'verified')
+            ->first();
+        abort_unless($budget, 404, 'No verified annual budget exists for this fiscal year.');
+
+        $project = DB::table('budget_projects')
+            ->where('annual_budget_id', $budget->annual_budget_id)
+            ->where('name', $validated['project_title'])
+            ->where('implementation_status', '<>', 'cancelled')
+            ->first();
+        $validated['project_id'] = $project
+            ? (int) $project->project_id
+            : $service->createProject(
+                (int) $budget->annual_budget_id,
+                ['name' => $validated['project_title'], 'category' => 'General'],
+                $request->user()
+            );
+
+        $expenseId = $service->submitExpense($validated, $request->file('proof'), $request->user());
+        return response()->json(['message' => 'Expense submitted.', 'expense_id' => $expenseId], 201);
+    }
+    private function mobileFinancialRecords(User $user): array
+    {
+        if (!in_array($user->role, ['sk_chairman', 'sk_president'], true)
+            || !Schema::hasTable('annual_budgets')
+            || !Schema::hasTable('budget_projects')
+            || !Schema::hasTable('project_expenses')) {
+            return ['budget_allocations' => [], 'budget_expenses' => []];
+        }
+
+        $allocations = DB::table('annual_budgets as a')
+            ->join('barangays as b', 'b.barangay_id', '=', 'a.barangay_id')
+            ->when($user->role === 'sk_chairman', fn ($query) => $query->where('a.barangay_id', $user->barangay_id))
+            ->orderByDesc('a.fiscal_year')
+            ->get([
+                'a.annual_budget_id', 'a.barangay_id', 'b.barangay_name',
+                'a.fiscal_year', 'a.approved_amount as amount', 'a.status',
+                'a.created_at', 'a.updated_at',
+            ]);
+
+        $expenses = DB::table('project_expenses as e')
+            ->join('budget_projects as p', 'p.project_id', '=', 'e.project_id')
+            ->join('annual_budgets as a', 'a.annual_budget_id', '=', 'p.annual_budget_id')
+            ->join('barangays as b', 'b.barangay_id', '=', 'a.barangay_id')
+            ->when($user->role === 'sk_chairman', fn ($query) => $query->where('a.barangay_id', $user->barangay_id))
+            ->orderByDesc('e.expense_date')
+            ->get([
+                'e.expense_id', 'e.project_id', 'a.barangay_id', 'b.barangay_name',
+                'a.fiscal_year', 'e.description', 'e.amount', 'e.expense_date',
+                'e.document_reference', 'e.payee_name', 'e.status', 'e.revision_no',
+                'e.created_by', 'e.submitted_at', 'e.created_at',
+                'p.name as project_name', 'p.category as project_category',
+            ]);
+
+        return ['budget_allocations' => $allocations, 'budget_expenses' => $expenses];
+    }
     public function sync(Request $request): JsonResponse
     {
         $validated = $request->validate([
@@ -479,6 +553,7 @@ class MobileSyncController extends Controller
             'report_submissions' => $this->reportSubmissions($user, $since),
             'accomplishment_reports' => $this->accomplishmentReports($user, $since),
             'budget_reports' => $this->budgetReports($user, $since),
+            ...$this->mobileFinancialRecords($user),
             'leadership_profiles' => $this->leadershipProfiles($user, $since),
             'leadership_history' => $this->leadershipHistory($user),
             'archive_documents' => $this->archiveDocuments($user, $since),

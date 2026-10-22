@@ -42,6 +42,7 @@ Route::prefix('mobile')->group(function(){
         Route::post('/leadership/secretary',[MobileSyncController::class,'storeSecretaryAccount'])->middleware('throttle:3,10')->name('mobile.leadership.secretary.store');
         Route::post('/leadership/chairman',[MobileSyncController::class,'storeChairmanAccount'])->middleware('throttle:3,10')->name('mobile.leadership.chairman.store');
 
+        Route::post('/financial-expenses',[MobileSyncController::class,'storeFinancialExpense'])->name('mobile.financial-expenses.store');
         Route::post('/official-submissions',[MobileSyncController::class,'storeOfficialSubmission'])->name('mobile.official-submissions.store');
 
         Route::get('/submission-slots',[MobileSyncController::class,'submissionSlots'])->name('mobile.submission-slots.index');
