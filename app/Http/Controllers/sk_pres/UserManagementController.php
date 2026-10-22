@@ -47,6 +47,7 @@ class UserManagementController extends Controller
             'availableChairmanBarangays'=>$availableChairmanBarangays,
             'currentAdministration'=>$currentAdministration,
             'pendingPresident'=>$pendingPresident,
+            'pendingSetupCount'=>$this->pendingSetupAccounts($currentAdministration?->term_id)->count(),
             'activeTab'=>$activeTab,
             'historyTerms'=>$historyTerms,
             'selectedHistoryTerm'=>$selectedHistoryTerm,
@@ -564,6 +565,53 @@ class UserManagementController extends Controller
         if(!$pendingTerm){
             return back()->with('warning','This account is not connected to a pending administration assignment.');
         }
+        if (!$this->sendNewSetupLink($user)) {
+            return back()->with('warning','The new setup link could not be sent. Please try again.');
+        }
+        return back()->with('success','A new password setup link was sent to '.$user->email.'.');
+    }
+
+    protected function pendingSetupAccounts(?int $termId): \Illuminate\Database\Eloquent\Builder
+    {
+        return User::query()->whereNull('archived_at')->where('is_verified', false)
+            ->whereIn('role', ['sk_chairman', 'sk_president'])
+            ->whereExists(function ($query) use ($termId) {
+                $query->selectRaw('1')->from('official_terms')
+                    ->whereColumn('official_terms.user_id', 'users.user_id')
+                    ->whereColumn('official_terms.role', 'users.role')
+                    ->where('official_terms.status', 'pending')
+                    ->where('official_terms.term_id', $termId ?? 0);
+            });
+    }
+
+    public function resendPendingSetupLinks(): RedirectResponse
+    {
+        abort_unless(auth()->check() && auth()->user()->role === 'sk_president', 403);
+        $accounts = $this->pendingSetupAccounts($this->currentAdministrationTerm()?->term_id)->get();
+        if ($accounts->count() <= 3) {
+            return back()->with('warning', 'Bulk resend is available only when more than 3 accounts are pending. Use the individual resend buttons.');
+        }
+        $sent = 0;
+        $failed = 0;
+        foreach ($accounts as $account) {
+            // Recheck eligibility in case the account was activated during this batch.
+            $account = $this->pendingSetupAccounts($this->currentAdministrationTerm()?->term_id)
+                ->where('users.user_id', $account->user_id)->first();
+            if (!$account) continue;
+            try {
+                $this->sendNewSetupLink($account) ? $sent++ : $failed++;
+            } catch (\Throwable $exception) {
+                \Log::error('Bulk setup resend failed for user '.$account->user_id.': '.$exception->getMessage());
+                $failed++;
+            }
+        }
+        $message = $sent.' setup link(s) sent. Each new link is valid for 24 hours and replaces the previous link.';
+        if ($failed) return back()->with('warning', $message.' '.$failed.' could not be sent; use individual resend to retry.');
+        return back()->with('success', $message);
+    }
+
+    protected function sendNewSetupLink(User $user): bool
+    {
         $token=Str::random(64);
         DB::table('password_reset_tokens')->updateOrInsert(
             ['email'=>$user->email],
@@ -583,9 +631,9 @@ class UserManagementController extends Controller
             });
         }catch(\Throwable $e){
             \Log::error('Setup link resend failed for '.$user->email.': '.$e->getMessage());
-            return back()->with('warning','The new setup link could not be sent. Please try again.');
+            return false;
         }
-        return back()->with('success','A new password setup link was sent to '.$user->email.'.');
+        return true;
     }
     /*
     |--------------------------------------------------------------------------

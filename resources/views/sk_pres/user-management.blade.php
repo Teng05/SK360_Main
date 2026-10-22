@@ -38,7 +38,8 @@
                     <p class="text-gray-600 text-lg">Manage current officials and official history</p>
                 </div>
                 @if(($activeTab ?? 'current') === 'current')
-                    <div class="flex items-center gap-2">
+                    <div class="flex flex-wrap items-center gap-2">
+                        @include('sk_pres.partials.resend-pending-setup')
                         <button id="openNewTermModal"
                             type="button"
                             class="sk-btn sk-btn--secondary">

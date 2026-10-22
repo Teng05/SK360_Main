@@ -210,6 +210,7 @@ Route::middleware('auth')->prefix('sk_pres')->name('sk_pres.')->group(function()
     Route::post('/user-management/bulk-officials',[SkPresidentUserManagementController::class,'storeBulkOfficials'])->name('user-management.store-bulk-officials');
     Route::post('/user-management/import',[SkPresidentUserManagementController::class,'import'])->name('user-management.import');
     Route::get('/user-management/csv-template',[SkPresidentUserManagementController::class,'downloadCsvTemplate'])->name('user-management.csv-template');
+    Route::post('/user-management/resend-pending-setup-links',[SkPresidentUserManagementController::class,'resendPendingSetupLinks'])->middleware('throttle:1,10')->name('user-management.resend-pending-setup-links');
     Route::post('/user-management/{userId}/resend-setup-link',[SkPresidentUserManagementController::class,'resendSetupLink'])->middleware('throttle:3,10')->name('user-management.resend-setup-link');
     Route::put('/user-management/{userId}',[SkPresidentUserManagementController::class,'update'])->name('user-management.update');
     Route::patch('/user-management/{userId}/toggle-status',[SkPresidentUserManagementController::class,'toggleStatus'])->name('user-management.toggle-status');

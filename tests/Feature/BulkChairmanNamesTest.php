@@ -104,4 +104,69 @@ class BulkChairmanNamesTest extends TestCase
         $this->assertDatabaseHas('users', ['email'=>'juan@example.test', 'phone_number'=>'09123456789']);
         $this->assertDatabaseHas('users', ['email'=>'maria@example.test', 'phone_number'=>'+639987654321']);
     }
+
+    private function pendingAccounts(int $count): void
+    {
+        for ($id=1; $id<=$count; $id++) {
+            DB::table('users')->insert(['user_id'=>$id, 'first_name'=>'Pending', 'last_name'=>'Official', 'email'=>'pending'.$id.'@example.test', 'role'=>'sk_chairman', 'barangay_id'=>$id, 'is_verified'=>false, 'status'=>'inactive']);
+            DB::table('official_terms')->insert(['user_id'=>$id, 'term_id'=>1, 'barangay_id'=>$id, 'role'=>'sk_chairman', 'status'=>'pending']);
+        }
+    }
+
+    public function test_bulk_resend_button_is_visible_only_above_three_pending_accounts(): void
+    {
+        foreach ([0, 1, 3, 4, 72] as $count) {
+            $html = view('sk_pres.partials.resend-pending-setup', ['pendingSetupCount'=>$count])->render();
+            $this->assertSame($count>3, str_contains($html, 'Resend Setup Links'));
+        }
+    }
+
+    public function test_bulk_resend_below_threshold_does_not_replace_tokens_or_send_mail(): void
+    {
+        $this->pendingAccounts(3);
+        Mail::shouldReceive('send')->never();
+        $this->post(route('sk_pres.user-management.resend-pending-setup-links'))->assertSessionHas('warning');
+        $this->assertDatabaseCount('password_reset_tokens', 0);
+    }
+
+    public function test_bulk_resend_sends_once_per_eligible_account_and_excludes_other_accounts(): void
+    {
+        $this->pendingAccounts(8);
+        DB::table('users')->where('user_id',5)->update(['is_verified'=>true]);
+        DB::table('users')->where('user_id',6)->update(['archived_at'=>now()]);
+        DB::table('official_terms')->where('user_id',7)->update(['term_id'=>2]);
+        DB::table('users')->where('user_id',8)->update(['role'=>'sk_secretary']);
+        DB::table('official_terms')->where('user_id',8)->update(['role'=>'sk_secretary']);
+        DB::table('official_terms')->insert(['user_id'=>1,'term_id'=>1,'barangay_id'=>1,'role'=>'sk_chairman','status'=>'pending']);
+        DB::table('password_reset_tokens')->insert(['email'=>'pending1@example.test','token'=>'old-token','created_at'=>now()->subDays(2)]);
+        $recipients=[];
+        Mail::shouldReceive('send')->times(4)->andReturnUsing(function ($view, $data, $callback) use (&$recipients) {
+            $this->assertSame('email.account-setup', $view);
+            $this->assertStringContainsString('/set-password/', $data['setupLink']);
+            $recipients[]=$data['user']->email;
+        });
+        $this->post(route('sk_pres.user-management.resend-pending-setup-links'))->assertSessionHas('success');
+        $this->assertSame(['pending1@example.test','pending2@example.test','pending3@example.test','pending4@example.test'], $recipients);
+        $this->assertDatabaseCount('password_reset_tokens', 4);
+        $this->assertNotSame('old-token', DB::table('password_reset_tokens')->where('email','pending1@example.test')->value('token'));
+        $this->assertDatabaseCount('users', 8);
+    }
+
+    public function test_bulk_resend_reports_partial_delivery_failures_and_continues(): void
+    {
+        $this->pendingAccounts(4);
+        $calls=0;
+        Mail::shouldReceive('send')->times(4)->andReturnUsing(function () use (&$calls) {
+            if (++$calls===2) throw new \RuntimeException('Simulated mail failure');
+        });
+        $this->post(route('sk_pres.user-management.resend-pending-setup-links'))->assertSessionHas('warning', fn ($message)=>str_contains($message, '3 setup link(s) sent.') && str_contains($message, '1 could not be sent'));
+    }
+
+    public function test_chairman_cannot_trigger_president_bulk_resend(): void
+    {
+        Mail::shouldReceive('send')->never();
+        $this->actingAs((new User())->forceFill(['user_id'=>98, 'role'=>'sk_chairman']));
+        $this->post(route('sk_pres.user-management.resend-pending-setup-links'))->assertForbidden();
+        $this->assertDatabaseCount('password_reset_tokens', 0);
+    }
 }
