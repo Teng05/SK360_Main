@@ -46,12 +46,55 @@ class BudgetController extends Controller
     private function publications(): \Illuminate\Database\Query\Builder
     {
         return DB::table('annual_budgets as a')->join('barangays as b', 'b.barangay_id', '=', 'a.barangay_id')
-            ->where('a.status', 'verified')->whereNotNull('a.published_by')->whereNotNull('a.published_at')
+            ->where('a.status', 'verified')
             ->select('a.annual_budget_id', 'a.barangay_id', 'a.fiscal_year', 'a.published_at', 'a.published_by', 'b.barangay_name');
     }
 
     private function snapshot(object $budget): ?array
     {
+        $allocation = $this->allocationSnapshot($budget);
+        $records = DB::table('project_expenses as e')->join('budget_projects as p', 'p.project_id', '=', 'e.project_id')
+            ->where('p.annual_budget_id', $budget->annual_budget_id)->whereIn('e.status', \App\Services\BudgetMonitoringService::ACTIVE_EXPENSES)
+            ->orderByDesc('e.expense_date')->orderByDesc('e.expense_id')
+            ->get(['e.expense_id','e.revision_no','e.description','e.amount','e.expense_date','p.project_id','p.name as project','p.category']);
+        if (!$allocation && $records->isEmpty()) return null;
+        $reported = 0;
+        $expenses = $records->map(function($expense) use (&$reported) {
+            $reported += \App\Services\BudgetMonitoringService::cents((string)$expense->amount);
+            $proof = DB::table('financial_attachments')->where('expense_id', $expense->expense_id)
+                ->where('owner_revision_no', $expense->revision_no)->whereNotNull('published_by')->whereNotNull('published_at')
+                ->orderByDesc('attachment_id')->value('attachment_id');
+            return ['description' => $expense->description, 'amount' => $expense->amount, 'expense_date' => $expense->expense_date,
+                'project_id' => (int)$expense->project_id, 'project' => $expense->project, 'category' => $expense->category,
+                'proof_url' => $proof ? route('public.budgets.proof', $proof) : null];
+        });
+        $projects = $records->groupBy('project_id')->map(function ($expenses, $projectId) {
+            $cents = $expenses->reduce(fn ($total, $expense) => $total + \App\Services\BudgetMonitoringService::cents((string)$expense->amount), 0);
+            return ['project_id' => (int)$projectId, 'name' => $expenses->first()->project, 'category' => $expenses->first()->category,
+                'reported_expenses' => \App\Services\BudgetMonitoringService::decimal($cents), 'expense_count' => $expenses->count()];
+        })->values();
+        $allotted = $allocation ? \App\Services\BudgetMonitoringService::decimal(\App\Services\BudgetMonitoringService::cents((string)$allocation['allotted'])) : null;
+        return ['annual_budget_id' => (int)$budget->annual_budget_id, 'barangay_id' => (int)$budget->barangay_id,
+            'barangay_name' => $budget->barangay_name, 'fiscal_year' => (int)$budget->fiscal_year,
+            'published_at' => $allocation ? $budget->published_at : null, 'allocation_published' => (bool)$allocation,
+            'allotted' => $allotted, 'reported_expenses' => \App\Services\BudgetMonitoringService::decimal($reported),
+            'remaining_estimate' => $allotted === null ? null : \App\Services\BudgetMonitoringService::decimal(\App\Services\BudgetMonitoringService::cents((string)$allotted) - $reported),
+            'expenses' => $expenses->all(), 'projects' => $projects->all(), 'itemized_available' => true];
+    }
+
+    public function proof(int $attachment)
+    {
+        $file = DB::table('financial_attachments as f')->join('project_expenses as e', 'e.expense_id', '=', 'f.expense_id')
+            ->join('budget_projects as p', 'p.project_id', '=', 'e.project_id')->join('annual_budgets as a', 'a.annual_budget_id', '=', 'p.annual_budget_id')
+            ->where('f.attachment_id', $attachment)->whereColumn('f.owner_revision_no', 'e.revision_no')
+            ->whereNotNull('f.published_by')->whereNotNull('f.published_at')->where('a.status', 'verified')
+            ->whereIn('e.status', \App\Services\BudgetMonitoringService::ACTIVE_EXPENSES)->select('f.*')->first();
+        return app(\App\Services\FinancialProofService::class)->response($file);
+    }
+
+    private function allocationSnapshot(object $budget): ?array
+    {
+        if (!$budget->published_at || !$budget->published_by) return null;
         $event = DB::table('financial_events')->where('subject_type', 'annual_budget')->where('subject_id', $budget->annual_budget_id)
             ->where('event_type', 'summary_published')->orderByDesc('sequence_no')->first();
         if (!$event || (int) $event->actor_id !== (int) $budget->published_by || $event->created_at > $budget->published_at) return null;

@@ -954,60 +954,6 @@
                         </div>
                     </div>
                 </div>
-                {{-- ANNUAL BUDGET AMOUNT --}}
-                <div id="annualBudgetAmountSection" class="hidden">
-                    <label
-                        for="annualBudgetAmount"
-                        class="block text-[10px] font-black text-gray-500 uppercase mb-2 ml-1"
-                    >
-                        Annual Budget Amount
-                    </label>
-                    <div class="relative">
-                        <span class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 font-bold">
-                            ₱
-                        </span>
-                        <input
-                            type="number"
-                            id="annualBudgetAmount"
-                            name="annual_budget_amount"
-                            value="{{ old('annual_budget_amount') }}"
-                            min="0.01"
-                            step="0.01"
-                            placeholder="0.00"
-                            class="w-full rounded-xl border border-gray-200 bg-white pl-9 pr-4 py-3 text-sm font-semibold text-gray-700 focus:outline-none focus:ring-2 focus:ring-red-200 focus:border-red-400"
-                        >
-                    </div>
-                    <p class="mt-2 text-[10px] leading-relaxed text-gray-400">
-                        Enter the total Annual Budget amount stated in the submitted Annual Budget document.
-                    </p>
-                </div>
-                {{-- ANNUAL COA ACTUAL EXPENDITURE --}}
-                <div id="actualExpenditureSection" class="hidden">
-                    <label
-                        for="actualExpenditure"
-                        class="block text-[10px] font-black text-gray-500 uppercase mb-2 ml-1"
-                    >
-                        Actual Expenditure
-                    </label>
-                    <div class="relative">
-                        <span class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 font-bold">
-                            ₱
-                        </span>
-                        <input
-                            type="number"
-                            id="actualExpenditure"
-                            name="actual_expenditure"
-                            value="{{ old('actual_expenditure') }}"
-                            min="0.01"
-                            step="0.01"
-                            placeholder="0.00"
-                            class="w-full rounded-xl border border-gray-200 bg-white pl-9 pr-4 py-3 text-sm font-semibold text-gray-700 focus:outline-none focus:ring-2 focus:ring-red-200 focus:border-red-400"
-                        >
-                    </div>
-                    <p class="mt-2 text-[10px] leading-relaxed text-gray-400">
-                        Enter the summarized total actual expenditure stated in the Annual COA / Financial Report.
-                    </p>
-                </div>
             @endif
             {{-- SUBMISSION METHOD --}}
             @if(($submissionType ?? '')==='report')
@@ -1281,30 +1227,12 @@ slotSubmissionForm?.addEventListener('submit',(event)=>{
     const selectedMethod=document.querySelector('input[name="sub_method"]:checked')
         ?? document.querySelector('input[name="sub_method"][type="hidden"]');
     const method=selectedMethod?.value || '';
-    const annualBudgetAmountSection=document.getElementById('annualBudgetAmountSection');
-    const annualBudgetAmount=document.getElementById('annualBudgetAmount');
-    const actualExpenditureSection=document.getElementById('actualExpenditureSection');
-    const actualExpenditure=document.getElementById('actualExpenditure');
     const fileInput=document.querySelector('input[name="report_file"]');
     if(!slotId){
         missing.push('Please select a valid submission slot.');
     }
     if(!method){
         missing.push('Please select a submission method.');
-    }
-    if(
-        annualBudgetAmountSection &&
-        !annualBudgetAmountSection.classList.contains('hidden') &&
-        (!annualBudgetAmount?.value || Number(annualBudgetAmount.value)<=0)
-    ){
-        missing.push('Annual Budget Amount is required.');
-    }
-    if(
-        actualExpenditureSection &&
-        !actualExpenditureSection.classList.contains('hidden') &&
-        (!actualExpenditure?.value || Number(actualExpenditure.value)<=0)
-    ){
-        missing.push('Actual Expenditure is required.');
     }
     if(
         method==='pdf' &&

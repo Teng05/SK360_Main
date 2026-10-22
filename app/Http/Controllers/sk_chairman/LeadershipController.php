@@ -214,7 +214,7 @@ class LeadershipController extends Controller
         $validated=$request->validateWithBag('councilorAdd',[
             'name'=>['required','string','max:255'],
             'email'=>['nullable','email','max:255'],
-            'phone'=>['nullable','string','max:20'],
+            'phone'=>['bail', 'nullable','string', new \App\Rules\PhilippineMobileNumber(),'max:20'],
         ]);
 
         $normalizedName=strtolower(trim(preg_replace('/\s+/',' ',$validated['name'])));
@@ -276,7 +276,7 @@ class LeadershipController extends Controller
             'councilors'=>['required','array','min:1'],
             'councilors.*.name'=>['required','string','max:255'],
             'councilors.*.email'=>['nullable','email','max:255'],
-            'councilors.*.phone'=>['nullable','string','max:20'],
+            'councilors.*.phone'=>['bail', 'nullable','string', new \App\Rules\PhilippineMobileNumber(),'max:20'],
         ]);
 
         $barangayId=auth()->user()->barangay_id;
@@ -388,7 +388,7 @@ class LeadershipController extends Controller
         $validated=$request->validateWithBag('councilorEdit',[
             'edit_councilor_name'=>['required','string','max:255'],
             'edit_councilor_email'=>['nullable','email','max:255'],
-            'edit_councilor_phone'=>['nullable','string','max:20'],
+            'edit_councilor_phone'=>['bail', 'nullable','string', new \App\Rules\PhilippineMobileNumber(),'max:20'],
         ]);
 
         DB::table('sk_council')
@@ -422,7 +422,7 @@ class LeadershipController extends Controller
         $validated=$request->validateWithBag('treasurerAdd',[
             'treasurer_name'=>['required','string','max:255'],
             'treasurer_email'=>['nullable','email','max:255'],
-            'treasurer_phone'=>['nullable','string','max:20'],
+            'treasurer_phone'=>['bail', 'nullable','string', new \App\Rules\PhilippineMobileNumber(),'max:20'],
         ]);
 
         $exists=DB::table('sk_council')
@@ -485,7 +485,7 @@ class LeadershipController extends Controller
         $validated=$request->validateWithBag('treasurerEdit',[
             'edit_treasurer_name'=>['required','string','max:255'],
             'edit_treasurer_email'=>['nullable','email','max:255'],
-            'edit_treasurer_phone'=>['nullable','string','max:20'],
+            'edit_treasurer_phone'=>['bail', 'nullable','string', new \App\Rules\PhilippineMobileNumber(),'max:20'],
         ]);
 
         DB::table('sk_council')
@@ -532,7 +532,7 @@ class LeadershipController extends Controller
             'secretary_first_name'=>['required','string','max:100'],
             'secretary_last_name'=>['required','string','max:100'],
             'secretary_email'=>['required','email','max:100','unique:users,email'],
-            'secretary_phone'=>['nullable','string','max:20','unique:users,phone_number'],
+            'secretary_phone'=>['bail', 'nullable','string', new \App\Rules\PhilippineMobileNumber(),'max:20','unique:users,phone_number'],
         ],[
             'secretary_email.unique'=>'This email is already registered. If this official was previously archived, use Leadership History to reappoint the official instead.',
         ]);
@@ -618,7 +618,7 @@ class LeadershipController extends Controller
             'edit_secretary_first_name'=>['required','string','max:100'],
             'edit_secretary_last_name'=>['required','string','max:100'],
             'edit_secretary_email'=>['required','email','max:100','unique:users,email,'.$userId.',user_id'],
-            'edit_secretary_phone'=>['nullable','string','max:20','unique:users,phone_number,'.$userId.',user_id'],
+            'edit_secretary_phone'=>['bail', 'nullable','string', new \App\Rules\PhilippineMobileNumber(),'max:20','unique:users,phone_number,'.$userId.',user_id'],
         ]);
 
         $emailChanged=strtolower($oldEmail) !== strtolower($validated['edit_secretary_email']);

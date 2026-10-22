@@ -254,7 +254,7 @@
                                 @if ($selectedBarangayName)
                                     {{ $selectedBarangayName }} —
                                 @endif
-                                Annual COA expenditure against Annual Budget for FY {{ $chartData['budgetUtilization']['year'] }}
+                                Active reported expenses against the allotted annual budget for FY {{ $chartData['budgetUtilization']['year'] }}
                             </p>
                         </div>
 
@@ -303,11 +303,11 @@
 
                             @if ($selectedBarangayName)
                                 <p class="text-sm text-gray-500">
-                                    Annual Budget submitted by {{ $selectedBarangayName }} for FY {{ $chartData['annualBudget']['year'] }}
+                                    Allotted annual budget for {{ $selectedBarangayName }} for FY {{ $chartData['annualBudget']['year'] }}
                                 </p>
                             @else
                                 <p class="text-sm text-gray-500">
-                                    Annual Budget amounts submitted for FY {{ $chartData['annualBudget']['year'] }}
+                                    Allotted annual budget amounts for FY {{ $chartData['annualBudget']['year'] }}
                                 </p>
                             @endif
                         </div>

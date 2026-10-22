@@ -1,6 +1,18 @@
 (() => {
     const page = document.querySelector('[data-budget-page]');
     if (!page) return;
+    const filters = page.querySelector('[data-financial-filters]');
+    if (filters) {
+        const year = filters.querySelector('[name="year"]');
+        const barangay = filters.querySelector('[name="barangay_id"]');
+        const clear = filters.querySelector('[data-clear-financial-filters]');
+        const appliedNonDefault = year.value !== filters.dataset.defaultYear || Number(barangay?.value || 0) !== 0;
+        const syncClear = () => {
+            clear.hidden = !appliedNonDefault && year.value === filters.dataset.defaultYear && Number(barangay?.value || 0) === 0;
+        };
+        filters.addEventListener('change', syncClear);
+        syncClear();
+    }
     const openDialog = (id, trigger) => {
         const dialog = document.getElementById(id);
         if (!(dialog instanceof HTMLDialogElement) || !dialog.classList.contains('budget-dialog')) return;
@@ -14,6 +26,22 @@
         const trigger = event.target.closest('[data-open-dialog]');
         if (trigger) openDialog(trigger.dataset.openDialog, trigger);
         if (event.target.closest('[data-close-dialog]')) event.target.closest('dialog')?.close();
+    });
+    document.querySelectorAll('[data-expense-form]').forEach(form => {
+        const project = form.querySelector('[data-project-select]');
+        const category = form.querySelector('[data-category-select]');
+        const sync = () => {
+            const isNew = project.value === 'new';
+            form.querySelector('[data-new-project]').hidden = !isNew;
+            form.querySelector('[data-existing-category]').hidden = isNew || !project.value;
+            form.querySelector('[data-existing-category]').textContent = !isNew && project.value ? 'Category: ' + project.selectedOptions[0].dataset.category : '';
+            form.querySelectorAll('[data-new-project] input, [data-new-project] select').forEach(field => { field.disabled = !isNew; field.required = isNew; });
+            const custom = isNew && category.value === 'new';
+            form.querySelector('[data-new-category]').hidden = !custom;
+            const name = form.querySelector('[name="new_category"]'); name.disabled = !custom; name.required = custom;
+        };
+        project.addEventListener('change', sync); category.addEventListener('change', sync); sync();
+        form.querySelector('[name="proof"]').addEventListener('change', () => { form.querySelector('[name="public_proof"]').checked = false; });
     });
     const proofDialog = document.getElementById('expense-proof');
     const image = document.getElementById('proof-image');

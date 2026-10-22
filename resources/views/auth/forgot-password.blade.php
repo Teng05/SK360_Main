@@ -298,7 +298,7 @@
                     <label class="form-label-custom">
                         <span class="label-icon">@include('auth.partials.login-icon', ['icon' => 'phone', 'iconSize' => 16])</span> Phone Number
                     </label>
-                    <input type="text" name="phone" class="form-control-custom" placeholder="+639123456789" value="{{ old('phone') }}" required>
+                    <input type="tel" name="phone" class="form-control-custom" placeholder="09XXXXXXXXX or +639XXXXXXXXX" value="{{ old('phone') }}" required inputmode="tel" maxlength="13" pattern="(?:09[0-9]{9}|\+639[0-9]{9})" title="Enter 09XXXXXXXXX or +639XXXXXXXXX.">
                     <button type="submit" class="btn-sk-primary">Send Reset Code</button>
                 </form>
 

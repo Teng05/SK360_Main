@@ -109,6 +109,8 @@ Route::controller(AuthController::class)->group(function () {
 });
 
 Route::middleware('auth')->group(function(){
+    Route::get('/archive-financial-attachments/{attachment}', [\App\Http\Controllers\FinancialArchiveController::class, 'proof'])->whereNumber('attachment')->name('archive.financial-proof');
+    Route::get('/archive-financial-attachments/{attachment}/download', [\App\Http\Controllers\FinancialArchiveController::class, 'proof'])->whereNumber('attachment')->name('archive.financial-proof.download');
     Route::get('/financial-attachments/{attachment}', [\App\Http\Controllers\BudgetMonitoringController::class, 'attachment'])->whereNumber('attachment')->name('finances.attachments');
     Route::get('/notifications/feed',[NotificationController::class,'feed'])->name('notifications.feed');
     Route::post('/notifications/{notification}/read',[NotificationController::class,'markRead'])->name('notifications.read');
@@ -192,8 +194,10 @@ Route::middleware('auth')->prefix('sk_pres')->name('sk_pres.')->group(function()
     */
 
     Route::get('/archive',[SkPresidentArchiveController::class,'index'])->name('archive');
+    Route::get('/archive/finances/{budget}', [\App\Http\Controllers\FinancialArchiveController::class, 'show'])->whereNumber('budget')->name('archive.finances');
     Route::get('/archive/download/bulk',[SkPresidentArchiveController::class,'bulkDownload'])->name('archive.bulk-download');
     Route::get('/archive/download/{sourceType}/{sourceId}',[SkPresidentArchiveController::class,'download'])->name('archive.download');
+    Route::get('/archive/view/{sourceType}/{sourceId}', [SkPresidentArchiveController::class, 'preview'])->name('archive.view');
 
     /*
     |--------------------------------------------------------------------------
@@ -289,8 +293,10 @@ Route::middleware('auth')->prefix('sk_chairman')->name('sk_chairman.')->group(fu
     Route::post('/leadership/council/{councilId}/reappoint',[SkChairmanLeadershipController::class,'reappointCouncilMember'])->name('leadership.council.reappoint');
 
     Route::get('/archive', [App\Http\Controllers\sk_chairman\ArchiveController::class, 'index'])->name('archive');
+    Route::get('/archive/finances/{budget}', [\App\Http\Controllers\FinancialArchiveController::class, 'show'])->whereNumber('budget')->name('archive.finances');
     Route::get('/archive/download/bulk', [App\Http\Controllers\sk_chairman\ArchiveController::class, 'bulkDownload'])->name('archive.bulk-download');
     Route::get('/archive/download/{sourceType}/{sourceId}', [App\Http\Controllers\sk_chairman\ArchiveController::class, 'download'])->name('archive.download');
+    Route::get('/archive/view/{sourceType}/{sourceId}', [App\Http\Controllers\sk_chairman\ArchiveController::class, 'preview'])->name('archive.view');
 
     Route::post('/profile/contact/send', fn (Request $r, \App\Http\Controllers\ProfileContactController $c) => $c->send($r, 'sk_chairman'))->middleware('throttle:10,10')->name('profile.contact.send');
     Route::post('/profile/contact/verify', fn (Request $r, \App\Http\Controllers\ProfileContactController $c) => $c->verify($r, 'sk_chairman'))->middleware('throttle:20,10')->name('profile.contact.verify');
@@ -359,6 +365,7 @@ Route::prefix('public-portal')->name('public.')->group(function(){
     Route::get('/leadership',[PublicLeadershipController::class,'index'])->name('leadership');
     Route::get('/annual-budgets',[PublicBudgetController::class,'index'])->name('budgets');
     Route::get('/annual-budgets/{budget}/summary', [PublicBudgetController::class, 'summary'])->whereNumber('budget')->name('budgets.summary');
+    Route::get('/financial-proofs/{attachment}', [PublicBudgetController::class, 'proof'])->whereNumber('attachment')->name('budgets.proof');
 
     Route::post('/announcements/{announcementId}/like',[PublicAnnouncementInteractionController::class,'toggleLike'])->middleware('throttle:30,1')->name('announcements.like');
     Route::post('/announcements/{announcementId}/view',[PublicAnnouncementInteractionController::class,'trackView'])->middleware('throttle:120,1')->name('announcements.view');

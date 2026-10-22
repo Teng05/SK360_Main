@@ -31,28 +31,6 @@
 
         /*
         |--------------------------------------------------------------------------
-        | ANNUAL BUDGET AMOUNT
-        |--------------------------------------------------------------------------
-        */
-        const annualBudgetAmountSection =
-            document.getElementById('annualBudgetAmountSection');
-
-        const annualBudgetAmount =
-            document.getElementById('annualBudgetAmount');
-
-        /*
-        |--------------------------------------------------------------------------
-        | ANNUAL COA ACTUAL EXPENDITURE
-        |--------------------------------------------------------------------------
-        */
-        const actualExpenditureSection =
-            document.getElementById('actualExpenditureSection');
-
-        const actualExpenditure =
-            document.getElementById('actualExpenditure');
-
-        /*
-        |--------------------------------------------------------------------------
         | SUBMISSION METHOD ELEMENTS
         |--------------------------------------------------------------------------
         */
@@ -89,46 +67,6 @@
         const isAnnualCoa =
             category === 'coa_report'
             && reportType === 'annual';
-
-        /*
-        |--------------------------------------------------------------------------
-        | SHOW / HIDE ANNUAL BUDGET AMOUNT
-        |--------------------------------------------------------------------------
-        */
-        if (annualBudgetAmountSection) {
-            annualBudgetAmountSection.classList.toggle(
-                'hidden',
-                !isAnnualBudget
-            );
-        }
-
-        if (annualBudgetAmount) {
-            annualBudgetAmount.required = isAnnualBudget;
-
-            if (!isAnnualBudget) {
-                annualBudgetAmount.value = '';
-            }
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | SHOW / HIDE ACTUAL EXPENDITURE
-        |--------------------------------------------------------------------------
-        */
-        if (actualExpenditureSection) {
-            actualExpenditureSection.classList.toggle(
-                'hidden',
-                !isAnnualCoa
-            );
-        }
-
-        if (actualExpenditure) {
-            actualExpenditure.required = isAnnualCoa;
-
-            if (!isAnnualCoa) {
-                actualExpenditure.value = '';
-            }
-        }
 
         /*
         |--------------------------------------------------------------------------

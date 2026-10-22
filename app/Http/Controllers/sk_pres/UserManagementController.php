@@ -72,7 +72,7 @@ class UserManagementController extends Controller
             'first_name'=>['required','string','max:100'],
             'last_name'=>['required','string','max:100'],
             'email'=>['required',new DeliverableEmail(),'max:100',Rule::unique('users','email')],
-            'phone_number'=>['nullable','string','max:20','unique:users,phone_number'],
+            'phone_number'=>['bail', 'nullable','string', new \App\Rules\PhilippineMobileNumber(),'max:20','unique:users,phone_number'],
             'barangay_id'=>['required','integer','exists:barangays,barangay_id'],
         ],[
             'email.unique'=>'This email address is already registered.',
@@ -157,7 +157,7 @@ class UserManagementController extends Controller
             'officials.*.first_name'=>['required','string','max:100'],
             'officials.*.last_name'=>['required','string','max:100'],
             'officials.*.email'=>['required',new DeliverableEmail(),'max:100'],
-            'officials.*.phone_number'=>['nullable','string','max:20'],
+            'officials.*.phone_number'=>['bail', 'nullable','string', new \App\Rules\PhilippineMobileNumber(),'max:20'],
             'officials.*.barangay_id'=>['required','integer','exists:barangays,barangay_id','distinct'],
         ],[
             'officials.required'=>'Add at least one SK Chairman.',
@@ -417,6 +417,10 @@ class UserManagementController extends Controller
                     $rowHasError=true;
                 }
             }
+            if ($row['phone_number'] !== '' && Validator::make(['phone' => $row['phone_number']], ['phone' => [new \App\Rules\PhilippineMobileNumber()]])->fails()) {
+                $errors[]="Row {$line}: Enter a Philippine mobile number as 09XXXXXXXXX or +639XXXXXXXXX.";
+                $rowHasError=true;
+            }
             if($row['phone_number'] !== ''){
                 if(isset($seenPhones[$row['phone_number']])){
                     $errors[]="Row {$line}: Phone number '{$row['phone_number']}' appears more than once in the CSV.";
@@ -601,7 +605,7 @@ class UserManagementController extends Controller
             'first_name'=>['required','string','max:100'],
             'last_name'=>['required','string','max:100'],
             'email'=>['required',new DeliverableEmail(),'max:100','unique:users,email,'.$userId.',user_id'],
-            'phone_number'=>['nullable','string','max:20','unique:users,phone_number,'.$userId.',user_id'],
+            'phone_number'=>['bail', 'nullable','string', new \App\Rules\PhilippineMobileNumber(),'max:20','unique:users,phone_number,'.$userId.',user_id'],
             'barangay_id'=>['nullable','integer','exists:barangays,barangay_id'],
             'role'=>['required','string'],
             'status'=>['required','in:active,inactive'],
@@ -738,7 +742,7 @@ class UserManagementController extends Controller
             'new_president_first_name'=>['nullable','required_if:president_mode,assign_new','string','max:100'],
             'new_president_last_name'=>['nullable','required_if:president_mode,assign_new','string','max:100'],
             'new_president_email'=>['nullable','required_if:president_mode,assign_new',new DeliverableEmail(),'max:100','unique:users,email'],
-            'new_president_phone'=>['nullable','string','max:20','unique:users,phone_number'],
+            'new_president_phone'=>['bail', 'nullable','string', new \App\Rules\PhilippineMobileNumber(),'max:20','unique:users,phone_number'],
         ],[
             'start_year.min'=>'Start year cannot be earlier than '.$minimumStartYear.'.',
             'start_year.max'=>'Start year must not be later than 2099.',

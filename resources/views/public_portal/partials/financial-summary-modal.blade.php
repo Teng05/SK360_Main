@@ -12,16 +12,17 @@
         <section id="public-summary-panel" role="tabpanel" aria-labelledby="public-summary-tab" tabindex="0">
             <div class="public-finance-metrics">
                 <div><h3>Allotted Budget</h3><p data-summary-allotted></p></div>
-                <div><h3>Verified Reported Expenses</h3><p data-summary-verified></p></div>
-                <div><h3>Budget Less Verified Expenses</h3><p data-summary-remaining></p></div>
+                <div><h3>Reported Expenses</h3><p data-summary-verified></p></div>
+                <div><h3>Estimated Remaining Budget</h3><p data-summary-remaining></p></div>
             </div>
-            <label for="public-finance-progress">Budget less verified expenses</label>
+            <label for="public-finance-progress">Estimated remaining budget</label>
             <progress id="public-finance-progress" max="100" value="0"></progress>
             <p data-summary-progress></p>
-            <p class="public-finance-note">This dated, authorized snapshot excludes pending expenses. Budget less verified expenses is not actual cash on hand or the bank balance; fund releases may occur separately.</p>
+            <p class="public-finance-note">This dated, authorized snapshot excludes pending expenses. Estimated remaining budget is not actual cash on hand or the bank balance; fund releases may occur separately.</p>
         </section>
         <section id="public-expenses-panel" role="tabpanel" aria-labelledby="public-expenses-tab" tabindex="0" hidden>
-            <p>Summary-only publication. Itemized expense disclosure is not currently authorized. Private receipts and supporting documents are not publicly available.</p>
+            <p class="public-finance-note">Reported expenses and supporting documents authorized for public disclosure. Private and historical proofs are excluded.</p>
+            <div data-public-expenses></div>
         </section>
     </div>
 </dialog>

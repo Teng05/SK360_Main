@@ -42,7 +42,7 @@ class AuthController extends Controller
         $validated=$request->validate([
             'method'=>['required','in:email,phone'],
             'email'=>['nullable','required_if:method,email','email'],
-            'phone'=>['nullable','required_if:method,phone','string','max:30'],
+            'phone'=>['bail', 'nullable','required_if:method,phone','string','max:30', new \App\Rules\PhilippineMobileNumber()],
         ]);
 
         if($validated['method'] === 'email'){

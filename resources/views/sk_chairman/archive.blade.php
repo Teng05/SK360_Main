@@ -168,6 +168,7 @@
                     @endif
                 </form>
 
+
                 <div class="mb-4 flex flex-wrap items-center justify-between gap-2 text-xs text-gray-400">
                     <span>
                         Showing {{ $documentCount }} documents
@@ -236,29 +237,7 @@
                                 </div>
                             </div>
 
-                            @if($document->downloadable)
-                                <a href="{{ route('sk_chairman.archive.download',[
-                                        $document->source_type,
-                                        $document->source_id
-                                    ]) }}"
-                                    class="shrink-0 text-gray-500 hover:text-red-500 transition"
-                                    title="Download record">
-
-                                    @include('partials.ui.icon',[
-                                        'icon'=>'download',
-                                        'iconSize'=>15
-                                    ])
-                                </a>
-                            @else
-                                <span class="shrink-0 cursor-not-allowed text-gray-300"
-                                    title="The archived record exists, but its source file is missing from storage.">
-
-                                    @include('partials.ui.icon',[
-                                        'icon'=>'download',
-                                        'iconSize'=>15
-                                    ])
-                                </span>
-                            @endif
+                            @include('shared.archive-file-actions', ['archivePrefix'=>'sk_chairman'])
                         </div>
                     @empty
                         <div class="rounded-2xl border border-dashed border-gray-200 bg-gray-50 px-6 py-10 text-center">

@@ -85,3 +85,5 @@ font-family:var(--sk-font);color:var(--sk-ink);background:var(--sk-bg);-webkit-f
 /* Stronger color only inside User Management, as requested. */
 .sk-web .sk-user-management-page .um-avatar{filter:saturate(1.18) brightness(.94);box-shadow:0 2px 5px rgba(23,35,56,.14)}
 .sk-web .sk-user-management-page .um-count{filter:saturate(1.18) brightness(.94);box-shadow:0 1px 3px rgba(23,35,56,.14)}
+
+.sk-web .sk-icon-btn[aria-disabled="true"],.sk-web .sk-icon-btn[aria-disabled="true"]:hover{color:#cbd5e1;background:transparent;border-color:transparent;cursor:not-allowed}

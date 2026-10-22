@@ -202,47 +202,6 @@
 
         </div>
 
-        {{-- SUMMARY --}}
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-5 mb-8">
-
-            <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-
-                <p class="text-[10px] font-black uppercase tracking-widest text-gray-400">
-                    Fiscal Year
-                </p>
-
-                <p class="text-3xl font-black text-gray-800 mt-2">
-                    {{ $selectedYear }}
-                </p>
-
-            </div>
-
-            <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-
-                <p class="text-[10px] font-black uppercase tracking-widest text-gray-400">
-                    Budgets Available
-                </p>
-
-                <p class="text-3xl font-black text-red-600 mt-2">
-                    {{ $publishedCount }}
-                </p>
-
-            </div>
-
-            <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-
-                <p class="text-[10px] font-black uppercase tracking-widest text-gray-400">
-                    Published Allotted Budget
-                </p>
-
-                <p class="text-2xl font-black text-gray-800 mt-2">
-                    ₱{{ number_format($totalBudget, 2) }}
-                </p>
-
-            </div>
-
-        </div>
-
         {{-- SECTION TITLE --}}
         <div class="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-6">
 
@@ -257,7 +216,7 @@
                 </h3>
 
                 <p class="text-sm text-gray-500 mt-2">
-                    Only explicitly published financial snapshots are shown. Pending expenses are excluded.
+                    Annual allocations are published by the President. Active reported expenses update automatically.
                 </p>
 
                 <p class="text-xs text-gray-400 mt-2">
@@ -318,15 +277,15 @@
 
                             </div>
 
-                            <span class="shrink-0 rounded-full bg-gray-100 px-3 py-1 text-[9px] font-black uppercase text-gray-600">{{ $item->summary ? 'Published' : 'Not Published' }}</span>
+                            <span class="shrink-0 rounded-full bg-gray-100 px-3 py-1 text-[9px] font-black uppercase text-gray-600">{{ $item->summary ? ($item->summary['allocation_published'] ? 'Allocation Published' : 'Expenses Reported') : 'Not Published' }}</span>
                         </div>
                         <p class="text-xs text-gray-500 mt-3">FY {{ $item->fiscal_year }}</p>
                         @if($item->summary)
                             <div class="mt-6">
                                 <p class="text-xs font-bold text-gray-500">Published Allotted Budget</p>
-                                <p class="text-3xl font-black text-red-600 mt-1 break-words">PHP {{ number_format((float) $item->summary['allotted'], 2) }}</p>
-                                <p class="text-xs font-bold text-gray-500 mt-4">Published Verified Expenditures</p>
-                                <p class="text-xl font-black text-gray-800 mt-1">PHP {{ number_format((float) $item->summary['verified_expenses'], 2) }}</p>
+                                <p class="text-3xl font-black text-red-600 mt-1 break-words">{{ $item->summary['allotted'] === null ? 'Allocation not published' : 'PHP '.number_format((float) $item->summary['allotted'], 2) }}</p>
+                                <p class="text-xs font-bold text-gray-500 mt-4">Reported Expenses</p>
+                                <p class="text-xl font-black text-gray-800 mt-1">PHP {{ number_format((float) $item->summary['reported_expenses'], 2) }}</p>
                             </div>
                             <button type="button" data-financial-summary="{{ route('public.budgets.summary', $item->summary['annual_budget_id']) }}" aria-haspopup="dialog" aria-controls="public-financial-summary" class="mt-5 w-full rounded-xl bg-red-600 px-4 py-3 text-xs font-black uppercase text-white hover:bg-red-700 transition">View Financial Summary</button>
                         @else

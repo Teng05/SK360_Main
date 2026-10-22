@@ -45,7 +45,7 @@ class SkChairmenImport implements ToModel, WithHeadingRow, WithValidation
             '*.last_name'    => ['required', 'string', 'max:255'],
             '*.email'        => ['required', 'email', 'max:255', 'unique:users,email'],
             '*.barangay'     => ['required', 'string'],
-            '*.phone_number' => ['nullable', 'string', 'max:20'],
+            '*.phone_number' => ['bail', 'nullable', 'string', 'max:20', new \App\Rules\PhilippineMobileNumber()],
         ];
     }
 

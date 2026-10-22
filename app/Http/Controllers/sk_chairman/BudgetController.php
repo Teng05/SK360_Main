@@ -151,17 +151,11 @@ class BudgetController extends Controller
         $validated=$request->validate([
             'slot_id'=>['required','integer'],
             'sub_method'=>['required','in:template,pdf'],
-            'annual_budget_amount'=>['nullable','numeric','min:0.01'],
-            'actual_expenditure'=>['nullable','numeric','min:0.01'],
             'report_file'=>['nullable','file','mimes:pdf','max:5120'],
         ],[
             'slot_id.required'=>'Please select a valid budget submission slot.',
             'sub_method.required'=>'Please select a submission method.',
             'sub_method.in'=>'The selected submission method is invalid.',
-            'annual_budget_amount.numeric'=>'Annual Budget Amount must be a valid number.',
-            'annual_budget_amount.min'=>'Annual Budget Amount must be greater than 0.',
-            'actual_expenditure.numeric'=>'Actual Expenditure must be a valid number.',
-            'actual_expenditure.min'=>'Actual Expenditure must be greater than 0.',
             'report_file.file'=>'Please select a valid PDF file.',
             'report_file.mimes'=>'The uploaded report must be a PDF file.',
             'report_file.max'=>'The PDF file must not exceed 5 MB.',
@@ -198,20 +192,6 @@ class BudgetController extends Controller
         $isAnnualBudget=($slot->budget_category ?? null)==='annual_budget';
         $isAnnualCoa=($slot->budget_category ?? null)==='coa_report'
             && ($slot->budget_period_type ?? null)==='annual';
-        if($isAnnualBudget && !$request->filled('annual_budget_amount')){
-            return back()
-                ->withErrors([
-                    'annual_budget_amount'=>'Please enter the Annual Budget amount.',
-                ])
-                ->withInput();
-        }
-        if($isAnnualCoa && !$request->filled('actual_expenditure')){
-            return back()
-                ->withErrors([
-                    'actual_expenditure'=>'Please enter the Actual Expenditure.',
-                ])
-                ->withInput();
-        }
         if($validated['sub_method']==='template'){
             if(!$this->templateAvailableForSlot($slot)){
                 return back()->with(
@@ -222,9 +202,7 @@ class BudgetController extends Controller
             $params=[
                 'slot_id'=>$slot->slot_id,
             ];
-            if($isAnnualCoa){
-                $params['actual_expenditure']=$validated['actual_expenditure'];
-            }
+
             return redirect()->route(
                 'sk_chairman.budget.template.create',
                 $params
@@ -256,12 +234,8 @@ class BudgetController extends Controller
             'template_data'=>null,
             'uploaded_file_name'=>$file->getClientOriginalName(),
             'uploaded_file_path'=>$uploadPath,
-            'total_amount'=>$isAnnualBudget
-                ? (float)$validated['annual_budget_amount']
-                : 0,
-            'actual_expenditure'=>$isAnnualCoa
-                ? (float)$validated['actual_expenditure']
-                : null,
+            'total_amount'=>$existing->total_amount ?? 0,
+            'actual_expenditure'=>$existing->actual_expenditure ?? null,
             'status'=>'recorded',
             'submitted_at'=>now(),
             'created_at'=>now(),
@@ -364,20 +338,6 @@ class BudgetController extends Controller
         }
         $isAnnualCoa=($slot->budget_category ?? null)==='coa_report'
             && ($slot->budget_period_type ?? null)==='annual';
-        $actualExpenditure=$isAnnualCoa
-            ? $request->query('actual_expenditure')
-            : null;
-        if(
-            $isAnnualCoa &&
-            (!is_numeric($actualExpenditure) || (float)$actualExpenditure<=0)
-        ){
-            return redirect()
-                ->route('sk_chairman.budget')
-                ->with(
-                    'report_error',
-                    'Please enter a valid Actual Expenditure.'
-                );
-        }
         $user=auth()->user();
         return view('shared.budget-template-form',[
             'slot'=>$slot,
@@ -396,7 +356,6 @@ class BudgetController extends Controller
             'reportingHalf'=>($slot->budget_period_type ?? null)==='semi_annual'
                 ? $slot->fiscal_half
                 : null,
-            'actualExpenditure'=>$actualExpenditure,
         ]);
     }
     public function storeTemplate(Request $request): RedirectResponse
@@ -404,7 +363,6 @@ class BudgetController extends Controller
         abort_unless(auth()->check() && auth()->user()->role==='sk_chairman',403);
         $validated=$request->validate([
             'slot_id'=>['required','integer'],
-            'actual_expenditure'=>['nullable','numeric','min:0.01'],
             'monitoring_officer'=>['nullable','string','max:255'],
             'sheet_no'=>['nullable','string','max:255'],
             'city'=>['nullable','string','max:255'],
@@ -500,14 +458,6 @@ class BudgetController extends Controller
         }
         $isAnnualCoa=($slot->budget_category ?? null)==='coa_report'
             && ($slot->budget_period_type ?? null)==='annual';
-        if($isAnnualCoa && empty($validated['actual_expenditure'])){
-            return redirect()
-                ->route('sk_chairman.budget')
-                ->with(
-                    'report_error',
-                    'Actual Expenditure is required for Annual COA.'
-                );
-        }
         $templateData=array_merge($validated,[
             'report_type'=>$slot->budget_period_type,
             'reporting_year'=>$slot->fiscal_year,
@@ -540,9 +490,7 @@ class BudgetController extends Controller
                 collect($validated['inventory_rows'] ?? [])->sum(
                     fn($row)=>(float)($row['shortage_value'] ?? 0)
                 ),
-            'actual_expenditure'=>$isAnnualCoa
-                ? (float)$validated['actual_expenditure']
-                : null,
+            'actual_expenditure'=>$existing->actual_expenditure ?? null,
             'status'=>'recorded',
             'submitted_at'=>now(),
             'created_at'=>now(),

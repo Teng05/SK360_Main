@@ -5,7 +5,7 @@
     $financialContext = ['year' => $financialYear];
     if (request()->filled('barangay_id')) $financialContext['barangay_id'] = request('barangay_id');
     $financialLinks = $financialRole === 'sk_president'
-        ? ['overview' => 'Overview', 'allocations' => 'Allocations', 'expenses' => 'Expenses', 'history' => 'History']
+        ? ['overview' => 'Overview', 'allocations' => 'Allocations', 'expenses' => 'Expenses', 'transparency' => 'Public Transparency', 'history' => 'History']
         : ['overview' => 'Overview', 'expenses' => 'Expenses', 'submissions' => 'Budget Submissions', 'history' => 'History'];
 @endphp
 @if(in_array($financialRole, ['sk_president', 'sk_chairman'], true))

@@ -13,6 +13,8 @@ class BudgetMonitoringController extends Controller
     {
         $role = $request->user()->role;
         abort_unless(in_array($role, ['sk_president', 'sk_chairman'], true), 403);
+        if ($request->routeIs('sk_pres.*')) abort_unless($role === 'sk_president', 403);
+        if ($request->routeIs('sk_chairman.*')) abort_unless($role === 'sk_chairman', 403);
         if ($role === 'sk_chairman') abort_unless($request->user()->barangay_id, 403);
         return $role;
     }
@@ -21,9 +23,12 @@ class BudgetMonitoringController extends Controller
     {
         $role = $this->role($request);
         $request->validate(['year' => 'nullable|integer|between:2000,2100']);
-        $year = (int) $request->query('year', now()->year);
+        $currentTerm = app(\App\Services\FinancialTermScope::class)->current();
+        $defaultYear = $currentTerm ? max((int)$currentTerm->start_year, min((int)$currentTerm->end_year, (int)now()->year)) : (int)now()->year;
+        $year = (int)$request->query('year', $defaultYear);
+        if ($currentTerm && ($year < (int)$currentTerm->start_year || $year > (int)$currentTerm->end_year)) abort(404, 'Previous administrations are available in Archive.');
         $budgets = DB::table('annual_budgets as a')->join('barangays as b', 'b.barangay_id', '=', 'a.barangay_id')
-            ->where('a.fiscal_year', $year)->where('a.status', 'verified')
+            ->where('a.fiscal_year', $year)->where('a.status', 'verified')->where('a.recorded_term_id', $currentTerm->term_id ?? 0)
             ->when($role === 'sk_chairman', fn ($q) => $q->where('a.barangay_id', $request->user()->barangay_id))
             ->select('a.*', 'b.barangay_name')->orderBy('b.barangay_name')->get();
         foreach ($budgets as $budget) {
@@ -50,6 +55,12 @@ class BudgetMonitoringController extends Controller
                 $expense->events = DB::table('financial_events')->where('subject_type', 'project_expense')->where('subject_id', $expense->expense_id)->orderByDesc('sequence_no')->get();
             }
         }
+        $actorIds = $budgets->flatMap(fn ($budget) => $budget->events->pluck('actor_id')
+            ->merge($budget->expenses->flatMap(fn ($expense) => $expense->events->pluck('actor_id'))))->unique();
+        $actorNames = $actorIds->isEmpty() ? collect() : DB::table('users')->whereIn('user_id', $actorIds)
+            ->get(['user_id', 'first_name', 'last_name'])->mapWithKeys(fn ($user) => [
+                $user->user_id => trim(($user->first_name ?? '').' '.($user->last_name ?? '')) ?: 'Official name unavailable',
+            ]);
         $prefix = $role === 'sk_president' ? 'sk_pres' : 'sk_chairman';
         $navigation = $role === 'sk_president'
             ? ['home' => 'Home', 'dashboard' => 'Dashboard', 'consolidation' => 'Consolidation', 'module' => 'Module Management',
@@ -64,13 +75,18 @@ class BudgetMonitoringController extends Controller
         }
         $section = $request->routeIs('sk_chairman.budget') ? 'submissions' : (string) $request->query('section', 'overview');
         if ($section === 'documents') $section = $role === 'sk_chairman' ? 'submissions' : 'overview';
-        $sections = $role === 'sk_president' ? ['overview', 'allocations', 'expenses', 'history'] : ['overview', 'expenses', 'submissions', 'history'];
+        $sections = $role === 'sk_president' ? ['overview', 'allocations', 'expenses', 'transparency', 'history'] : ['overview', 'expenses', 'submissions', 'history'];
         if (!in_array($section, $sections, true)) $section = 'overview';
         $submissionData = $role === 'sk_chairman' && $section === 'submissions'
             ? app(\App\Http\Controllers\sk_chairman\BudgetController::class)->submissionData($request) : null;
         return view('shared.budget-monitoring', [
             'budgets' => $budgets, 'year' => $year, 'isPresident' => $role === 'sk_president',
             'barangays' => DB::table('barangays')->orderBy('barangay_name')->get(),
+            'categories' => app(\App\Services\FinancialCategoryService::class)->options(),
+            'financialSchemaReady' => (bool)(collect(\Illuminate\Support\Facades\Schema::getColumns('annual_budgets'))->firstWhere('name', 'approval_reference')['nullable'] ?? false),
+            'fiscalYears' => $currentTerm ? collect(range((int)$currentTerm->start_year, (int)$currentTerm->end_year))->sortDesc()->values() : collect([$defaultYear]),
+            'defaultFinancialYear' => $defaultYear,
+            'actorNames' => $actorNames,
             'menuItems' => $menuItems,
             'currentUrl' => url()->current(),
             'financialSection' => $section, 'submissionData' => $submissionData,
@@ -83,7 +99,7 @@ class BudgetMonitoringController extends Controller
         $data = $request->validate([
             'barangay_id' => 'required|integer|exists:barangays,barangay_id', 'fiscal_year' => 'required|integer|between:2000,2100',
             'amount' => ['required', 'regex:/^\d{1,13}(\.\d{1,2})?$/', 'numeric', 'min:0.01'],
-            'approved_on' => 'required|date_format:Y-m-d', 'approval_reference' => 'required|string|max:150',
+            'approved_on' => 'required|date_format:Y-m-d', 'approval_reference' => 'nullable|string|max:150',
         ]);
         $service->allocate($data, $request->user());
         return redirect()->route('sk_pres.finances', ['year' => $data['fiscal_year'], 'barangay_id' => $data['barangay_id']])->with('success', 'Annual allocation recorded.');
@@ -103,7 +119,7 @@ class BudgetMonitoringController extends Controller
     public function project(Request $request, int $budget, BudgetMonitoringService $service)
     {
         abort_unless($this->role($request) === 'sk_chairman', 403);
-        $data = $request->validate(['name' => 'required|string|max:255', 'category' => 'required|string|max:100']);
+        $data = $request->validate(['name' => 'required|string|max:255', 'category' => 'required|string|max:100', 'planned_amount' => 'required|numeric|min:0|max:9999999999999.99']);
         $service->createProject($budget, $data, $request->user());
         return back()->with('success', 'Project/category recorded. Select it when submitting an expense.');
     }
@@ -112,13 +128,19 @@ class BudgetMonitoringController extends Controller
     {
         abort_unless($this->role($request) === 'sk_chairman', 403);
         $data = $request->validate([
-            'project_id' => 'required|integer', 'client_request_id' => ($expense ? 'nullable' : 'required').'|uuid',
+            'project_id' => ['required', 'regex:/^(new|[0-9]+)$/'],
+            'annual_budget_id' => 'required_if:project_id,new|nullable|integer',
+            'project_name' => 'required_if:project_id,new|nullable|string|max:255',
+            'category' => 'required_if:project_id,new|nullable|string|max:100',
+            'new_category' => 'required_if:category,new|nullable|string|max:100',
+            'planned_amount' => 'nullable|numeric|min:0|max:9999999999999.99',
+            'public_proof' => 'nullable|boolean', 'client_request_id' => ($expense ? 'nullable' : 'required').'|uuid',
             'description' => 'required|string|max:5000',
             'amount' => ['required', 'regex:/^\d{1,13}(\.\d{1,2})?$/', 'numeric', 'min:0.01'],
             'expense_date' => 'required|date_format:Y-m-d|before_or_equal:today', 'document_reference' => 'nullable|string|max:150',
-            'payee_name' => 'nullable|string|max:255', 'proof' => 'required|file|mimes:pdf,jpg,jpeg,png|max:5120',
+            'payee_name' => 'nullable|string|max:255', 'proof' => ($expense ? 'nullable' : 'required').'|file|mimes:pdf,jpg,jpeg,png|max:5120',
             'revision_no' => ($expense ? 'required' : 'nullable').'|integer|min:1',
-            'reason' => ($expense ? 'required' : 'nullable').'|string|max:2000',
+            'reason' => 'nullable|string|max:2000',
         ]);
         $service->submitExpense($data, $request->file('proof'), $request->user(), $expense);
         return back()->with('success', 'Expense submitted. Monitoring balance recalculated.');
@@ -127,9 +149,9 @@ class BudgetMonitoringController extends Controller
     public function transition(Request $request, int $expense, BudgetMonitoringService $service)
     {
         $this->role($request);
-        $data = $request->validate(['status' => 'required|in:verified,needs_revision,cancelled', 'revision_no' => 'required|integer|min:1', 'reason' => 'required|string|max:2000']);
+        $data = $request->validate(['status' => 'required|in:verified,needs_revision,cancelled', 'revision_no' => 'required|integer|min:1', 'reason' => 'nullable|string|max:2000']);
         $service->transitionExpense($expense, $data, $request->user());
-        return back()->with('success', 'Expense status recorded with audit history.');
+        return back()->with('success', 'Expense deleted from active records. Audit history retained.');
     }
 
     public function attachment(Request $request, int $attachment)
@@ -137,22 +159,9 @@ class BudgetMonitoringController extends Controller
         $role = $this->role($request);
         $file = DB::table('financial_attachments as f')->join('project_expenses as e', 'e.expense_id', '=', 'f.expense_id')
             ->join('budget_projects as p', 'p.project_id', '=', 'e.project_id')->join('annual_budgets as a', 'a.annual_budget_id', '=', 'p.annual_budget_id')
-            ->where('f.attachment_id', $attachment)->when($role === 'sk_chairman', fn ($q) => $q->where('a.barangay_id', $request->user()->barangay_id))
+            ->where('f.attachment_id', $attachment)->where('a.recorded_term_id', app(\App\Services\FinancialTermScope::class)->current()->term_id ?? 0)->when($role === 'sk_chairman', fn ($q) => $q->where('a.barangay_id', $request->user()->barangay_id))
             ->select('f.*')->first();
-        abort_unless($file && $file->storage_disk === 'local' && str_starts_with($file->storage_path, 'financial/expenses/') && !str_contains($file->storage_path, '..'), 404);
-        abort_unless(Storage::disk('local')->exists($file->storage_path), 404);
-        abort_if(($file->budget_report_id ?? null) !== null || ($file->fund_release_id ?? null) !== null, 404);
-        $disk = Storage::disk('local');
-        $path = realpath($disk->path($file->storage_path));
-        $root = realpath($disk->path('financial/expenses'));
-        abort_unless($path && $root && str_starts_with(str_replace('\\', '/', $path), rtrim(str_replace('\\', '/', $root), '/').'/'), 404);
-        $mime = (new \finfo(FILEINFO_MIME_TYPE))->file($path);
-        abort_unless(in_array($mime, ['image/jpeg', 'image/png', 'application/pdf'], true) && $mime === $file->mime_type, 415, 'Unsupported proof format.');
-        return response()->file($path, [
-            'Content-Type' => $mime, 'Cache-Control' => 'private, no-store, max-age=0, must-revalidate',
-            'Pragma' => 'no-cache', 'Expires' => '0', 'X-Content-Type-Options' => 'nosniff',
-            'Content-Security-Policy' => "frame-ancestors 'self'", 'Referrer-Policy' => 'no-referrer',
-        ])->setContentDisposition('inline', basename($file->original_name))->setPrivate();
+        return app(\App\Services\FinancialProofService::class)->response($file);
     }
 
     public function linkReport(Request $request, int $report, BudgetMonitoringService $service)
@@ -167,6 +176,6 @@ class BudgetMonitoringController extends Controller
     {
         abort_unless($this->role($request) === 'sk_president', 403);
         $service->publishSummary($budget, $request->user());
-        return back()->with('success', 'Verified financial summary snapshot authorized for public viewing.');
+        return back()->with('success', 'Annual allocation authorized for public viewing. Reported expenses update automatically.');
     }
 }

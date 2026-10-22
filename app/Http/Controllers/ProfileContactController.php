@@ -94,12 +94,8 @@ class ProfileContactController extends ProfileSettingsController
     protected function contactValue(Request $request,string $channel): string
     {
         if($channel==='email') return strtolower(trim($request->validateWithBag('contact',['email'=>['required','email','max:255']])['email']));
-        $phone=$request->validateWithBag('contact',['phone_number'=>['required','string','max:25']])['phone_number'];
-        $digits=preg_replace('/[\s()+-]/','',trim($phone));
-        if(preg_match('/^639\d{9}$/',$digits)) $digits='0'.substr($digits,2);
-        if(preg_match('/^9\d{9}$/',$digits)) $digits='0'.$digits;
-        if(!preg_match('/^09\d{9}$/',$digits)) $this->fail('Enter a valid Philippine mobile number (09XXXXXXXXX).');
-        return $digits;
+        $phone=$request->validateWithBag('contact',['phone_number'=>['bail', 'required','string','max:25', new \App\Rules\PhilippineMobileNumber()]])['phone_number'];
+        return str_starts_with($phone, '+63') ? '0'.substr($phone, 3) : $phone;
     }
 
     protected function ensureAvailable(string $channel,string $value): void

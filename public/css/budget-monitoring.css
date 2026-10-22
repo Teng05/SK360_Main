@@ -16,6 +16,8 @@
 .sk-web .budget-table{width:100%;border-collapse:collapse;text-align:left;font-size:13px}
 .sk-web .budget-table th{background:var(--sk-subtle);padding:13px 20px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--sk-muted);font-weight:800;white-space:nowrap}
 .sk-web .budget-table td{padding:18px 20px;border-top:1px solid var(--sk-border);vertical-align:middle}
+.sk-web .budget-dialog [hidden]{display:none!important}
+.sk-web .budget-table td{overflow-wrap:anywhere}
 .sk-web .budget-table tbody tr:hover{background:#fafbfc}
 .sk-web .budget-table .budget-money{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
 .sk-web .budget-description{max-width:330px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}

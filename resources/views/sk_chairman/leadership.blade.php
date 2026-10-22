@@ -92,11 +92,10 @@
                                 placeholder="Email"
                                 class="rounded-xl border px-3 py-2 text-sm">
 
-                            <input type="text"
+                            <input type="tel"
                                 name="councilors[{{ $index }}][phone]"
-                                value="{{ $councilor['phone'] ?? '' }}"
-                                placeholder="Phone"
-                                class="rounded-xl border px-3 py-2 text-sm">
+                                value="{{ $councilor['phone'] ?? '' }}" placeholder="09XXXXXXXXX or +639XXXXXXXXX"
+                                class="rounded-xl border px-3 py-2 text-sm" inputmode="tel" maxlength="13" pattern="(?:09[0-9]{9}|\+639[0-9]{9})" title="Enter 09XXXXXXXXX or +639XXXXXXXXX.">
                         </div>
                     </div>
                 @endforeach
@@ -169,10 +168,10 @@
 
             <div>
                 <label class="text-[10px] font-black text-gray-400 uppercase">Phone</label>
-                <input type="text"
+                <input type="tel"
                     name="secretary_phone"
                     value="{{ old('secretary_phone') }}"
-                    class="w-full border-b-2 border-gray-100 focus:border-blue-500 outline-none py-2 text-sm font-bold">
+                    class="w-full border-b-2 border-gray-100 focus:border-blue-500 outline-none py-2 text-sm font-bold" inputmode="tel" maxlength="13" pattern="(?:09[0-9]{9}|\+639[0-9]{9})" title="Enter 09XXXXXXXXX or +639XXXXXXXXX.">
             </div>
 
             <div class="rounded-xl bg-green-50 border border-green-100 px-4 py-3">
@@ -260,10 +259,10 @@
 
             <div>
                 <label class="text-[10px] font-black text-gray-400 uppercase">Phone</label>
-                <input type="text"
+                <input type="tel"
                     name="edit_secretary_phone"
                     value="{{ old('edit_secretary_phone',$secretary['phone']) }}"
-                    class="w-full border-b-2 border-gray-100 focus:border-blue-500 outline-none py-2 text-sm font-bold">
+                    class="w-full border-b-2 border-gray-100 focus:border-blue-500 outline-none py-2 text-sm font-bold" inputmode="tel" maxlength="13" pattern="(?:09[0-9]{9}|\+639[0-9]{9})" title="Enter 09XXXXXXXXX or +639XXXXXXXXX.">
             </div>
 
             <div class="rounded-xl bg-gray-50 border border-gray-100 px-4 py-3">
@@ -335,10 +334,10 @@
 
                 <div>
                     <label class="text-[10px] font-black text-gray-400 uppercase">Phone</label>
-                    <input type="text"
+                    <input type="tel"
                         name="treasurer_phone"
                         value="{{ old('treasurer_phone') }}"
-                        class="w-full border-b-2 border-gray-100 focus:border-yellow-500 outline-none py-2 text-sm font-bold">
+                        class="w-full border-b-2 border-gray-100 focus:border-yellow-500 outline-none py-2 text-sm font-bold" inputmode="tel" maxlength="13" pattern="(?:09[0-9]{9}|\+639[0-9]{9})" title="Enter 09XXXXXXXXX or +639XXXXXXXXX.">
                 </div>
             </div>
 
@@ -412,10 +411,10 @@
 
                 <div>
                     <label class="text-[10px] font-black text-gray-400 uppercase">Phone</label>
-                    <input type="text"
+                    <input type="tel"
                         name="edit_treasurer_phone"
                         value="{{ old('edit_treasurer_phone',$treasurer['phone']) }}"
-                        class="w-full border-b-2 border-gray-100 focus:border-yellow-500 outline-none py-2 text-sm font-bold">
+                        class="w-full border-b-2 border-gray-100 focus:border-yellow-500 outline-none py-2 text-sm font-bold" inputmode="tel" maxlength="13" pattern="(?:09[0-9]{9}|\+639[0-9]{9})" title="Enter 09XXXXXXXXX or +639XXXXXXXXX.">
                 </div>
             </div>
 
@@ -494,11 +493,11 @@
 
                 <div>
                     <label class="text-[10px] font-black text-gray-400 uppercase">Phone</label>
-                    <input type="text"
+                    <input type="tel"
                         id="edit_councilor_phone"
                         name="edit_councilor_phone"
                         value="{{ old('edit_councilor_phone') }}"
-                        class="w-full border-b-2 border-gray-100 focus:border-red-500 outline-none py-2 text-sm font-bold">
+                        class="w-full border-b-2 border-gray-100 focus:border-red-500 outline-none py-2 text-sm font-bold" inputmode="tel" maxlength="13" pattern="(?:09[0-9]{9}|\+639[0-9]{9})" title="Enter 09XXXXXXXXX or +639XXXXXXXXX.">
                 </div>
             </div>
 

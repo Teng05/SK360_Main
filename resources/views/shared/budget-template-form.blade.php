@@ -105,7 +105,6 @@
             <input type="hidden" name="reporting_year" value="{{ $reportingYear }}">
             <input type="hidden" name="reporting_month" value="{{ $reportingMonth }}">
             <input type="hidden" name="reporting_quarter" value="{{ $reportingQuarter }}">
-            <input type="hidden" name="actual_expenditure" value="{{ old('actual_expenditure', $actualExpenditure ?? '') }}">
 
 
             @if ($reportType === 'monthly')

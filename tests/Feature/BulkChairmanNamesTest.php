@@ -85,4 +85,23 @@ class BulkChairmanNamesTest extends TestCase
             ->assertSessionHasErrors(['officials'], null, 'bulkAdd');
         $this->assertDatabaseCount('users', 1);
     }
+
+    public function test_bulk_invalid_phone_is_rejected_without_creating_any_accounts(): void
+    {
+        $this->post(route('sk_pres.user-management.store-bulk-officials'), ['officials'=>[
+            ['first_name'=>'Juan', 'last_name'=>'Cruz', 'email'=>'juan@example.test', 'phone_number'=>'08123456789', 'barangay_id'=>1],
+        ]])->assertSessionHasErrors(['officials.0.phone_number'], null, 'bulkAdd');
+        $this->assertDatabaseCount('users', 0);
+        $this->assertDatabaseCount('official_terms', 0);
+    }
+
+    public function test_bulk_accepts_both_philippine_mobile_formats(): void
+    {
+        $this->post(route('sk_pres.user-management.store-bulk-officials'), ['officials'=>[
+            ['first_name'=>'Juan', 'last_name'=>'Cruz', 'email'=>'juan@example.test', 'phone_number'=>'09123456789', 'barangay_id'=>1],
+            ['first_name'=>'Maria', 'last_name'=>'Reyes', 'email'=>'maria@example.test', 'phone_number'=>'+639987654321', 'barangay_id'=>2],
+        ]])->assertSessionHasNoErrors();
+        $this->assertDatabaseHas('users', ['email'=>'juan@example.test', 'phone_number'=>'09123456789']);
+        $this->assertDatabaseHas('users', ['email'=>'maria@example.test', 'phone_number'=>'+639987654321']);
+    }
 }

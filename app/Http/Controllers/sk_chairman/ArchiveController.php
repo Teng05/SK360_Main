@@ -26,7 +26,20 @@ class ArchiveController extends Controller
         $administrationTerms=$this->administrationTerms();
         $filters=$this->filters($request,$administrationTerms);
         $allDocuments=$this->documents($barangayId,$filters['term_id']);
-        $documents=$this->applyFilters($allDocuments,$filters);
+        $financialArchives = app(\App\Services\FinancialArchiveService::class)->records($user, $filters);
+        $financialYears = app(\App\Services\FinancialArchiveService::class)->records($user)->pluck('fiscal_year');
+        $financialDocuments = $financialArchives->map(fn($record) => (object)[
+            'source_type'=>'financial_record', 'source_id'=>$record->annual_budget_id,
+            'title'=>'Financial Records - FY '.$record->fiscal_year, 'category'=>'Budget',
+            'type_key'=>'budget', 'administration_label'=>$record->start_year.'-'.$record->end_year,
+            'badge'=>'FINANCIAL RECORD',
+            'owner'=>$record->barangay_name, 'size'=>'Read-only record', 'icon'=>'&#128176;',
+            'formatted_date'=>$record->created_at ? date('Y-m-d',strtotime($record->created_at)) : 'N/A',
+            'document_date'=>$record->created_at ?? '', 'document_year'=>(string)$record->fiscal_year,
+            'proof_links'=>app(\App\Services\FinancialArchiveService::class)->proofLinks($user,$record->annual_budget_id),
+            'downloadable'=>false, 'view_url'=>route('sk_chairman.archive.finances',$record->annual_budget_id),
+        ]);
+        $documents=$this->applyFilters($allDocuments,$filters)->merge($financialDocuments)->sortByDesc('document_date')->values();
 
         return view('sk_chairman.archive',[
             'fullName'=>$fullName,
@@ -34,9 +47,10 @@ class ArchiveController extends Controller
             'menuItems'=>$this->menuItems(),
             'currentUrl'=>url()->current(),
             'archiveCards'=>$this->archiveCards($barangayId,$filters['term_id']),
+            'financialArchives'=>$financialArchives,
             'documents'=>$documents,
             'documentCount'=>$documents->count(),
-            'filterYears'=>$this->filterYears($allDocuments),
+            'filterYears'=>$this->filterYears($allDocuments)->merge($financialYears)->unique()->sortDesc()->values(),
             'typeOptions'=>$this->typeOptions(),
             'administrationTerms'=>$administrationTerms,
             'filters'=>$filters,
@@ -191,6 +205,7 @@ class ArchiveController extends Controller
                 );
 
                 $row->downloadable=$this->isDownloadable($row);
+                $row->viewable=$this->isViewable($row);
 
                 return $row;
             });
@@ -214,6 +229,31 @@ class ArchiveController extends Controller
         }
 
         return $this->downloadDocument($document);
+    }
+
+    public function preview(string $sourceType, int $sourceId)
+    {
+        // Reuse the existing completed-term and role/barangay authorization.
+        $response = $this->download($sourceType, $sourceId);
+        if ($response instanceof \Symfony\Component\HttpFoundation\BinaryFileResponse) {
+            $mime = (new \finfo(FILEINFO_MIME_TYPE))->file($response->getFile()->getPathname());
+            abort_unless(in_array($mime, ['application/pdf','image/jpeg','image/png','image/gif','image/webp','text/plain'], true), 415, 'Preview is unavailable for this format. Use Download instead.');
+            $response->headers->set('Content-Type', $mime);
+            $response->setPrivate();
+        }
+        if (str_starts_with((string)$response->headers->get('Content-Type'), 'application/pdf') || $response instanceof \Symfony\Component\HttpFoundation\BinaryFileResponse) {
+            $response->headers->set('Content-Disposition', preg_replace('/^attachment/i', 'inline', $response->headers->get('Content-Disposition', 'inline')));
+            $response->headers->set('X-Content-Type-Options', 'nosniff');
+            $response->headers->set('Cache-Control', 'private, no-store');
+        }
+        return $response;
+    }
+
+    protected function isViewable(object $document): bool
+    {
+        $path = $this->firstPublicFilePath([$document->file_path ?? null, $document->generated_path ?? null]);
+        if ($path) return in_array((new \finfo(FILEINFO_MIME_TYPE))->file($path), ['application/pdf','image/jpeg','image/png','image/gif','image/webp','text/plain'], true);
+        return $this->isDownloadable($document);
     }
 
     public function bulkDownload(Request $request)
@@ -253,6 +293,7 @@ class ArchiveController extends Controller
     {
         $year=(string)$request->query('year','');
         $type=(string)$request->query('type','');
+        if($type==='finance') $type='budget';
         $termId=(int)$request->query('term_id',0);
 
         if($termId<=0 || !$administrationTerms->contains('term_id',$termId)){
@@ -535,7 +576,7 @@ class ArchiveController extends Controller
         if(
             !$publicRoot
             || !$realPath
-            || !Str::startsWith($realPath,$publicRoot)
+            || !Str::startsWith(str_replace('\\','/',$realPath),rtrim(str_replace('\\','/',$publicRoot),'/').'/')
             || !File::isFile($realPath)
         ){
             return null;
@@ -592,7 +633,14 @@ class ArchiveController extends Controller
     protected function administrationTerms(): Collection
     {
         return DB::table('administration_terms')
-            ->where('status','completed')
+            ->where(function($terms){
+                $terms->where('status','completed')->orWhereExists(function($deleted){
+                    $deleted->selectRaw('1')->from('annual_budgets as fa')->join('budget_projects as fp','fp.annual_budget_id','=','fa.annual_budget_id')
+                        ->join('project_expenses as fe','fe.project_id','=','fp.project_id')
+                        ->whereColumn('fa.recorded_term_id','administration_terms.term_id')->whereIn('fe.status',['cancelled','voided'])
+                        ->when(auth()->user()->role==='sk_chairman',fn($q)=>$q->where('fa.barangay_id',auth()->user()->barangay_id));
+                });
+            })
             ->orderByDesc('start_year')
             ->orderByDesc('term_id')
             ->get([

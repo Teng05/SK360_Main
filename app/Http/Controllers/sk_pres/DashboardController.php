@@ -232,6 +232,10 @@ class DashboardController extends Controller
             return collect([now()->year]);
         }
 
+        if (Schema::hasTable('annual_budgets')) {
+            $years = $years->merge(DB::table('annual_budgets')->where('recorded_term_id', $currentTermId)->distinct()->pluck('fiscal_year'));
+        }
+
         if (Schema::hasTable('submission_slots')) {
             if (Schema::hasColumn('submission_slots', 'fiscal_year')) {
                 $years = $years->merge(
@@ -554,214 +558,37 @@ class DashboardController extends Controller
         ];
     }
 
-    protected function annualBudgetByBarangayChartData(
-        ?int $year = null,
-        ?int $barangayId = null
-    ): array {
-        if (
-            !Schema::hasTable('budget_reports') ||
-            !Schema::hasTable('barangays') ||
-            !Schema::hasColumn('budget_reports', 'budget_category') ||
-            !Schema::hasColumn('budget_reports', 'total_amount')
-        ) {
-            return [
-                'labels' => ['No annual budget data'],
-                'values' => [0],
-                'year' => $year ?: now()->year,
-            ];
-        }
-
-        $currentTermId = $this->currentTermId();
-
-        if (!$currentTermId) {
-            return [
-                'labels' => ['No annual budget data'],
-                'values' => [0],
-                'year' => $year ?: now()->year,
-            ];
-        }
-
-        if (!$year) {
-            $year = DB::table('budget_reports')
-                ->where('term_id', $currentTermId)
-                ->where('budget_category', 'annual_budget')
-                ->whereIn('status', ['submitted', 'recorded', 'archived'])
-                ->whereNotNull('fiscal_year')
-                ->max('fiscal_year');
-
-            $year = $year ?: now()->year;
-        }
-
-        $latestIdsQuery = DB::table('budget_reports')
-            ->selectRaw('MAX(budget_report_id) as budget_report_id')
-            ->where('term_id', $currentTermId)
-            ->where('budget_category', 'annual_budget')
-            ->where('fiscal_year', $year)
-            ->whereIn('status', ['submitted', 'recorded', 'archived']);
-
-        if ($barangayId) {
-            $latestIdsQuery->where('barangay_id', $barangayId);
-        }
-
-        $latestIds = $latestIdsQuery
-            ->groupBy('barangay_id')
-            ->pluck('budget_report_id');
-
-        if ($latestIds->isEmpty()) {
-            return [
-                'labels' => ['No annual budget data'],
-                'values' => [0],
-                'year' => $year,
-            ];
-        }
-
-        $rows = DB::table('budget_reports as br')
-            ->join('barangays as b', 'b.barangay_id', '=', 'br.barangay_id')
-            ->where('br.term_id', $currentTermId)
-            ->whereIn('br.budget_report_id', $latestIds)
-            ->where('br.total_amount', '>', 0)
-            ->orderBy('b.barangay_name')
-            ->get([
-                'b.barangay_name',
-                'br.total_amount',
-            ]);
-
-        if ($rows->isEmpty()) {
-            return [
-                'labels' => ['No annual budget data'],
-                'values' => [0],
-                'year' => $year,
-            ];
-        }
-
-        return [
-            'labels' => $rows->pluck('barangay_name')->all(),
-            'values' => $rows
-                ->pluck('total_amount')
-                ->map(fn ($amount) => (float) $amount)
-                ->all(),
-            'year' => $year,
-        ];
+    protected function financialChartData(?int $year = null, ?int $barangayId = null, bool $utilization = false): array
+    {
+        $emptyLabel = $utilization ? 'No utilization data' : 'No annual budget data';
+        $termId = $this->currentTermId();
+        if (!$termId || !Schema::hasTable('annual_budgets')) return ['labels'=>[$emptyLabel], 'values'=>[0], 'year'=>$year ?: now()->year];
+        $query = DB::table('annual_budgets as a')->join('barangays as b', 'b.barangay_id', '=', 'a.barangay_id')
+            ->where('a.recorded_term_id', $termId)->where('a.status', 'verified')
+            ->when($barangayId, fn($q)=>$q->where('a.barangay_id', $barangayId));
+        $year = $year ?: ((clone $query)->max('a.fiscal_year') ?: now()->year);
+        $service = app(\App\Services\BudgetMonitoringService::class);
+        $rows = (clone $query)->where('a.fiscal_year', $year)->orderBy('b.barangay_name')->select('a.*', 'b.barangay_name')->get()
+            ->map(function($budget) use($service, $utilization) {
+                if (!$utilization) return ['name'=>$budget->barangay_name,'value'=>(float)$service->allotted($budget)];
+                $summary = $service->summary($budget);
+                $allotted = \App\Services\BudgetMonitoringService::cents((string)$summary['allotted']);
+                if ($allotted <= 0) return null;
+                $expenses = \App\Services\BudgetMonitoringService::cents((string)$summary['expenses']);
+                return ['name'=>$budget->barangay_name,'value'=>round($expenses / $allotted * 100, 2)];
+            })->filter()->values();
+        return ['labels'=>$rows->isEmpty() ? [$emptyLabel] : $rows->pluck('name')->all(),
+            'values'=>$rows->isEmpty() ? [0] : $rows->pluck('value')->all(), 'year'=>(int)$year];
     }
 
-    protected function budgetUtilizationChartData(
-        ?int $year = null,
-        ?int $barangayId = null
-    ): array {
-        if (
-            !Schema::hasTable('budget_reports') ||
-            !Schema::hasTable('barangays') ||
-            !Schema::hasColumn('budget_reports', 'budget_category') ||
-            !Schema::hasColumn('budget_reports', 'actual_expenditure')
-        ) {
-            return [
-                'labels' => ['No utilization data'],
-                'values' => [0],
-                'year' => $year ?: now()->year,
-            ];
-        }
+    protected function annualBudgetByBarangayChartData(?int $year = null, ?int $barangayId = null): array
+    {
+        return $this->financialChartData($year, $barangayId);
+    }
 
-        $currentTermId = $this->currentTermId();
-
-        if (!$currentTermId) {
-            return [
-                'labels' => ['No utilization data'],
-                'values' => [0],
-                'year' => $year ?: now()->year,
-            ];
-        }
-
-        if (!$year) {
-            $year = DB::table('budget_reports')
-                ->where('term_id', $currentTermId)
-                ->where('budget_category', 'annual_budget')
-                ->whereIn('status', ['submitted', 'recorded', 'archived'])
-                ->whereNotNull('fiscal_year')
-                ->max('fiscal_year');
-
-            $year = $year ?: now()->year;
-        }
-
-        $annualBudgetQuery = DB::table('budget_reports')
-            ->where('term_id', $currentTermId)
-            ->where('budget_category', 'annual_budget')
-            ->where('fiscal_year', $year)
-            ->whereIn('status', ['submitted', 'recorded', 'archived'])
-            ->where('total_amount', '>', 0);
-
-        $annualCoaQuery = DB::table('budget_reports')
-            ->where('term_id', $currentTermId)
-            ->where('budget_category', 'coa_report')
-            ->where('budget_period_type', 'annual')
-            ->where('fiscal_year', $year)
-            ->whereIn('status', ['submitted', 'recorded', 'archived'])
-            ->whereNotNull('actual_expenditure');
-
-        if ($barangayId) {
-            $annualBudgetQuery->where('barangay_id', $barangayId);
-            $annualCoaQuery->where('barangay_id', $barangayId);
-        }
-
-        $annualBudgets = $annualBudgetQuery
-            ->orderByDesc('budget_report_id')
-            ->get()
-            ->unique('barangay_id')
-            ->keyBy('barangay_id');
-
-        $annualCoa = $annualCoaQuery
-            ->orderByDesc('budget_report_id')
-            ->get()
-            ->unique('barangay_id')
-            ->keyBy('barangay_id');
-
-        $barangayQuery = DB::table('barangays')
-            ->orderBy('barangay_name');
-
-        if ($barangayId) {
-            $barangayQuery->where('barangay_id', $barangayId);
-        }
-
-        $rows = $barangayQuery
-            ->get(['barangay_id', 'barangay_name'])
-            ->map(function ($barangay) use ($annualBudgets, $annualCoa) {
-                $budget = $annualBudgets->get($barangay->barangay_id);
-                $coa = $annualCoa->get($barangay->barangay_id);
-
-                if (!$budget || !$coa) {
-                    return null;
-                }
-
-                $annualBudget = (float) $budget->total_amount;
-                $actualExpenditure = (float) $coa->actual_expenditure;
-
-                if ($annualBudget <= 0) {
-                    return null;
-                }
-
-                return [
-                    'name' => $barangay->barangay_name,
-                    'utilization' => round(
-                        ($actualExpenditure / $annualBudget) * 100,
-                        2
-                    ),
-                ];
-            })
-            ->filter()
-            ->values();
-
-        if ($rows->isEmpty()) {
-            return [
-                'labels' => ['No utilization data'],
-                'values' => [0],
-                'year' => $year,
-            ];
-        }
-
-        return [
-            'labels' => $rows->pluck('name')->all(),
-            'values' => $rows->pluck('utilization')->all(),
-            'year' => $year,
-        ];
+    protected function budgetUtilizationChartData(?int $year = null, ?int $barangayId = null): array
+    {
+        return $this->financialChartData($year, $barangayId, true);
     }
 
     protected function barangaySubmissionChartData(

@@ -962,11 +962,10 @@
                     <label class="mb-1 block text-[10px] font-black uppercase text-gray-500">
                         Phone Number
                     </label>
-                    <input type="text"
+                    <input type="tel"
                         name="new_president_phone"
                         value="{{ old('new_president_phone') }}"
-                        class="w-full rounded-xl border border-blue-100 bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
-                        placeholder="09xxxxxxxxx (Optional)">
+                        class="w-full rounded-xl border border-blue-100 bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300" placeholder="09XXXXXXXXX or +639XXXXXXXXX" inputmode="tel" maxlength="13" pattern="(?:09[0-9]{9}|\+639[0-9]{9})" title="Enter 09XXXXXXXXX or +639XXXXXXXXX.">
                 </div>
             </div>
             <div class="rounded-xl border border-yellow-200 bg-yellow-50 px-4 py-3">
@@ -1119,11 +1118,10 @@
                 <label class="mb-1.5 block text-xs font-black uppercase text-gray-500">
                     Phone Number
                 </label>
-                <input type="text"
+                <input type="tel"
                     id="edit_phone_number"
                     name="phone_number"
-                    class="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-300"
-                    placeholder="09xxxxxxxxx">
+                    class="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-300" placeholder="09XXXXXXXXX or +639XXXXXXXXX" inputmode="tel" maxlength="13" pattern="(?:09[0-9]{9}|\+639[0-9]{9})" title="Enter 09XXXXXXXXX or +639XXXXXXXXX.">
             </div>
             <div class="pt-2">
                 <button type="submit"
@@ -1354,11 +1352,10 @@
                                 <label class="mb-1.5 block text-xs font-black uppercase text-gray-500">
                                     Phone Number
                                 </label>
-                                <input type="text"
+                                <input type="tel"
                                     name="officials[{{ $index }}][phone_number]"
                                     value="{{ $official['phone_number'] ?? '' }}"
-                                    class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm"
-                                    placeholder="09xxxxxxxxx (Optional)">
+                                    class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm" placeholder="09XXXXXXXXX or +639XXXXXXXXX" inputmode="tel" maxlength="13" pattern="(?:09[0-9]{9}|\+639[0-9]{9})" title="Enter 09XXXXXXXXX or +639XXXXXXXXX.">
                             </div>
                             <div>
                                 <label class="mb-1.5 block text-xs font-black uppercase text-gray-500">
