@@ -210,7 +210,7 @@ class BudgetMonitoringService
                 'published_by' => null, 'published_at' => null,
             ]);
             $this->event('project_expense', $id, 'expense_'.$data['status'], $actor, $before,
-                $this->expenseSnapshot(DB::table('project_expenses')->where('expense_id', $id)->first()), $data['reason']);
+                $this->expenseSnapshot(DB::table('project_expenses')->where('expense_id', $id)->first()), $data['reason'] ?? null);
         });
     }
 

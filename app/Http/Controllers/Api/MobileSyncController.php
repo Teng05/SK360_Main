@@ -491,6 +491,54 @@ class MobileSyncController extends Controller
         $expenseId = $service->submitExpense($validated, $request->file('proof'), $request->user());
         return response()->json(['message' => 'Expense submitted.', 'expense_id' => $expenseId], 201);
     }
+    public function storeFinancialAllocation(Request $request, BudgetMonitoringService $service): JsonResponse
+    {
+        abort_unless($request->user()->role === 'sk_president', 403);
+        $validated = $request->validate([
+            'barangay_id' => ['required', 'integer', 'exists:barangays,barangay_id'],
+            'fiscal_year' => ['required', 'integer', 'between:2000,2100'],
+            'amount' => ['required', 'regex:/^\d{1,13}(\.\d{1,2})?$/', 'numeric', 'min:0.01'],
+            'approved_on' => ['nullable', 'date_format:Y-m-d'],
+        ]);
+        $validated['approved_on'] ??= now()->toDateString();
+        // The mobile allocation form intentionally omits session references.
+        $validated['approval_reference'] = 'Recorded via SK360 mobile';
+        $allocationId = $service->allocate($validated, $request->user());
+
+        return response()->json([
+            'message' => 'Annual allocation recorded.',
+            'annual_budget_id' => $allocationId,
+        ], 201);
+    }
+
+    public function storeFinancialProject(Request $request, int $budget, BudgetMonitoringService $service): JsonResponse
+    {
+        $user = $request->user();
+        abort_unless($user->role === 'sk_chairman' && $user->barangay_id, 403);
+        // Explicitly scope the budget to the signed-in chairman's barangay before writing.
+        $annualBudget = DB::table('annual_budgets')
+            ->where('annual_budget_id', $budget)
+            ->where('barangay_id', $user->barangay_id)
+            ->where('status', 'verified')
+            ->exists();
+        abort_unless($annualBudget, 404);
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'category' => ['required', 'string', 'max:100'],
+        ]);
+        $projectId = $service->createProject($budget, $validated, $user);
+
+        return response()->json(['message' => 'Project/category recorded.', 'project_id' => $projectId], 201);
+    }
+
+    public function publishFinancialSummary(Request $request, int $budget, BudgetMonitoringService $service): JsonResponse
+    {
+        abort_unless($request->user()->role === 'sk_president', 403);
+        $service->publishSummary($budget, $request->user());
+
+        return response()->json(['message' => 'Financial summary published.']);
+    }
+
     public function correctFinancialAllocation(Request $request, int $budget, BudgetMonitoringService $service): JsonResponse
     {
         abort_unless($request->user()->role === 'sk_president', 403);
@@ -508,13 +556,16 @@ class MobileSyncController extends Controller
         $user = $request->user();
         abort_unless(in_array($user->role, ['sk_president', 'sk_chairman'], true), 403);
         abort_unless(Schema::hasTable('financial_attachments'), 404);
+        $attachmentId = $request->integer('attachment_id') ?: null;
 
         $proof = DB::table('financial_attachments as f')
             ->join('project_expenses as e', 'e.expense_id', '=', 'f.expense_id')
             ->join('budget_projects as p', 'p.project_id', '=', 'e.project_id')
             ->join('annual_budgets as a', 'a.annual_budget_id', '=', 'p.annual_budget_id')
             ->where('e.expense_id', $expense)
-            ->where('f.owner_revision_no', DB::raw('e.revision_no'))
+            ->when($attachmentId,
+                fn ($query) => $query->where('f.attachment_id', $attachmentId),
+                fn ($query) => $query->where('f.owner_revision_no', DB::raw('e.revision_no')))
             ->where('f.document_kind', 'expense_proof')
             ->when($user->role === 'sk_chairman', fn ($query) => $query->where('a.barangay_id', $user->barangay_id))
             ->orderByDesc('f.attachment_id')
@@ -547,13 +598,62 @@ class MobileSyncController extends Controller
         ])->setContentDisposition('inline', basename($proof->original_name))->setPrivate();
     }
 
+    public function mobileFinancialExpenseHistory(Request $request, int $expense): JsonResponse
+    {
+        $user = $request->user();
+        abort_unless(in_array($user->role, ['sk_president', 'sk_chairman'], true), 403);
+        $record = DB::table('project_expenses as e')
+            ->join('budget_projects as p', 'p.project_id', '=', 'e.project_id')
+            ->join('annual_budgets as a', 'a.annual_budget_id', '=', 'p.annual_budget_id')
+            ->where('e.expense_id', $expense)
+            ->when($user->role === 'sk_chairman', fn ($query) => $query->where('a.barangay_id', $user->barangay_id))
+            ->exists();
+        abort_unless($record, 404);
+
+        $proofs = Schema::hasTable('financial_attachments')
+            ? DB::table('financial_attachments')
+                ->where('expense_id', $expense)
+                ->where('document_kind', 'expense_proof')
+                ->orderByDesc('owner_revision_no')
+                ->orderByDesc('attachment_id')
+                ->get(['attachment_id', 'owner_revision_no', 'original_name', 'mime_type', 'created_at'])
+            : collect();
+        $events = Schema::hasTable('financial_events')
+            ? DB::table('financial_events')
+                ->where('subject_type', 'project_expense')
+                ->where('subject_id', $expense)
+                ->orderByDesc('sequence_no')
+                ->get(['event_type', 'sequence_no', 'remarks', 'created_at'])
+            : collect();
+
+        return response()->json(['proofs' => $proofs, 'events' => $events]);
+    }
+
+    public function reviewFinancialExpense(Request $request, int $expense, BudgetMonitoringService $service): JsonResponse
+    {
+        abort_unless($request->user()->role === 'sk_president', 403);
+        $data = $request->validate([
+            'status' => ['required', 'in:verified,needs_revision'],
+            'revision_no' => ['required', 'integer', 'min:1'],
+            'reason' => ['required_if:status,needs_revision', 'nullable', 'string', 'max:2000'],
+        ]);
+        $service->transitionExpense($expense, $data, $request->user());
+
+        return response()->json([
+            'message' => 'Expense review saved.',
+            'expense_id' => $expense,
+            'status' => $data['status'],
+            'revision_no' => $data['revision_no'],
+        ]);
+    }
+
     private function mobileFinancialRecords(User $user): array
     {
         if (!in_array($user->role, ['sk_chairman', 'sk_president'], true)
             || !Schema::hasTable('annual_budgets')
             || !Schema::hasTable('budget_projects')
             || !Schema::hasTable('project_expenses')) {
-            return ['budget_allocations' => [], 'budget_expenses' => []];
+            return ['budget_allocations' => [], 'budget_expenses' => [], 'budget_public_summaries' => []];
         }
 
         $allocations = DB::table('annual_budgets as a')
@@ -563,12 +663,13 @@ class MobileSyncController extends Controller
             ->get([
                 'a.annual_budget_id', 'a.barangay_id', 'b.barangay_name',
                 'a.fiscal_year', 'a.approved_amount', 'a.approved_amount as original_amount', 'a.status', 'a.revision_no',
-                'a.created_at', 'a.updated_at',
+                'a.published_at', 'a.published_by', 'a.created_at', 'a.updated_at',
             ]);
 
         $budgetService = app(BudgetMonitoringService::class);
         foreach ($allocations as $allocation) {
             $allocation->amount = $budgetService->allotted($allocation);
+            $allocation->last_authorized_at = $allocation->published_at;
         }
         $expenses = DB::table('project_expenses as e')
             ->join('budget_projects as p', 'p.project_id', '=', 'e.project_id')
@@ -598,7 +699,11 @@ class MobileSyncController extends Controller
             }
         }
 
-        return ['budget_allocations' => $allocations, 'budget_expenses' => $expenses];
+        return [
+            'budget_allocations' => $allocations,
+            'budget_expenses' => $expenses,
+            'budget_public_summaries' => $allocations,
+        ];
     }
     public function sync(Request $request): JsonResponse
     {

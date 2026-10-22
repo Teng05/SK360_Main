@@ -43,7 +43,12 @@ Route::prefix('mobile')->group(function(){
         Route::post('/leadership/chairman',[MobileSyncController::class,'storeChairmanAccount'])->middleware('throttle:3,10')->name('mobile.leadership.chairman.store');
 
         Route::post('/financial-expenses',[MobileSyncController::class,'storeFinancialExpense'])->name('mobile.financial-expenses.store');
+        Route::post('/financial-allocations',[MobileSyncController::class,'storeFinancialAllocation'])->name('mobile.financial-allocations.store');
+        Route::post('/financial-allocations/{budget}/projects',[MobileSyncController::class,'storeFinancialProject'])->whereNumber('budget')->name('mobile.financial-projects.store');
+        Route::post('/financial-allocations/{budget}/publish',[MobileSyncController::class,'publishFinancialSummary'])->whereNumber('budget')->name('mobile.financial-allocations.publish');
         Route::get('/financial-expenses/{expense}/proof',[MobileSyncController::class,'financialExpenseProof'])->whereNumber('expense')->name('mobile.financial-expenses.proof');
+        Route::get('/financial-expenses/{expense}/history',[MobileSyncController::class,'mobileFinancialExpenseHistory'])->whereNumber('expense')->name('mobile.financial-expenses.history');
+        Route::patch('/financial-expenses/{expense}/review',[MobileSyncController::class,'reviewFinancialExpense'])->whereNumber('expense')->name('mobile.financial-expenses.review');
         Route::patch('/financial-allocations/{budget}',[MobileSyncController::class,'correctFinancialAllocation'])->whereNumber('budget')->name('mobile.financial-allocations.correct');
         Route::post('/official-submissions',[MobileSyncController::class,'storeOfficialSubmission'])->name('mobile.official-submissions.store');
 
