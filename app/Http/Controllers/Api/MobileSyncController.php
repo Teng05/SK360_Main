@@ -21,6 +21,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
@@ -490,6 +491,62 @@ class MobileSyncController extends Controller
         $expenseId = $service->submitExpense($validated, $request->file('proof'), $request->user());
         return response()->json(['message' => 'Expense submitted.', 'expense_id' => $expenseId], 201);
     }
+    public function correctFinancialAllocation(Request $request, int $budget, BudgetMonitoringService $service): JsonResponse
+    {
+        abort_unless($request->user()->role === 'sk_president', 403);
+        $validated = $request->validate([
+            'amount' => ['required', 'regex:/^\\d{1,13}(\\.\\d{1,2})?$/', 'numeric', 'min:0.01'],
+            'revision_no' => ['required', 'integer', 'min:1'],
+            'reason' => ['required', 'string', 'max:2000'],
+        ]);
+        $service->correctAllocation($budget, $validated, $request->user());
+        return response()->json(['message' => 'Allocation corrected. Original history retained.']);
+    }
+
+    public function financialExpenseProof(Request $request, int $expense)
+    {
+        $user = $request->user();
+        abort_unless(in_array($user->role, ['sk_president', 'sk_chairman'], true), 403);
+        abort_unless(Schema::hasTable('financial_attachments'), 404);
+
+        $proof = DB::table('financial_attachments as f')
+            ->join('project_expenses as e', 'e.expense_id', '=', 'f.expense_id')
+            ->join('budget_projects as p', 'p.project_id', '=', 'e.project_id')
+            ->join('annual_budgets as a', 'a.annual_budget_id', '=', 'p.annual_budget_id')
+            ->where('e.expense_id', $expense)
+            ->where('f.owner_revision_no', DB::raw('e.revision_no'))
+            ->where('f.document_kind', 'expense_proof')
+            ->when($user->role === 'sk_chairman', fn ($query) => $query->where('a.barangay_id', $user->barangay_id))
+            ->orderByDesc('f.attachment_id')
+            ->select('f.*')
+            ->first();
+
+        abort_unless($proof && $proof->storage_disk === 'local'
+            && str_starts_with($proof->storage_path, 'financial/expenses/')
+            && !str_contains($proof->storage_path, '..'), 404);
+
+        $disk = Storage::disk('local');
+        abort_unless($disk->exists($proof->storage_path), 404);
+        $path = realpath($disk->path($proof->storage_path));
+        $root = realpath($disk->path('financial/expenses'));
+        abort_unless($path && $root
+            && str_starts_with(str_replace('\\', '/', $path), rtrim(str_replace('\\', '/', $root), '/').'/'), 404);
+
+        $mime = (new \finfo(FILEINFO_MIME_TYPE))->file($path);
+        abort_unless(in_array($mime, ['image/jpeg', 'image/png', 'application/pdf'], true)
+            && $mime === $proof->mime_type, 415, 'Unsupported proof format.');
+
+        return response()->file($path, [
+            'Content-Type' => $mime,
+            'Cache-Control' => 'private, no-store, max-age=0, must-revalidate',
+            'Pragma' => 'no-cache',
+            'Expires' => '0',
+            'X-Content-Type-Options' => 'nosniff',
+            'Content-Security-Policy' => "frame-ancestors 'self'",
+            'Referrer-Policy' => 'no-referrer',
+        ])->setContentDisposition('inline', basename($proof->original_name))->setPrivate();
+    }
+
     private function mobileFinancialRecords(User $user): array
     {
         if (!in_array($user->role, ['sk_chairman', 'sk_president'], true)
@@ -505,10 +562,14 @@ class MobileSyncController extends Controller
             ->orderByDesc('a.fiscal_year')
             ->get([
                 'a.annual_budget_id', 'a.barangay_id', 'b.barangay_name',
-                'a.fiscal_year', 'a.approved_amount as amount', 'a.status',
+                'a.fiscal_year', 'a.approved_amount as original_amount', 'a.status', 'a.revision_no',
                 'a.created_at', 'a.updated_at',
             ]);
 
+        $budgetService = app(BudgetMonitoringService::class);
+        foreach ($allocations as $allocation) {
+            $allocation->amount = $budgetService->allotted($allocation);
+        }
         $expenses = DB::table('project_expenses as e')
             ->join('budget_projects as p', 'p.project_id', '=', 'e.project_id')
             ->join('annual_budgets as a', 'a.annual_budget_id', '=', 'p.annual_budget_id')
@@ -522,6 +583,20 @@ class MobileSyncController extends Controller
                 'e.created_by', 'e.submitted_at', 'e.created_at',
                 'p.name as project_name', 'p.category as project_category',
             ]);
+
+        if (Schema::hasTable('financial_attachments')) {
+            foreach ($expenses as $expense) {
+                $proof = DB::table('financial_attachments')
+                    ->where('expense_id', $expense->expense_id)
+                    ->where('owner_revision_no', $expense->revision_no)
+                    ->where('document_kind', 'expense_proof')
+                    ->orderByDesc('attachment_id')
+                    ->first(['attachment_id', 'original_name', 'mime_type']);
+                $expense->proof_attachment_id = $proof?->attachment_id;
+                $expense->proof_name = $proof?->original_name;
+                $expense->proof_mime_type = $proof?->mime_type;
+            }
+        }
 
         return ['budget_allocations' => $allocations, 'budget_expenses' => $expenses];
     }

@@ -43,6 +43,8 @@ Route::prefix('mobile')->group(function(){
         Route::post('/leadership/chairman',[MobileSyncController::class,'storeChairmanAccount'])->middleware('throttle:3,10')->name('mobile.leadership.chairman.store');
 
         Route::post('/financial-expenses',[MobileSyncController::class,'storeFinancialExpense'])->name('mobile.financial-expenses.store');
+        Route::get('/financial-expenses/{expense}/proof',[MobileSyncController::class,'financialExpenseProof'])->whereNumber('expense')->name('mobile.financial-expenses.proof');
+        Route::patch('/financial-allocations/{budget}',[MobileSyncController::class,'correctFinancialAllocation'])->whereNumber('budget')->name('mobile.financial-allocations.correct');
         Route::post('/official-submissions',[MobileSyncController::class,'storeOfficialSubmission'])->name('mobile.official-submissions.store');
 
         Route::get('/submission-slots',[MobileSyncController::class,'submissionSlots'])->name('mobile.submission-slots.index');
