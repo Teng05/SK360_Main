@@ -18,6 +18,10 @@ class BulkChairmanNamesTest extends TestCase
         DB::purge('sqlite');
         $this->withoutMiddleware(\App\Http\Middleware\EnsureAccountIsActive::class);
         Mail::fake();
+        // DNS is simulated; these tests never depend on public DNS or real mailboxes.
+        $this->mock(\App\Services\EmailDomainService::class, function ($mock) {
+            $mock->shouldReceive('acceptsMail')->andReturnUsing(fn ($domain) => $domain === 'example.test');
+        });
         Schema::create('administration_terms', function (Blueprint $t) {
             $t->increments('term_id'); $t->string('status'); $t->integer('start_year'); $t->integer('end_year');
         });
@@ -47,6 +51,7 @@ class BulkChairmanNamesTest extends TestCase
             ['first_name' => 'Maria Clara', 'last_name' => 'De Leon', 'email' => 'maria@example.test', 'phone_number' => '', 'barangay_id' => 2],
         ]])->assertSessionHasNoErrors()->assertRedirect(route('sk_pres.user-management'));
         $this->assertDatabaseHas('users', ['first_name' => 'Juan Miguel', 'last_name' => 'Dela Cruz', 'role' => 'sk_chairman']);
+        $this->assertDatabaseHas('users', ['email' => 'juan@example.test', 'is_verified' => false, 'status' => 'inactive']);
         $this->assertDatabaseHas('users', ['first_name' => 'Maria Clara', 'last_name' => 'De Leon']);
         $this->assertDatabaseCount('official_terms', 2);
     }
@@ -58,5 +63,26 @@ class BulkChairmanNamesTest extends TestCase
             ['first_name' => 'Maria', 'last_name' => '', 'email' => 'maria@example.test', 'barangay_id' => 2],
         ]])->assertSessionHasErrors(['officials.0.first_name', 'officials.1.last_name'], null, 'bulkAdd');
         $this->assertDatabaseCount('users', 0);
+    }
+
+    public function test_invalid_syntax_and_unverified_mail_domains_cannot_create_accounts(): void
+    {
+        foreach (['juan@', 'juan@@example.test', 'juan@example.invalid'] as $email) {
+            $this->post(route('sk_pres.user-management.store-bulk-officials'), ['officials' => [
+                ['first_name' => 'Juan', 'last_name' => 'Dela Cruz', 'email' => $email, 'barangay_id' => 1],
+            ]])->assertSessionHasErrors(['officials.0.email'], null, 'bulkAdd');
+        }
+        $this->assertDatabaseCount('users', 0);
+        Mail::assertNothingSent();
+    }
+
+    public function test_pending_account_email_cannot_be_registered_again(): void
+    {
+        $official = ['first_name' => 'Juan', 'last_name' => 'Dela Cruz', 'email' => 'juan@example.test', 'phone_number' => '', 'barangay_id' => 1];
+        $this->post(route('sk_pres.user-management.store-bulk-officials'), ['officials' => [$official]])->assertSessionHasNoErrors();
+        $official['barangay_id'] = 2;
+        $this->post(route('sk_pres.user-management.store-bulk-officials'), ['officials' => [$official]])
+            ->assertSessionHasErrors(['officials'], null, 'bulkAdd');
+        $this->assertDatabaseCount('users', 1);
     }
 }

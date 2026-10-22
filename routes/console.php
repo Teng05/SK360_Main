@@ -1,6 +1,7 @@
 <?php
 
 use App\Services\RankingPointsService;
+use App\Services\NotificationService;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
@@ -14,5 +15,13 @@ Schedule::call(function(){
 })
 ->name('record-missed-submissions')
 ->dailyAt('00:05')
+->timezone('Asia/Manila')
+->withoutOverlapping();
+
+Schedule::call(function(){
+    app(NotificationService::class)->notifyDeadlinesSoon();
+})
+->name('submission-deadline-reminders')
+->hourly()
 ->timezone('Asia/Manila')
 ->withoutOverlapping();

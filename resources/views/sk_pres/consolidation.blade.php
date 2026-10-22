@@ -292,7 +292,7 @@
                                                     class="bg-white border rounded-2xl p-5 transition-all duration-500 {{ $isFocused ? 'border-yellow-400 bg-yellow-50 ring-4 ring-yellow-200 shadow-lg' : 'border-gray-200' }}"
                                                 >
                                                     @if($isFocused)
-                                                        <div class="mb-4 flex items-center gap-2 rounded-xl border border-yellow-200 bg-yellow-100 px-4 py-3 text-sm font-semibold text-yellow-800">
+                                                        <div data-notification-focus-badge class="mb-4 flex items-center gap-2 rounded-xl border border-yellow-200 bg-yellow-100 px-4 py-3 text-sm font-semibold text-yellow-800">
                                                             @include('partials.ui.icon', ['icon'=>'bell','iconSize'=>15])
                                                             <span>This is the submission from the notification you opened.</span>
                                                         </div>
@@ -326,9 +326,6 @@
                                                         @endif
                                                     </div>
 
-                                                    @if($item->source_type === 'budget_report')
-                                                        <p class="text-sm my-3"><a class="text-red-800 underline" href="{{ route('sk_pres.finances', ['year' => $item->year, 'barangay_id' => $item->barangay_id]) }}#barangay-{{ $item->barangay_id }}">Review related expenses, private proofs and reconciliation status</a></p>
-                                                    @endif
                                                     @if($status==='approved')
                                                         <div class="rounded-xl bg-green-50 border border-green-100 p-4">
                                                             <p class="text-sm font-semibold text-green-700">Document Approved</p>
@@ -554,6 +551,16 @@ document.addEventListener('DOMContentLoaded',function(){
             block:'center'
         });
     },250);
+    setTimeout(()=>{
+        focusedSubmission.classList.remove('border-yellow-400','bg-yellow-50','ring-4','ring-yellow-200','shadow-lg');
+        focusedSubmission.classList.add('border-gray-200');
+        focusedSubmission.dataset.focusTarget='0';
+        focusedSubmission.querySelectorAll('[data-notification-focus-badge]').forEach(badge=>badge.remove());
+        const url=new URL(window.location.href);
+        url.searchParams.delete('focus_type');
+        url.searchParams.delete('focus_id');
+        window.history.replaceState(window.history.state,'',url);
+    },10000);
 });
 </script>
 @endpush

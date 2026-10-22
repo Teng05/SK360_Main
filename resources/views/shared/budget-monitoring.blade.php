@@ -19,7 +19,7 @@
 <div class="flex h-screen overflow-hidden bg-gray-100 budget-monitoring" data-budget-page data-reopen="{{ $errors->any() ? old('_dialog', '') : '' }}">
     @include('partials.app.sidebar')
     <div class="flex-1 flex flex-col overflow-hidden min-w-0">
-        @include('partials.app.topbar')
+        @include('partials.app.topbar', ['bindBell' => true, 'bindAccount' => true])
         <main class="flex-1 overflow-y-auto p-8">
             <div class="sk-page-head">
                 <div class="sk-page-head__text"><span class="sk-eyebrow"><span class="sk-dot"></span>Financial Management</span><h1 class="sk-page-title">{{ $isPresident ? 'Budget & Finance' : 'Budget' }}</h1><p class="sk-page-subtitle">{{ $isPresident ? 'Manage allotted budgets and monitor barangay expenditures.' : 'Manage your barangay budget, expenses, and financial submissions.' }}</p></div>

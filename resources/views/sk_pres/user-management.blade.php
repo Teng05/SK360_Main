@@ -296,7 +296,7 @@
                                                         </span>
                                                         @if($isPending)
                                                             <span class="rounded-full bg-yellow-100 text-yellow-700 px-2 py-0.5 text-[9px] font-bold uppercase">
-                                                                {{ $isReappointment ? 'Reappointment Pending' : 'Pending' }}
+                                                                {{ $isReappointment ? 'Reappointment Pending ? Email Setup Required' : 'Pending Email Verification' }}
                                                             </span>
                                                         @elseif($isCaretaker)
                                                             <span class="rounded-full bg-orange-100 text-orange-700 px-2 py-0.5 text-[9px] font-bold uppercase">
@@ -1062,7 +1062,7 @@
                     </select>
                     <p id="pendingStatusNote"
                         class="hidden mt-1 text-[10px] text-yellow-600">
-                        Pending officials are activated automatically after setting their password.
+                        Accounts remain inactive until the recipient opens the emailed setup link and sets their password.
                     </p>
                 </div>
             </div>
@@ -1243,7 +1243,7 @@
                     Add SK Chairmen
                 </h2>
                 <p class="text-xs text-gray-500">
-                    Create multiple SK Chairman accounts at once. Barangays with a current or pending Chairman are automatically excluded.
+                    Create multiple SK Chairman accounts at once. Accounts remain pending email verification until setup is completed. Barangays with a current or pending Chairman are automatically excluded.
                 </p>
             </div>
             <button id="closeBulkModal"
