@@ -562,7 +562,7 @@ class MobileSyncController extends Controller
             ->orderByDesc('a.fiscal_year')
             ->get([
                 'a.annual_budget_id', 'a.barangay_id', 'b.barangay_name',
-                'a.fiscal_year', 'a.approved_amount as original_amount', 'a.status', 'a.revision_no',
+                'a.fiscal_year', 'a.approved_amount', 'a.approved_amount as original_amount', 'a.status', 'a.revision_no',
                 'a.created_at', 'a.updated_at',
             ]);
 

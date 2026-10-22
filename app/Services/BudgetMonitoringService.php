@@ -6,6 +6,7 @@ use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Carbon\Carbon;
@@ -39,10 +40,13 @@ class BudgetMonitoringService
 
     public function allotted(object $budget): string
     {
+        $approvedAmount = $budget->approved_amount ?? $budget->original_amount ?? '0.00';
+        if (!Schema::hasTable('financial_events')) return (string) $approvedAmount;
+
         $event = DB::table('financial_events')->where('subject_type', 'annual_budget')
             ->where('subject_id', $budget->annual_budget_id)->where('event_type', 'allocation_corrected')
             ->orderByDesc('sequence_no')->first();
-        return $event ? (string) json_decode($event->after_snapshot, true, 512, JSON_THROW_ON_ERROR)['effective_amount'] : (string) $budget->approved_amount;
+        return $event ? (string) json_decode($event->after_snapshot, true, 512, JSON_THROW_ON_ERROR)['effective_amount'] : (string) $approvedAmount;
     }
 
     public function summary(object $budget): array
